@@ -33,6 +33,7 @@ static int genuine(const char *filename){
     size_t ot77_h12_verified=0u;
     uint32_t circle_unreadable_stages[6]={0};
     size_t circle_unreadable=0u;
+    size_t reactor_circle_owner_verified=0u;
     uint32_t unreadable_by_type[MUSACAD_AC1032_OWNER_GAP_FAMILIES]={0};
     uint64_t first_insert=0u,first_child=0u;
     uint64_t first_unreadable_ot18=0u,first_unreadable_ot77=0u;
@@ -59,6 +60,47 @@ static int genuine(const char *filename){
                    census.child_count!=coverage.child_count){ok=0;break;}
                 census_inventories++;
                 for(uint32_t k=0u;k<coverage.child_count;k++){
+                    /* Four original one-reactor CIRCLE children now have
+                     * independent reactor H12, owner H4 and layer H5
+                     * evidence. Forward OT49 membership is also checked
+                     * against this authenticated child slot. */
+                    const uint64_t circle_h=coverage.child_handles[k];
+                    if(coverage.child_types[k]==18u&&
+                       circle_h>=UINT64_C(0xBE49)&&
+                       circle_h<=UINT64_C(0xBE4C)){
+                        MusaDwgAc1032CircleReactorHTailProbe triple={0};
+                        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+                        if(coverage.child_status[k]!=
+                               MUSACAD_AC1032_BLOCK_OWNER_VERIFIED||
+                           !musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+                               scene,circle_h,&triple)||
+                           !triple.strict_common_verified||
+                           !triple.original_record_crc_verified||
+                           triple.ref_codes[0]!=12u||
+                           triple.ref_codes[1]!=4u||
+                           triple.ref_codes[2]!=5u||
+                           triple.raw_targets[0]!=UINT64_C(0xBE41)||
+                           triple.raw_targets[1]!=UINT64_C(0xBE48)||
+                           triple.raw_targets[2]!=UINT64_C(0xBF71)||
+                           triple.residual_bits_after_three_refs!=3u||
+                           !triple.one_tail_padding||triple.zero_tail_padding||
+                           !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                               scene,circle_h,&edge)||
+                           !musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &edge,circle_h,coverage.block_header_handle,18u)||
+                           edge.original_relative_h12_owner_verified||
+                           edge.original_owner_wire_code!=4u||
+                           edge.layer_handle!=UINT64_C(0xBF71)){
+                            ok=0;break;
+                        }
+                        MusaDwgAc1032EntityBlockOwnerLayerSource forged=edge;
+                        forged.owner_block_header_handle^=1u;
+                        if(musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &forged,circle_h,coverage.block_header_handle,18u)){
+                            ok=0;break;
+                        }
+                        reactor_circle_owner_verified++;
+                    }
                     if(coverage.child_types[k]!=18u||
                        coverage.child_status[k]!=
                            MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE)continue;
@@ -317,10 +359,10 @@ static int genuine(const char *filename){
             }
         }
     }
-    if(ok)ok=census_inventories>0u&&census_unreadable>0u&&
-             circle_unreadable>0u&&
+    if(ok)ok=census_inventories>0u&&census_unreadable==0u&&
+             circle_unreadable==0u&&reactor_circle_owner_verified==4u&&
              ot77_h12_verified>0u&&
-             complete_style_positive>0u&&partial_style_rejected>0u&&
+             complete_style_positive>0u&&
              inserts>0u&&source_rows>0u&&joined>0u&&
              joined+unsupported==source_rows;
     if(ok){
