@@ -19,3 +19,5 @@ legacy_path,new_path,source_commit,authors,rights_evidence,dependencies,classifi
 ,core/src/mc2_ownership.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/include/mc2_scene.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/src/mc2_scene.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_transform.h,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_transform.c,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
