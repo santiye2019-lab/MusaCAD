@@ -8,10 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 CODE_SUFFIXES = {".c", ".h", ".cc", ".cpp", ".hpp", ".cmake", ".gradle", ".kt", ".java", ".swift"}
 SOURCE_DIRS = ("core", "tests")
 FORBIDDEN = (
-    (re.compile(r"SPDX-License-Identifier:\\s*(?:GPL|AGPL|LGPL)(?:-|\\b)", re.I), "copyleft SPDX marker"),
+    (re.compile(r"SPDX-License-Identifier:\s*(?:GPL|AGPL|LGPL)(?:-|\b)", re.I), "copyleft SPDX marker"),
     (re.compile(r"GNU (?:AFFERO )?GENERAL PUBLIC LICENSE", re.I), "GPL/AGPL license declaration"),
-    (re.compile(r"\\b(?:libredwg|libre_dwg)\\b", re.I), "LibreDWG reference"),
-    (re.compile(r"#\\s*include\\s*[<\"]\\s*(?:\\.\\./|core/native/|musacad_)", re.I), "legacy include dependency"),
+    (re.compile(r"\b(?:libredwg|libre_dwg)\b", re.I), "LibreDWG reference"),
+    (re.compile(r"#\s*include\s*[<\"]\s*(?:\.\./|core/native/|musacad_)", re.I), "legacy include dependency"),
 )
 def main():
     failures = []
