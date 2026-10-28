@@ -73,6 +73,25 @@ static int genuine(const char *filename){
                        stage.owner_layer_visibility_and_paint_accepted){
                         ok=0;break;
                     }
+                    MusaDwgAc1032CirclePrefixProbe prefix={0};
+                    if(!musa_dwg_ac1032_scene_index_circle_prefix_probe(
+                           scene,child,&prefix)||
+                       prefix.indexed_handle!=child||
+                       prefix.fetch_stage!=stage.fetch_stage||
+                       prefix.owner_layer_visibility_and_paint_accepted||
+                       (prefix.fetch_stage<4u&&prefix.prefix_reason!=0u)||
+                       (prefix.fetch_stage==5u&&prefix.prefix_reason!=9u)){
+                        ok=0;break;
+                    }
+                    fprintf(stderr,"DIAG genuine OT18 H=%llx stage=%u "
+                        "prefix_reason=%u embedded=%llx mode=%u eed=%u "
+                        "preview=%u reactors=%u xdict_missing=%u ds=%u\\n",
+                        (unsigned long long)child,prefix.fetch_stage,
+                        prefix.prefix_reason,
+                        (unsigned long long)prefix.embedded_self_handle,
+                        prefix.entity_mode,prefix.eed_bytes,prefix.preview,
+                        prefix.reactor_count,prefix.xdictionary_missing,
+                        prefix.has_binary_data_store);
                     circle_unreadable_stages[stage.fetch_stage]++;
                     circle_unreadable++;
                     MusaDwgAc1032CircleDecodeStage untouched;
