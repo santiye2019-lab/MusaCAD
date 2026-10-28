@@ -1,5 +1,6 @@
 #include "mc2_spatial.h"
 #include <assert.h>
+#include <math.h>
 int main(void) {
     Mc2Bounds2 a={0,0,2,2},b={2,2,4,4},c={3,3,5,5},out;
     assert(mc2_bounds_intersects(&a,&b));
@@ -13,6 +14,15 @@ int main(void) {
     line.geometry.line.end=(Mc2Point2){2,2};
     assert(mc2_entity_world_bounds(&line,&t,&out));
     assert(out.min_x==8 && out.max_y==22);
+    Mc2Entity2 circle={0};
+    circle.kind=MC2_ENTITY_CIRCLE;
+    circle.geometry.circle.center=(Mc2Point2){0,0};
+    circle.geometry.circle.radius=2;
+    Mc2Affine2 shear={1,0,1,1,0,0};
+    assert(mc2_entity_world_bounds(&circle,&shear,&out));
+    assert(fabs(out.max_x-2.8284271247461903)<1e-12);
+    assert(fabs(out.min_x+2.8284271247461903)<1e-12);
+    assert(out.max_y==2 && out.min_y==-2);
     a.min_x=3;
     assert(!mc2_transform_bounds(&a,&t,&out));
     return 0;
