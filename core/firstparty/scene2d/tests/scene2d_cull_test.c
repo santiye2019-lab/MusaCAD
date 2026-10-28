@@ -108,7 +108,7 @@ int main(void) {
     const MusaScene2dBox far_away = {20000,20000,20001,20001};
     written = 77;
     assert(musa_scene2d_collect_visible(nodes,resolved,boxes,5,
-                                        far_away,NULL,0,&written));
+                                        far_away,untouched,0,&written));
     assert(written == 0);
     /* Empty input must reject invalid viewports and preserve the count. */
     written = 77;
