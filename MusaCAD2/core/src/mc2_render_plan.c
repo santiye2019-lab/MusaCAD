@@ -24,12 +24,9 @@ int mc2_render_plan_build(const Mc2SceneItem *items,size_t count,
         nodes[i].ownership.visible=items[i].own_visible;
         nodes[i].local_transform=local_transforms[i];
     }
-    int ok=1;
-    for (size_t i=0;i<count;++i) {
-        if (!mc2_block_world_transform(nodes,count,nodes[i].ownership.handle,&world[i])) {
-            ok=0;break;
-        }
-    }
+    /* Resolve every world transform once instead of repeatedly walking
+     * the ownership forest for each visible candidate. */
+    int ok=mc2_block_world_transforms_all(nodes,count,world);
     size_t produced=0;
     if (ok) ok=mc2_viewport_collect(items,count,world,layers,layer_count,
                                    viewport,temporary,capacity,&produced);
