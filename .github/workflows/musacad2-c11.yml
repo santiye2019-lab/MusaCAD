@@ -1,0 +1,30 @@
+name: MusaCAD2 isolated C11
+on:
+  push:
+    branches:
+      - feature/musacad2-isolated-20261028
+    paths:
+      - 'MusaCAD2/**'
+      - '.github/workflows/musacad2-c11.yml'
+  pull_request:
+    paths:
+      - 'MusaCAD2/**'
+      - '.github/workflows/musacad2-c11.yml'
+  workflow_dispatch:
+jobs:
+  portable-c11:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source boundary
+        run: python MusaCAD2/tests/check_source_boundary.py
+      - name: Configure standalone MusaCAD2
+        run: cmake -S MusaCAD2 -B build-musacad2 -DBUILD_TESTING=ON
+      - name: Build standalone MusaCAD2
+        run: cmake --build build-musacad2 --config Release
+      - name: Test standalone MusaCAD2
+        run: ctest --test-dir build-musacad2 -C Release --output-on-failure

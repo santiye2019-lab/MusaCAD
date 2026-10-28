@@ -1,0 +1,34 @@
+legacy_path,new_path,source_commit,authors,rights_evidence,dependencies,classification,decision,tests,status
+,core/include/mc2_bytes.h,,new independent implementation,independent development record; bounded numeric reader extensions 2026-10-28,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_bytes.c,,new independent implementation,independent development record; bounded numeric reader extensions 2026-10-28,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_dwg_header.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_dwg_header.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_dwg_sections.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_dwg_sections.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_bitstream.h,,new independent implementation,independently authored 2026-10-28 BS BL BD H and AC1032 object-type decoders from public DWG format descriptions; no third-party source copied; 2026-10-28 reserved OT selector and zero-type rejection with cursor rollback; unaligned 64-bit reader boundary regression 2026-10-28,standard C11,NEW_ORIGINAL,APPROVE,CI bitstream regression,PENDING
+,core/src/mc2_bitstream.c,,new independent implementation,independently authored 2026-10-28 BS BL BD H and AC1032 object-type decoders from public DWG format descriptions; no third-party source copied; 2026-10-28 reserved OT selector and zero-type rejection with cursor rollback; unaligned 64-bit reader boundary regression 2026-10-28,standard C11,NEW_ORIGINAL,APPROVE,CI bitstream regression,PENDING
+,core/include/mc2_section_map.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_section_map.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_dwg_document.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/src/mc2_dwg_document.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
+,core/include/mc2_geometry.h,,new independent implementation,independent development record; 2026-10-28 wrapped counterclockwise arc behavior,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_geometry.c,,new independent implementation,independent development record; 2026-10-28 wrapped counterclockwise arc geometry,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_layers.h,,new independent implementation,independent development record; 2026-10-28 direct validated layer appearance API,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_layers.c,,new independent implementation,independent development record; 2026-10-28 independent single-layer resolver,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_ownership.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_ownership.c,,new independent implementation,independent development record; 2026-10-28 indexed O(n log n) ownership graph validation,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_scene.h,,new independent implementation,independent development record; indexed scene traversal and inherited visibility 2026-10-28; 2026-10-28 nested BYBLOCK appearance behavior; 2026-10-28 indexed layer table lookup,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_scene.c,,new independent implementation,independent development record; indexed scene traversal and inherited visibility 2026-10-28; 2026-10-28 nested BYBLOCK appearance fix; 2026-10-28 sorted layer lookup and duplicate rejection,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_transform.h,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_transform.c,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_block_transform.h,,new independent implementation,independent development record; 2026-10-28 indexed batch world-transform API,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_block_transform.c,,new independent implementation,independent development record; 2026-10-28 independent indexed batch world-transform implementation,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_spatial.h,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_spatial.c,,new independent implementation,independent development record; 2026-10-28 wrapped affine arc extrema correction,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_viewport.h,,new independent implementation,independent development record; 2026-10-28 single-pass scene visibility and viewport collection,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_viewport.c,,new independent implementation,independent development record; 2026-10-28 single-pass scene visibility and viewport collection,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_render_plan.h,,new independent implementation,independent development record; 2026-10-28 indexed render plan behavior,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_render_plan.c,,new independent implementation,independent development record; 2026-10-28 indexed batch transform integration,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_polyline.h,,new independent implementation,independent development record; bulge arc analytic geometry and affine arc bounds 2026-10-28,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_polyline.c,,new independent implementation,independent development record; bulge arc analytic geometry and affine arc bounds 2026-10-28,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,tests/AC1032_VALIDATION_GAPS.md,,new independent documentation,independently authored validation plan 2026-10-28; no third-party code,plain text,NEW_ORIGINAL,APPROVE,review,PENDING

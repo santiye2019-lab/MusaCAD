@@ -1,0 +1,65 @@
+#include "mc2_geometry.h"
+#include <assert.h>
+#include <math.h>
+int main(void) {
+    Mc2Entity2 e = {0};
+    Mc2Bounds2 b;
+    e.kind = MC2_ENTITY_LINE;
+    e.color_rgb = 0x00ff00;
+    e.geometry.line.start = (Mc2Point2){-2,5};
+    e.geometry.line.end = (Mc2Point2){7,-3};
+    assert(mc2_entity_validate(&e));
+    assert(mc2_entity_bounds(&e,&b));
+    assert(b.min_x == -2 && b.min_y == -3 && b.max_x == 7 && b.max_y == 5);
+    e.kind = MC2_ENTITY_CIRCLE;
+    e.geometry.circle.center = (Mc2Point2){4,5};
+    e.geometry.circle.radius = 3;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(b.min_x == 1 && b.max_x == 7 && b.min_y == 2 && b.max_y == 8);
+    e.geometry.circle.radius = -1;
+    assert(!mc2_entity_validate(&e));
+    e.kind = MC2_ENTITY_ARC;
+    e.geometry.arc.center = (Mc2Point2){0,0};
+    e.geometry.arc.radius = 2;
+    e.geometry.arc.start_radians = 0;
+    e.geometry.arc.end_radians = 3.141592653589793;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x+2)<1e-12 && b.max_x == 2);
+    assert(b.min_y >= -1e-12 && fabs(b.max_y-2)<1e-12);
+    e.geometry.arc.end_radians = 1.5707963267948966;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(b.min_x >= -1e-12 && fabs(b.max_x-2)<1e-12);
+    assert(b.min_y >= -1e-12 && fabs(b.max_y-2)<1e-12);
+    /* Counterclockwise sweep from 270 to 90 degrees crosses zero. */
+    e.geometry.arc.start_radians = 4.71238898038469;
+    e.geometry.arc.end_radians = 1.5707963267948966;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x)<1e-12 && fabs(b.max_x-2)<1e-12);
+    assert(fabs(b.min_y+2)<1e-12 && fabs(b.max_y-2)<1e-12);
+    /* Wider arc includes the west, north and south cardinal extrema. */
+    e.geometry.arc.start_radians = 0.7853981633974483;
+    e.geometry.arc.end_radians = 5.497787143782138;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x+2)<1e-12 && fabs(b.min_y+2)<1e-12);
+    assert(fabs(b.max_y-2)<1e-12);
+    e.geometry.arc.end_radians = e.geometry.arc.start_radians;
+    assert(!mc2_entity_validate(&e));
+    e.geometry.arc.start_radians = 0;
+    e.geometry.arc.end_radians = 6.28318530717958647693;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(fabs(b.min_x+2)<1e-12 && fabs(b.max_x-2)<1e-12);
+    assert(fabs(b.min_y+2)<1e-12 && fabs(b.max_y-2)<1e-12);
+    e.geometry.arc.end_radians = NAN;
+    assert(!mc2_entity_validate(&e));
+    /* Finite endpoints may still overflow the bounds representation: no partial output. */
+    e.kind = MC2_ENTITY_LINE;
+    e.geometry.line.start = (Mc2Point2){1e308, 0};
+    e.geometry.line.end = (Mc2Point2){-1e308, 1};
+    assert(mc2_entity_bounds(&e, &b));
+    assert(b.min_x == -1e308 && b.max_x == 1e308);
+    e.geometry.line.start.x = INFINITY;
+    b = (Mc2Bounds2){11, 12, 13, 14};
+    assert(!mc2_entity_bounds(&e, &b));
+    assert(b.min_x == 11 && b.min_y == 12 && b.max_x == 13 && b.max_y == 14);
+    return 0;
+}
