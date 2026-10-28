@@ -32,6 +32,7 @@ static int genuine(const char *filename){
     size_t census_inventories=0u,census_unreadable=0u;
     uint32_t unreadable_by_type[MUSACAD_AC1032_OWNER_GAP_FAMILIES]={0};
     uint64_t first_insert=0u,first_child=0u;
+    uint64_t first_unreadable_ot18=0u,first_unreadable_ot77=0u;
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
         MusaDwgAc1032HandleEntry entry={0};
         uint16_t type=0u;
@@ -53,6 +54,10 @@ static int genuine(const char *filename){
                    census.block_header_handle!=coverage.block_header_handle||
                    census.child_count!=coverage.child_count){ok=0;break;}
                 census_inventories++;
+                if(census.unreadable[1]&&!first_unreadable_ot18)
+                    first_unreadable_ot18=census.first_unreadable_handle[1];
+                if(census.unreadable[5]&&!first_unreadable_ot77)
+                    first_unreadable_ot77=census.first_unreadable_handle[5];
                 for(unsigned t=0u;t<MUSACAD_AC1032_OWNER_GAP_FAMILIES;t++){
                     unreadable_by_type[t]+=census.unreadable[t];
                     census_unreadable+=census.unreadable[t];
@@ -185,6 +190,44 @@ static int genuine(const char *filename){
            !memcmp(&untouched,&before,sizeof(before))&&
            !musa_dwg_ac1032_insert_line_layer_source(
                scene,first_insert,first_child,NULL);
+    }
+    /* Original OT77 negative owner evidence; no owner role is inferred. */
+    if(ok&&first_unreadable_ot77){
+        MusaDwgAc1032LWPolylineHTailProbe p={0};
+        ok=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+               scene,first_unreadable_ot77,&p)&&
+           p.original_record_crc_verified&&
+           p.indexed_handle==first_unreadable_ot77&&
+           p.raw_object_type==77u&&
+           !p.final_owner_layer_visibility_and_paint_accepted;
+        if(ok){
+            fprintf(stderr,"DIAG genuine OT77 unreadable H=%llx "
+                "first=%u/%u/%llx second=%u/%u/%llx "
+                "residual=%llu zero_pad=%u one_pad=%u "
+                "entity_mode=%u reactor=%u xdict_missing=%u\n",
+                (unsigned long long)p.indexed_handle,
+                p.first_ref_decoded,p.first_ref_code,
+                (unsigned long long)p.first_raw_target,
+                p.second_ref_decoded,p.second_ref_code,
+                (unsigned long long)p.second_raw_target,
+                (unsigned long long)p.residual_bits_after_two_refs,
+                p.zero_tail_padding,p.one_tail_padding,
+                p.entity_mode,p.reactor_count,p.xdictionary_missing);
+            MusaDwgAc1032LWPolylineHTailProbe untouched;
+            memset(&untouched,0xa5,sizeof(untouched));
+            const MusaDwgAc1032LWPolylineHTailProbe before=untouched;
+            ok=!musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                     scene,0u,&untouched)&&
+               !memcmp(&untouched,&before,sizeof(untouched))&&
+               !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                     scene,UINT64_MAX,&untouched)&&
+               !memcmp(&untouched,&before,sizeof(untouched))&&
+               !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                     NULL,first_unreadable_ot77,&untouched)&&
+               !memcmp(&untouched,&before,sizeof(untouched))&&
+               !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                     scene,first_unreadable_ot77,NULL);
+        }
     }
     fprintf(stderr,"DIAG genuine R2018 owner gap by OT: "
                    "OT17=%u OT18=%u OT19=%u OT27=%u OT35=%u OT77=%u "
