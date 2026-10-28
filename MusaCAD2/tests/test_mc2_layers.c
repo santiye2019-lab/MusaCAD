@@ -29,5 +29,23 @@ int main(void) {
     layers[1].id = 8;
     entity.layer_id = 99;
     assert(!mc2_resolve_appearance(&entity,(Mc2Color){0,MC2_COLOR_BY_LAYER},layers,2,0,1,&result));
+    entity.layer_id = 7;
+    Mc2Layer valid = {7,0x334455,1,0};
+    Mc2EntityAppearance fast = {0xdeadbeef,9};
+    assert(mc2_resolve_appearance_on_layer(&entity,
+           (Mc2Color){0,MC2_COLOR_BY_LAYER},&valid,0,1,&fast));
+    assert(fast.effective_rgb==0x334455 && fast.visible);
+    assert(mc2_resolve_appearance_on_layer(&entity,
+           (Mc2Color){0,MC2_COLOR_BY_BLOCK},&valid,0x123456,1,&fast));
+    assert(fast.effective_rgb==0x123456);
+    valid.id=8;
+    assert(!mc2_resolve_appearance_on_layer(&entity,
+           (Mc2Color){0,MC2_COLOR_BY_LAYER},&valid,0,1,&fast));
+    assert(fast.effective_rgb==0x123456 && fast.visible);
+    valid.id=7;
+    valid.color_rgb=0x1000000;
+    assert(!mc2_resolve_appearance_on_layer(&entity,
+           (Mc2Color){0,MC2_COLOR_BY_LAYER},&valid,0,1,&fast));
+    assert(fast.effective_rgb==0x123456);
     return 0;
 }
