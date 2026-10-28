@@ -13,12 +13,12 @@ legacy_path,new_path,source_commit,authors,rights_evidence,dependencies,classifi
 ,core/src/mc2_dwg_document.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,TESTED
 ,core/include/mc2_geometry.h,,new independent implementation,independent development record; 2026-10-28 wrapped counterclockwise arc behavior,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/src/mc2_geometry.c,,new independent implementation,independent development record; 2026-10-28 wrapped counterclockwise arc geometry,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
-,core/include/mc2_layers.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
-,core/src/mc2_layers.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_layers.h,,new independent implementation,independent development record; 2026-10-28 direct validated layer appearance API,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_layers.c,,new independent implementation,independent development record; 2026-10-28 independent single-layer resolver,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/include/mc2_ownership.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/src/mc2_ownership.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
-,core/include/mc2_scene.h,,new independent implementation,independent development record; indexed scene traversal and inherited visibility 2026-10-28; 2026-10-28 nested BYBLOCK appearance behavior,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
-,core/src/mc2_scene.c,,new independent implementation,independent development record; indexed scene traversal and inherited visibility 2026-10-28; 2026-10-28 nested BYBLOCK appearance fix,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_scene.h,,new independent implementation,independent development record; indexed scene traversal and inherited visibility 2026-10-28; 2026-10-28 nested BYBLOCK appearance behavior; 2026-10-28 indexed layer table lookup,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_scene.c,,new independent implementation,independent development record; indexed scene traversal and inherited visibility 2026-10-28; 2026-10-28 nested BYBLOCK appearance fix; 2026-10-28 sorted layer lookup and duplicate rejection,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/include/mc2_transform.h,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/src/mc2_transform.c,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/include/mc2_block_transform.h,,new independent implementation,independent development record; 2026-10-28 indexed batch world-transform API,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
