@@ -1,1 +1,3 @@
 legacy_path,new_path,source_commit,authors,rights_evidence,dependencies,classification,decision,tests,status
+(new implementation),core/include/mc2_bytes.h,,assistant-authored-in-new-branch,original implementation,standard C11 only,NEW_ORIGINAL,admit,not yet run,added
+(new implementation),core/src/mc2_bytes.c,,assistant-authored-in-new-branch,original implementation,standard C11 only,NEW_ORIGINAL,admit,not yet run,added
