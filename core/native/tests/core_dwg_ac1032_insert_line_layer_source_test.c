@@ -92,6 +92,19 @@ static int genuine(const char *filename){
                         prefix.entity_mode,prefix.eed_bytes,prefix.preview,
                         prefix.reactor_count,prefix.xdictionary_missing,
                         prefix.has_binary_data_store);
+                    MusaDwgAc1032CirclePrefixProbe untouched_prefix;
+                    memset(&untouched_prefix,0xa5,sizeof(untouched_prefix));
+                    unsigned char prefix_before[sizeof(untouched_prefix)];
+                    memcpy(prefix_before,&untouched_prefix,
+                           sizeof(prefix_before));
+                    if(musa_dwg_ac1032_scene_index_circle_prefix_probe(
+                           scene,0u,&untouched_prefix)||
+                       memcmp(&untouched_prefix,prefix_before,
+                              sizeof(prefix_before))||
+                       musa_dwg_ac1032_scene_index_circle_prefix_probe(
+                           scene,UINT64_MAX,&untouched_prefix)||
+                       memcmp(&untouched_prefix,prefix_before,
+                              sizeof(prefix_before))){ok=0;break;}
                     circle_unreadable_stages[stage.fetch_stage]++;
                     circle_unreadable++;
                     MusaDwgAc1032CircleDecodeStage untouched;
