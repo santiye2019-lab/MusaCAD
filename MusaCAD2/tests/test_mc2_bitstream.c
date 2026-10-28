@@ -1,7 +1,81 @@
 #include "mc2_bitstream.h"
 #include <assert.h>
 #include <stdint.h>
+
+/* Fixture encoder used only in tests: explicit bit patterns and byte order. */
+static void put_test_bits(uint8_t *bytes, size_t *position, uint64_t value, unsigned count) {
+    for (unsigned i=0; i<count; ++i) {
+        unsigned shift=count-i-1u;
+        if ((value >> shift) & 1u)
+            bytes[*position / 8u] |= (uint8_t)(0x80u >> (*position % 8u));
+        ++*position;
+    }
+}
+static void test_dwg_bitcodes(void) {
+    uint8_t fixture[64] = {0};
+    size_t bits = 0;
+    put_test_bits(fixture,&bits,0,2); /* BS raw +257 (LE) */
+    put_test_bits(fixture,&bits,1,8);
+    put_test_bits(fixture,&bits,1,8);
+    put_test_bits(fixture,&bits,1,2); /* BS 127 */
+    put_test_bits(fixture,&bits,127,8);
+    put_test_bits(fixture,&bits,2,2); /* BS zero */
+    put_test_bits(fixture,&bits,3,2); /* BS 256 */
+    put_test_bits(fixture,&bits,0,2); /* BS -1 */
+    put_test_bits(fixture,&bits,255,8);
+    put_test_bits(fixture,&bits,255,8);
+    put_test_bits(fixture,&bits,0,2); /* BL -2 */
+    put_test_bits(fixture,&bits,254,8);
+    put_test_bits(fixture,&bits,255,8);
+    put_test_bits(fixture,&bits,255,8);
+    put_test_bits(fixture,&bits,255,8);
+    put_test_bits(fixture,&bits,1,2); /* BL 42 */
+    put_test_bits(fixture,&bits,42,8);
+    put_test_bits(fixture,&bits,2,2); /* BL zero */
+    put_test_bits(fixture,&bits,1,2); /* BD 1.0 */
+    put_test_bits(fixture,&bits,2,2); /* BD 0.0 */
+    put_test_bits(fixture,&bits,0,2); /* BD raw 2.5 */
+    const uint8_t raw_two_point_five[8] = {0,0,0,0,0,0,4,0x40};
+    for (unsigned i=0;i<8;++i) put_test_bits(fixture,&bits,raw_two_point_five[i],8);
+    Mc2BitReader r;
+    int16_t s = -100;
+    int32_t l = -100;
+    double d = -100;
+    assert(mc2_bitreader_init(&r,fixture,(bits+7u)/8u));
+    assert(mc2_read_dwg_bitshort(&r,&s) && s==257);
+    assert(mc2_read_dwg_bitshort(&r,&s) && s==127);
+    assert(mc2_read_dwg_bitshort(&r,&s) && s==0);
+    assert(mc2_read_dwg_bitshort(&r,&s) && s==256);
+    assert(mc2_read_dwg_bitshort(&r,&s) && s==-1);
+    assert(mc2_read_dwg_bitlong(&r,&l) && l==-2);
+    assert(mc2_read_dwg_bitlong(&r,&l) && l==42);
+    assert(mc2_read_dwg_bitlong(&r,&l) && l==0);
+    assert(mc2_read_dwg_bitdouble(&r,&d) && d==1.0);
+    assert(mc2_read_dwg_bitdouble(&r,&d) && d==0.0);
+    assert(mc2_read_dwg_bitdouble(&r,&d) && d==2.5);
+    assert(r.bit_position==bits);
+    /* Invalid selector and truncated payload must not advance the cursor. */
+    const uint8_t truncated[] = {0x00};
+    assert(mc2_bitreader_init(&r,truncated,sizeof truncated));
+    assert(!mc2_read_dwg_bitshort(&r,&s) && r.bit_position==0 && s==-1);
+    assert(!mc2_read_dwg_bitlong(&r,&l) && r.bit_position==0 && l==0);
+    assert(!mc2_read_dwg_bitdouble(&r,&d) && r.bit_position==0 && d==2.5);
+    const uint8_t reserved[] = {0xc0};
+    assert(mc2_bitreader_init(&r,reserved,sizeof reserved));
+    assert(!mc2_read_dwg_bitlong(&r,&l) && r.bit_position==0);
+    assert(!mc2_read_dwg_bitdouble(&r,&d) && r.bit_position==0);
+    uint8_t invalid_double[9] = {0};
+    size_t invalid_bits=0;
+    put_test_bits(invalid_double,&invalid_bits,0,2);
+    for (unsigned i=0;i<6;++i) put_test_bits(invalid_double,&invalid_bits,0,8);
+    put_test_bits(invalid_double,&invalid_bits,0xf0,8);
+    put_test_bits(invalid_double,&invalid_bits,0x7f,8); /* +infinity */
+    assert(mc2_bitreader_init(&r,invalid_double,sizeof invalid_double));
+    assert(!mc2_read_dwg_bitdouble(&r,&d) && r.bit_position==0 && d==2.5);
+}
+
 int main(void) {
+    test_dwg_bitcodes();
     const uint8_t data[] = {0xb2,0x5c,0xff};
     Mc2BitReader r;
     uint32_t x = 0;
