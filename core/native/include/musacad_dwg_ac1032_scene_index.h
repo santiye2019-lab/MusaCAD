@@ -1046,6 +1046,62 @@ static inline int musa_dwg_ac1032_scene_index_source_child_circle_bounds(
     for(unsigned i=0u;i<4u;i++)out_minmax[i]=bounds[i];
     return 1;
 }
+/* Bounded, fail-atomic source CIRCLE envelope batch from one genuine OT49
+ * child inventory. Unsupported sibling object types are counted and
+ * preserved as unresolved, never silently converted into paintable
+ * geometry. Unreadable/mismatched owner edges reject the entire batch.
+ * Each CIRCLE independently passes original reverse-owner, OT51 layer,
+ * OT18 geometry and OT7 INSERT affine gates. No final paint admission. */
+typedef struct MusaDwgAc1032InsertBlockCircleBoundsBatch {
+    uint64_t insert_handle,block_header_handle;
+    uint64_t circle_handles[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    uint64_t layer_handles[MUSACAD_AC1032_OT49_CHILD_LIMIT];
+    double bounds[MUSACAD_AC1032_OT49_CHILD_LIMIT][4];
+    uint32_t circle_count,unsupported_sibling_count;
+    uint8_t original_circle_sources_verified;
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032InsertBlockCircleBoundsBatch;
+static inline int musa_dwg_ac1032_scene_index_source_block_circle_batch(
+    const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
+    MusaDwgAc1032InsertBlockCircleBoundsBatch *out){
+    if(!index||!insert_handle||!out)return 0;
+    MusaDwgAc1032InsertBlockOwnerCoverage coverage={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_owner_coverage(
+           index,insert_handle,&coverage)||
+       !coverage.source_inventory_verified||
+       coverage.insert_handle!=insert_handle||
+       !coverage.block_header_handle||
+       coverage.final_display_accepted||
+       coverage.unreadable_count||coverage.mismatched_count||
+       coverage.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+    MusaDwgAc1032InsertBlockCircleBoundsBatch local={0};
+    local.insert_handle=insert_handle;
+    local.block_header_handle=coverage.block_header_handle;
+    local.unsupported_sibling_count=coverage.unsupported_count;
+    for(uint32_t i=0u;i<coverage.child_count;i++){
+        if(coverage.child_types[i]!=18u)continue;
+        if(coverage.child_status[i]!=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED)
+            return 0;
+        const uint64_t child=coverage.child_handles[i];
+        MusaDwgAc1032InsertBlockChildLayerSource layer={0};
+        double bounds[4];
+        if(!musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+               index,insert_handle,child,&layer)||
+           !layer.original_owner_layer_and_name_verified||
+           layer.final_visibility_color_and_paint_accepted||
+           layer.raw_child_type!=18u||!layer.layer_handle||
+           !musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+               index,insert_handle,child,bounds))return 0;
+        const uint32_t at=local.circle_count++;
+        local.circle_handles[at]=child;
+        local.layer_handles[at]=layer.layer_handle;
+        for(unsigned j=0u;j<4u;j++)local.bounds[at][j]=bounds[j];
+    }
+    if(!local.circle_count)return 0;
+    local.original_circle_sources_verified=1u;
+    *out=local;
+    return 1;
+}
 /* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
 typedef struct MusaDwgAc1032LineHTailProbe {
     uint64_t indexed_handle,first_target,second_target;
