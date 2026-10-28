@@ -1,5 +1,7 @@
 #include "mc2_bytes.h"
 #include <string.h>
+#include <float.h>
+#include <math.h>
 
 int mc2_reader_init(Mc2Reader *r, const uint8_t *data, size_t length) {
     if (!r || (!data && length)) return 0;
@@ -40,5 +42,24 @@ int mc2_read_dwg_version(const uint8_t *data, size_t length, char out[7]) {
     }
     memcpy(out, data, 6);
     out[6] = '\0';
+    return 1;
+}
+
+int mc2_read_u64le(Mc2Reader *r, uint64_t *out) {
+    uint8_t bytes[8];
+    if (!out || !mc2_read_bytes(r,bytes,8)) return 0;
+    uint64_t value=0;
+    for (unsigned i=0;i<8;++i) value|=(uint64_t)bytes[i]<<(8*i);
+    *out=value;
+    return 1;
+}
+int mc2_read_f64le(Mc2Reader *r, double *out) {
+    if (!out || sizeof(double)!=8 || DBL_MANT_DIG!=53 || FLT_RADIX!=2) return 0;
+    uint64_t bits;
+    if (!mc2_read_u64le(r,&bits)) return 0;
+    double value;
+    memcpy(&value,&bits,sizeof(value));
+    if (!isfinite(value)) return 0;
+    *out=value;
     return 1;
 }
