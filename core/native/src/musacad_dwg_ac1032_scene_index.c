@@ -1804,6 +1804,63 @@ int musa_dwg_ac1032_scene_index_circle_h_tail_profile(
 }
 
 
+/* Read all three original OT18 one-reactor HANDLE references without
+ * assigning any of them an owner/layer role. This deliberately does NOT
+ * relax the existing two-reference ownership gate. CRC/OT, the strict
+ * entity common and bit boundaries must all agree before returning data.
+ * Caller output is unchanged on every failure. */
+int musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleReactorHTailProbe *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    Payload p={0};
+    if(!fetch(s,h,18u,&p))return 0;
+    const int common=p.common.common_decoded&&
+        p.common.prefix.prefix_decoded&&
+        p.common.prefix.indexed_handle==h&&
+        p.common.prefix.raw_object_type==18u&&
+        p.common.prefix.entity_mode==0u&&
+        p.common.prefix.reactor_count==1u&&
+        p.common.prefix.xdictionary_missing==1u&&
+        !p.common.has_color_reference&&
+        !p.common.linetype_flags&&!p.common.plotstyle_flags&&
+        !p.common.material_flags&&!p.common.visualstyle_flags&&
+        p.layout.data_stream_bits<=SIZE_MAX&&
+        p.layout.total_payload_bits<=SIZE_MAX&&
+        p.layout.data_stream_bits<p.layout.total_payload_bits;
+    MusaDwgAc1032CircleReactorHTailProbe v={0};
+    v.indexed_handle=h;
+    v.handle_start_bit=p.layout.data_stream_bits;
+    v.handle_end_bit=p.layout.total_payload_bits;
+    v.reactor_count=p.common.prefix.reactor_count;
+    MusaDwgAc1015Bits bits={0};
+    int ok=common&&musa_dwg_ac1015_bits_init(&bits,p.raw,p.bytes,
+        (size_t)p.layout.data_stream_bits,
+        (size_t)p.layout.total_payload_bits);
+    for(unsigned i=0u;ok&&i<3u;i++){
+        MusaDwgAc1015HandleRef ref={0};
+        ok=musa_dwg_ac1015_read_handle_ref(&bits,h,&ref);
+        if(ok){
+            v.raw_targets[i]=ref.target;
+            v.ref_codes[i]=ref.code;
+            v.ref_counts[i]=ref.count;
+            v.ref_relative[i]=ref.relative;
+        }
+    }
+    if(ok){
+        v.residual_bits_after_three_refs=bits.bit_end-bits.bit_pos;
+        MusaDwgAc1015Bits zero=bits,one=bits;
+        v.zero_tail_padding=(uint8_t)cached_graph_zero_padding(&zero);
+        v.one_tail_padding=(uint8_t)cached_graph_one_padding(&one);
+        v.original_record_crc_verified=1u;
+        v.strict_common_verified=1u;
+    }
+    free(p.raw);
+    if(!ok)return 0;
+    *out=v;
+    return 1;
+}
+
 /* Exact ORIGINAL OT18 H(C-relative owner),H5(layer) source edge.  This
  * grammar is deliberately limited to an R2018 CIRCLE whose authenticated
  * first handle is relative code 0xC and whose second is code 5.  It is
