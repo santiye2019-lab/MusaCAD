@@ -56,6 +56,45 @@ int mc2_entity_world_bounds(const Mc2Entity2 *entity,const Mc2Affine2 *world,Mc2
         *out=bounds;
         return 1;
     }
-    /* Partial arcs: conservative bounds from the transformed local AABB. */
-    return mc2_transform_bounds(&local,world,out);
+    if (entity->kind == MC2_ENTITY_ARC) {
+        /* Exact affine arc AABB: endpoints and stationary points of each axis. */
+        const double pi=3.14159265358979323846;
+        const double tau=2.0*pi;
+        double start=entity->geometry.arc.start_radians;
+        double end=entity->geometry.arc.end_radians;
+        double radius=entity->geometry.arc.radius;
+        Mc2Point2 center=entity->geometry.arc.center;
+        Mc2Point2 transformed_center;
+        if (!mc2_transform_point(world,center,&transformed_center)) return 0;
+        double angles[6]={start,end,atan2(world->c,world->a),
+                          atan2(world->c,world->a)+pi,
+                          atan2(world->d,world->b),
+                          atan2(world->d,world->b)+pi};
+        Mc2Bounds2 bounds={0,0,0,0};
+        int initialized=0;
+        for (int i=0;i<6;++i) {
+            double angle=angles[i];
+            if (i>=2) {
+                angle=fmod(angle,tau);
+                if (angle<0) angle+=tau;
+                if (angle<start || angle>end) continue;
+            }
+            double x=transformed_center.x+radius*(world->a*cos(angle)+world->c*sin(angle));
+            double y=transformed_center.y+radius*(world->b*cos(angle)+world->d*sin(angle));
+            if (!isfinite(x) || !isfinite(y)) return 0;
+            if (!initialized) {
+                bounds=(Mc2Bounds2){x,y,x,y};
+                initialized=1;
+            } else {
+                if (x<bounds.min_x) bounds.min_x=x;
+                if (x>bounds.max_x) bounds.max_x=x;
+                if (y<bounds.min_y) bounds.min_y=y;
+                if (y>bounds.max_y) bounds.max_y=y;
+            }
+        }
+        if (!initialized || !valid_bounds(&bounds)) return 0;
+        *out=bounds;
+        return 1;
+    }
+    return 0;
 }
