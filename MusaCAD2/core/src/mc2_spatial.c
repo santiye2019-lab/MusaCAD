@@ -31,5 +31,17 @@ int mc2_transform_bounds(const Mc2Bounds2 *source,const Mc2Affine2 *t,Mc2Bounds2
 }
 int mc2_entity_world_bounds(const Mc2Entity2 *entity,const Mc2Affine2 *world,Mc2Bounds2 *out) {
     Mc2Bounds2 local;
-    return mc2_entity_bounds(entity,&local) && mc2_transform_bounds(&local,world,out);
+    if (!entity || !world || !out || !mc2_entity_bounds(entity,&local)) return 0;
+    if (entity->kind == MC2_ENTITY_LINE) {
+        Mc2Point2 a,b;
+        if (!mc2_transform_point(world,entity->geometry.line.start,&a) ||
+            !mc2_transform_point(world,entity->geometry.line.end,&b)) return 0;
+        *out=(Mc2Bounds2){
+            a.x<b.x?a.x:b.x, a.y<b.y?a.y:b.y,
+            a.x>b.x?a.x:b.x, a.y>b.y?a.y:b.y
+        };
+        return 1;
+    }
+    /* Conservative bound for curved entities; refine for precise viewport culling later. */
+    return mc2_transform_bounds(&local,world,out);
 }
