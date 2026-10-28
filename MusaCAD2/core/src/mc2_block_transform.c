@@ -11,6 +11,12 @@ int mc2_block_world_transform(const Mc2BlockTransformNode *nodes,size_t count,
         }
     }
     if (found==count) return 0;
+    /* Reject duplicate handles anywhere in the graph, even off this path. */
+    for (size_t i=0;i<count;++i) {
+        if (!nodes[i].ownership.handle) return 0;
+        for (size_t j=0;j<i;++j)
+            if (nodes[i].ownership.handle==nodes[j].ownership.handle) return 0;
+    }
     Mc2Affine2 world=mc2_transform_identity();
     /* Walk child to root, pre-multiplying each ancestor transform. */
     uint64_t current=handle;
