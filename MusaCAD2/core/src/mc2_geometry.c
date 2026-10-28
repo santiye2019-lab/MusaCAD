@@ -40,7 +40,25 @@ int mc2_entity_bounds(const Mc2Entity2 *e, Mc2Bounds2 *out) {
         if (!isfinite(c.x-r) || !isfinite(c.x+r) ||
             !isfinite(c.y-r) || !isfinite(c.y+r)) return 0;
         b = (Mc2Bounds2){c.x-r,c.y-r,c.x+r,c.y+r};
-        /* A conservative enclosing box is valid for partial arcs too. */
+        if (e->kind == MC2_ENTITY_ARC) {
+            /* Tight local bounds: endpoints and cardinal angles in the arc sweep. */
+            double start=e->geometry.arc.start_radians;
+            double end=e->geometry.arc.end_radians;
+            double x=c.x+r*cos(start), y=c.y+r*sin(start);
+            double ex=c.x+r*cos(end), ey=c.y+r*sin(end);
+            if (!isfinite(x)||!isfinite(y)||!isfinite(ex)||!isfinite(ey)) return 0;
+            b=(Mc2Bounds2){x,y,x,y};
+            add_point(&b,ex,ey);
+            const double pi=3.14159265358979323846;
+            for (int k=0;k<4;++k) {
+                double angle=k*pi/2.0;
+                if (angle>=start && angle<=end) {
+                    double px=c.x+r*cos(angle),py=c.y+r*sin(angle);
+                    if (!isfinite(px)||!isfinite(py)) return 0;
+                    add_point(&b,px,py);
+                }
+            }
+        }
     }
     *out = b;
     return 1;
