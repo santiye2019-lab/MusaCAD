@@ -112,7 +112,11 @@ static int genuine(const char *filename){
                        &forged,&untouched)||
                    memcmp(&untouched,&before,sizeof(untouched))){ok=0;break;}
             }
-            if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)){
+            uint32_t line_children=0u;
+            for(uint32_t k=0u;k<coverage.child_count;k++)
+                if(coverage.child_types[k]==19u)line_children++;
+            if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)&&
+               line_children){
                 MusaDwgAc1032CompleteBlockLineStyleRisk batch={0};
                 if(!musa_dwg_ac1032_complete_block_line_style_risk(
                        scene,entry.handle,&batch)||
@@ -139,6 +143,15 @@ static int genuine(const char *filename){
                 }
                 if(!ok)break;
                 complete_style_positive++;
+            }else if(musa_dwg_ac1032_block_owner_coverage_complete(
+                          &coverage)){
+                MusaDwgAc1032InsertBlockLineSources empty={0};
+                if(line_children||
+                   !musa_dwg_ac1032_scene_index_complete_block_line_sources(
+                       scene,entry.handle,&empty)||
+                   empty.line_count||
+                   !empty.original_source_geometry_verified||
+                   empty.final_display_accepted){ok=0;break;}
             }else if(coverage.child_count){
                 MusaDwgAc1032CompleteBlockLineStyleRisk untouched;
                 memset(&untouched,0xa5,sizeof(untouched));
