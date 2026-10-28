@@ -23,3 +23,5 @@ legacy_path,new_path,source_commit,authors,rights_evidence,dependencies,classifi
 ,core/src/mc2_transform.c,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/include/mc2_block_transform.h,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
 ,core/src/mc2_block_transform.c,,new independent implementation,independent development record,standard C11,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/include/mc2_spatial.h,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
+,core/src/mc2_spatial.c,,new independent implementation,independent development record,standard C11 math library,NEW_ORIGINAL,APPROVE,CI,PENDING
