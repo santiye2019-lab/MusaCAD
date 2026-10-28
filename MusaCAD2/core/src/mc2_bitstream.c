@@ -173,9 +173,12 @@ int mc2_read_dwg_object_type(Mc2BitReader *r, uint16_t *out) {
     Mc2BitReader candidate = *r;
     uint32_t selector;
     uint64_t raw;
-    if (!mc2_read_bits_msb(&candidate, 2, &selector)) return 0;
+    /* OT mode 11 is reserved; accepting it could misclassify the next
+     * object and desynchronize the complete DWG object stream. */
+    if (!mc2_read_bits_msb(&candidate, 2, &selector) || selector == 3) return 0;
     if (!mc2_dwg_raw_le(&candidate, selector < 2 ? 1 : 2, &raw)) return 0;
     if (selector == 1) raw += 0x1f0u;
+    if (!raw || raw > UINT16_MAX) return 0;
     *out = (uint16_t)raw;
     *r = candidate;
     return 1;
