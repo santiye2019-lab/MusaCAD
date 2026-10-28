@@ -143,7 +143,7 @@ typedef struct Payload {
 /* Forensic inspection of CRC-authenticated OT7 prefix bytes only.
  * Noncanonical fields are REPORTED, never accepted as valid geometry. */
 static void inspect_insert_prefix(const uint8_t *raw,size_t bytes,
-    const MusaDwgAc1032ObjectStreams *layout,
+    const MusaDwgAc1032ObjectStreams *layout,uint16_t type,
     MusaDwgAc1032InsertPrefixProbe *out){
     if(!raw||!layout||!out||layout->data_stream_bits>SIZE_MAX)return;
     MusaDwgAc1015Bits bits={0};
@@ -189,7 +189,9 @@ static void inspect_insert_prefix(const uint8_t *raw,size_t bytes,
         out->prefix_reason=6u;return;
     }
     out->reactor_count=reactors;
-    if(reactors){out->prefix_reason=6u;return;}
+    if(reactors&&!(type==18u&&reactors==1u)){
+        out->prefix_reason=6u;return;
+    }
     if(!musa_dwg_ac1015_bits_read_u(&bits,1u,&xdic)){
         out->prefix_reason=7u;return;
     }
@@ -244,7 +246,7 @@ static int fetch_staged(const MusaDwgAc1032SceneIndex *s,uint64_t h,
     if(!ok){free(raw);return 0;}
     if(stage)*stage=4u; /* immutable original record copied */
     if(prefix_probe&&(type==7u||type==18u))
-        inspect_insert_prefix(raw,needed,&layout,prefix_probe);
+        inspect_insert_prefix(raw,needed,&layout,type,prefix_probe);
     ok=musa_dwg_ac1032_entity_common_bytes(
           raw,needed,&layout,type,&common)&&
        common.common_decoded&&
