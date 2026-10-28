@@ -1499,7 +1499,8 @@ int musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
                (((type==18u||type==19u||type==77u)&&owner_wire_code==12u)?
                     ((type!=77u||
                       (bits.bit_end>=bits.bit_pos&&
-                       bits.bit_end-bits.bit_pos==5u))&&
+                       (bits.bit_end-bits.bit_pos==5u||
+                        bits.bit_end-bits.bit_pos==7u)))&&
                      cached_graph_one_padding(&bits)):
                     cached_graph_zero_padding(&bits));
     }
