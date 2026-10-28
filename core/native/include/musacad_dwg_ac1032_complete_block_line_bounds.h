@@ -18,6 +18,32 @@ typedef struct MusaDwgAc1032CompleteBlockLineBounds {
     uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032CompleteBlockLineBounds;
 
+/* Convert verified double WCS bounds to an outward-rounded float
+ * transport rectangle. Rounding MUST NOT clip a source endpoint.
+ * This remains a source framing hint, not final paint authorization. */
+static inline int musa_dwg_ac1032_complete_block_line_bounds_float(
+    const MusaDwgAc1032CompleteBlockLineBounds *source,float out_xy[4]){
+    if(!source||!out_xy||
+       !source->original_complete_source_bounds_verified||
+       source->final_visibility_color_and_paint_accepted||
+       !source->insert_handle||!source->block_header_handle||
+       !source->line_count||
+       source->line_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+    float local[4]={0};
+    for(unsigned axis=0u;axis<2u;axis++){
+        const double low=source->min_xy[axis],high=source->max_xy[axis];
+        if(!isfinite(low)||!isfinite(high)||low>high||
+           fabs(low)>FLT_MAX||fabs(high)>FLT_MAX)return 0;
+        float lo=(float)low,hi=(float)high;
+        if((double)lo>low)lo=nextafterf(lo,-INFINITY);
+        if((double)hi<high)hi=nextafterf(hi,INFINITY);
+        if(!isfinite(lo)||!isfinite(hi)||lo>hi)return 0;
+        local[axis]=lo;
+        local[axis+2u]=hi;
+    }
+    for(unsigned i=0u;i<4u;i++)out_xy[i]=local[i];
+    return 1;
+}
 /* Fail atomic: no caller writes until every original child LINE endpoint
  * has passed full owner, layer, numeric and finite-float checks. Bounds
  * remain double precision, avoiding premature viewport float clipping. */
