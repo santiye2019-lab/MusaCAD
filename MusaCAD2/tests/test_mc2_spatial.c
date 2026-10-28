@@ -23,6 +23,16 @@ int main(void) {
     assert(fabs(out.max_x-2.8284271247461903)<1e-12);
     assert(fabs(out.min_x+2.8284271247461903)<1e-12);
     assert(out.max_y==2 && out.min_y==-2);
+    Mc2Entity2 arc={0};
+    arc.kind=MC2_ENTITY_ARC;
+    arc.geometry.arc.center=(Mc2Point2){0,0};
+    arc.geometry.arc.radius=2;
+    arc.geometry.arc.start_radians=0;
+    arc.geometry.arc.end_radians=1.5707963267948966;
+    assert(mc2_entity_world_bounds(&arc,&shear,&out));
+    assert(fabs(out.max_x-2.8284271247461903)<1e-12);
+    assert(out.min_x>=-1e-12 && out.min_y>=-1e-12);
+    assert(fabs(out.max_y-2)<1e-12);
     a.min_x=3;
     assert(!mc2_transform_bounds(&a,&t,&out));
     return 0;
