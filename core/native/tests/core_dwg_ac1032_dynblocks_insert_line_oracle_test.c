@@ -254,6 +254,15 @@ static int original(const char *filename){
                        bounds.min_xy[axis]>bounds.max_xy[axis])
                         ok=0;
                 if(!ok)break;
+                float framed[4]={0};
+                if(!musa_dwg_ac1032_complete_block_line_bounds_float(
+                       &bounds,framed)||
+                   !isfinite(framed[0])||!isfinite(framed[1])||
+                   !isfinite(framed[2])||!isfinite(framed[3])||
+                   (double)framed[0]>expected_min[0]||
+                   (double)framed[1]>expected_min[1]||
+                   (double)framed[2]<expected_max[0]||
+                   (double)framed[3]<expected_max[1]){ok=0;break;}
                 complete_bounds_positive++;
                 complete_batch_positive++;
                 owner_bulk_positive++;
@@ -750,7 +759,21 @@ static int original(const char *filename){
         MusaDwgAc1032CompleteBlockLineBounds untouched;
         memset(&untouched,0xa5,sizeof(untouched));
         const MusaDwgAc1032CompleteBlockLineBounds before=untouched;
-        ok=!musa_dwg_ac1032_complete_block_line_bounds(
+        float frame[4]={11.0f,22.0f,33.0f,44.0f};
+        MusaDwgAc1032CompleteBlockLineBounds forged={0};
+        forged.insert_handle=first_insert;
+        forged.block_header_handle=UINT64_C(1);
+        forged.line_count=1u;
+        forged.original_complete_source_bounds_verified=1u;
+        forged.min_xy[0]=NAN;
+        forged.max_xy[0]=2.0;
+        forged.min_xy[1]=0.0;
+        forged.max_xy[1]=2.0;
+        ok=!musa_dwg_ac1032_complete_block_line_bounds_float(
+               &forged,frame)&&
+           frame[0]==11.0f&&frame[1]==22.0f&&
+           frame[2]==33.0f&&frame[3]==44.0f&&
+           !musa_dwg_ac1032_complete_block_line_bounds(
                NULL,first_insert,&untouched)&&
            !memcmp(&untouched,&before,sizeof(untouched))&&
            !musa_dwg_ac1032_complete_block_line_bounds(
