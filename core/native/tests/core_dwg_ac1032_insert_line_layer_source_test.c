@@ -247,17 +247,21 @@ static int genuine(const char *filename){
             memset(&untouched,0xa5,sizeof(untouched));
             unsigned char before[sizeof(untouched)];
             memcpy(before,&untouched,sizeof(before));
-            ok=!musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-                     scene,0u,&untouched)&&
-               !memcmp(&untouched,&before,sizeof(untouched))&&
-               !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-                     scene,UINT64_MAX,&untouched)&&
-               !memcmp(&untouched,&before,sizeof(untouched))&&
-               !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-                     NULL,sample,&untouched)&&
-               !memcmp(&untouched,&before,sizeof(untouched))&&
-               !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-                     scene,sample,NULL);
+            const int r0=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                scene,0u,&untouched);
+            const int b0=!memcmp(&untouched,before,sizeof(before));
+            const int r1=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                scene,UINT64_MAX,&untouched);
+            const int b1=!memcmp(&untouched,before,sizeof(before));
+            const int r2=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                NULL,sample,&untouched);
+            const int b2=!memcmp(&untouched,before,sizeof(before));
+            const int r3=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+                scene,sample,NULL);
+            fprintf(stderr,"DIAG genuine OT77 negative probes "
+                "r=%d/%d/%d/%d unchanged=%d/%d/%d\\n",
+                r0,r1,r2,r3,b0,b1,b2);
+            ok=!r0&&b0&&!r1&&b1&&!r2&&b2&&!r3;
         }
     }
     /* Existing CIRCLE H-tail decoder is independently inspected on the
