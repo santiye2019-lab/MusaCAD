@@ -27,7 +27,7 @@ int mc2_section_map_add(Mc2SectionMap *map, uint32_t id,
 }
 int mc2_section_map_find(const Mc2SectionMap *map, uint32_t id,
                          Mc2SectionRange *out) {
-    if (!map || !out) return 0;
+    if (!map || !out || map->count > 128u) return 0;
     for (size_t i = 0; i < map->count; ++i) {
         if (map->entries[i].id == id) {
             *out = map->entries[i];
@@ -40,9 +40,9 @@ int mc2_section_map_slice(const Mc2SectionMap *map, uint32_t id,
                           const uint8_t *file, size_t actual_length,
                           const uint8_t **data, size_t *length) {
     Mc2SectionRange range;
-    if (!file || !data || !length ||
+    if (!map || map->count > 128u || !file || !data || !length ||
         !mc2_section_map_find(map, id, &range) ||
-        actual_length < map->file_length ||
+        actual_length != map->file_length ||
         range.offset > actual_length ||
         range.length > actual_length - range.offset) return 0;
     *data = file + range.offset;
