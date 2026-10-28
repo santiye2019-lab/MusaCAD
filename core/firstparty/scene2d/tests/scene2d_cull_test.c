@@ -99,5 +99,22 @@ int main(void) {
     assert(musa_scene2d_collect_visible(NULL,NULL,NULL,0,
                                         whole,NULL,0,&written));
     assert(written == 0);
+    /* Reject invalid output aliasing without changing either buffer. */
+    size_t same[5] = {11,12,13,14,15};
+    assert(!musa_scene2d_collect_visible(nodes,resolved,boxes,5,
+                                         whole,same,5,&same[0]));
+    assert(same[0] == 11 && same[1] == 12);
+    /* Capacity zero is a valid empty result only when nothing is visible. */
+    const MusaScene2dBox far_away = {20000,20000,20001,20001};
+    written = 77;
+    assert(musa_scene2d_collect_visible(nodes,resolved,boxes,5,
+                                        far_away,NULL,0,&written));
+    assert(written == 0);
+    /* Empty input must reject invalid viewports and preserve the count. */
+    written = 77;
+    assert(!musa_scene2d_collect_visible(NULL,NULL,NULL,0,
+                                         (MusaScene2dBox){2,0,1,1},
+                                         NULL,0,&written));
+    assert(written == 77);
     return 0;
 }
