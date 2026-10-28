@@ -61,7 +61,7 @@ static int genuine(const char *filename){
                 census_inventories++;
                 for(uint32_t k=0u;k<coverage.child_count;k++){
                     /* Four original one-reactor CIRCLE children now have
-                     * independent reactor H12, owner H4 and layer H5
+                     * independent owner H12, reactor H4 and layer H5
                      * evidence. Forward OT49 membership is also checked
                      * against this authenticated child slot. */
                     const uint64_t circle_h=coverage.child_handles[k];
@@ -92,8 +92,8 @@ static int genuine(const char *filename){
                                scene,circle_h,&edge)||
                            !musa_dwg_ac1032_block_child_owner_edge_matches(
                                &edge,circle_h,coverage.block_header_handle,18u)||
-                           edge.original_relative_h12_owner_verified||
-                           edge.original_owner_wire_code!=4u||
+                           !edge.original_relative_h12_owner_verified||
+                           edge.original_owner_wire_code!=12u||
                            edge.layer_handle!=UINT64_C(0xBF71)){
                             ok=0;break;
                         }
