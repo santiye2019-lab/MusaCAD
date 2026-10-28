@@ -34,6 +34,56 @@ static int original(const char *filename){
        !memcmp(src,copy,(size_t)n);
     free(src);free(copy);
     if(!ok){musa_dwg_ac1032_scene_index_close(scene);return 0;}
+    /* Positive genuine R2018 CIRCLE HBE49 and synthetic nonuniform
+     * affine envelope. No visibility or final paint is inferred. */
+    {
+        MusaDwgAc1032NativeCurve circle={0};
+        const double identity[6]={1.0,0.0,0.0,0.0,1.0,0.0};
+        double real_bounds[4]={0};
+        ok=musa_dwg_ac1032_scene_index_read_curve(
+               scene,UINT64_C(0xBE49),&circle)&&
+           circle.geometry_decoded&&circle.object_type==18u&&
+           musa_dwg_ac1032_planar_circle_affine_bounds(
+               &circle,identity,real_bounds)&&
+           real_bounds[0]<=circle.center[0]-circle.radius&&
+           real_bounds[1]<=circle.center[1]-circle.radius&&
+           real_bounds[2]>=circle.center[0]+circle.radius&&
+           real_bounds[3]>=circle.center[1]+circle.radius;
+        MusaDwgAc1032NativeCurve synthetic={0};
+        synthetic.indexed_handle=1u;
+        synthetic.object_type=18u;
+        synthetic.geometry_decoded=1u;
+        synthetic.center[0]=3.0;synthetic.center[1]=4.0;
+        synthetic.radius=2.0;synthetic.extrusion[2]=1.0;
+        const double shear[6]={2.0,1.0,10.0,-1.0,3.0,20.0};
+        double bounds[4]={0};
+        const double rx=2.0*hypot(2.0,1.0);
+        const double ry=2.0*hypot(-1.0,3.0);
+        ok=ok&&musa_dwg_ac1032_planar_circle_affine_bounds(
+                    &synthetic,shear,bounds)&&
+           bounds[0]<=20.0-rx&&bounds[2]>=20.0+rx&&
+           bounds[1]<=29.0-ry&&bounds[3]>=29.0+ry&&
+           fabs(bounds[0]-(20.0-rx))<1e-10&&
+           fabs(bounds[3]-(29.0+ry))<1e-10;
+        double untouched[4]={9.0,8.0,7.0,6.0};
+        const double before[4]={9.0,8.0,7.0,6.0};
+        synthetic.extrusion[0]=1.0;
+        ok=ok&&!musa_dwg_ac1032_planar_circle_affine_bounds(
+                   &synthetic,shear,untouched)&&
+           !memcmp(untouched,before,sizeof(before));
+        synthetic.extrusion[0]=0.0;
+        synthetic.radius=INFINITY;
+        ok=ok&&!musa_dwg_ac1032_planar_circle_affine_bounds(
+                   &synthetic,shear,untouched)&&
+           !memcmp(untouched,before,sizeof(before));
+        synthetic.radius=2.0;
+        double overflow[6]={1e308,0.0,0.0,0.0,1e308,0.0};
+        ok=ok&&!musa_dwg_ac1032_planar_circle_affine_bounds(
+                   &synthetic,overflow,untouched)&&
+           !memcmp(untouched,before,sizeof(before));
+        if(!ok)fprintf(stderr,
+            "FAIL genuine CIRCLE or conservative affine bounds oracle\\n");
+    }
     size_t inserts=0u,admitted=0u,verified=0u;
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
