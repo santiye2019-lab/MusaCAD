@@ -344,7 +344,7 @@ static int genuine(const char *filename){
     }
     fprintf(stderr,"DIAG genuine R2018 OT18 unreadable fetch stages: "
                    "stage0=%u stage1=%u stage2=%u stage3=%u "
-                   "stage4=%u stage5=%u total=%zu\\n",
+                   "stage4=%u stage5=%u total=%zu\n",
             circle_unreadable_stages[0],circle_unreadable_stages[1],
             circle_unreadable_stages[2],circle_unreadable_stages[3],
             circle_unreadable_stages[4],circle_unreadable_stages[5],
