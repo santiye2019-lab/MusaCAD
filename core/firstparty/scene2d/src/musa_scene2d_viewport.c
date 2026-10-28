@@ -29,7 +29,11 @@ int musa_scene2d_resolve_viewport(
     if (ranges_overlap(out, node_count * sizeof(*out),
                        viewport_layer_visible, layer_count) ||
         ranges_overlap(written, sizeof(*written),
-                       viewport_layer_visible, layer_count))
+                       viewport_layer_visible, layer_count) ||
+        ranges_overlap(out, node_count * sizeof(*out),
+                       layers, layer_count * sizeof(*layers)) ||
+        ranges_overlap(written, sizeof(*written),
+                       layers, layer_count * sizeof(*layers)))
         return 0;
 
     for (size_t i = 0; i < layer_count; ++i)
