@@ -37,5 +37,24 @@ int main(void) {
     assert(!mc2_read_dwg_version((const uint8_t *)"ZZ1032", 6, version));
     assert(!mc2_read_dwg_version((const uint8_t *)"AC10x2", 6, version));
     assert(!mc2_read_dwg_version((const uint8_t *)"AC1032", 5, version));
+    const uint8_t doubles[] = {
+        0,0,0,0,0,0,0x0c,0x40, /* 3.5 */
+        0,0,0,0,0,0,0xf0,0x7f, /* +infinity */
+        0,0,0,0,0,0,0xf8,0x7f  /* NaN */
+    };
+    double value=0;
+    uint64_t integer=0;
+    assert(mc2_reader_init(&r,doubles,sizeof doubles));
+    assert(mc2_read_f64le(&r,&value) && value==3.5 && r.offset==8);
+    assert(!mc2_read_f64le(&r,&value) && r.offset==8 && value==3.5);
+    assert(mc2_read_u64le(&r,&integer) && integer==UINT64_C(0x7ff0000000000000));
+    assert(!mc2_read_f64le(&r,&value) && r.offset==16);
+    assert(!mc2_read_f64le(&r,0) && r.offset==16);
+    assert(mc2_read_u64le(&r,&integer) && integer==UINT64_C(0x7ff8000000000000));
+    assert(!mc2_read_u64le(&r,&integer) && r.offset==24);
+    assert(mc2_reader_init(&r,doubles+8,8));
+    assert(!mc2_read_f64le(&r,&value) && r.offset==0);
+    assert(mc2_reader_init(&r,doubles+16,8));
+    assert(!mc2_read_f64le(&r,&value) && r.offset==0);
     return 0;
 }
