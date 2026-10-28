@@ -14,7 +14,8 @@ int main(void) {
     assert(mc2_reader_init(&numeric_reader,numeric,sizeof numeric));
     assert(mc2_read_u64le(&numeric_reader,&integer) && integer==UINT64_C(0x0102030405060708));
     assert(mc2_read_f64le(&numeric_reader,&number) && number==1.0);
-    assert(!mc2_read_f64le(&numeric_reader,&number) && number==1.0);
+    assert(!mc2_read_f64le(&numeric_reader,&number) && number==1.0 && numeric_reader.offset==16);
+    assert(mc2_read_u64le(&numeric_reader,&integer) && integer==UINT64_C(0x7ff8000000000000));
     assert(!mc2_read_u64le(&numeric_reader,&integer));
     const uint8_t bytes[] = {0x12,0x34,0x56,0x78,0x9a,0xbc,0xde};
     Mc2Reader r;
