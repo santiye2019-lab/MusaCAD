@@ -987,6 +987,26 @@ int musa_dwg_ac1032_scene_index_line_h_tail_probe(
     const MusaDwgAc1032SceneIndex *scene,uint64_t line_handle,
     MusaDwgAc1032LineHTailProbe *out);
 
+/* R2018 OT77 original CRC-indexed HANDLE tail diagnostics.
+ * These are raw decoded references, NOT authenticated owner/layer roles.
+ * Residual bits and padding profiles are observed, never inferred.
+ * No source visibility, color or paint permission is granted. */
+typedef struct MusaDwgAc1032LWPolylineHTailProbe {
+    uint64_t indexed_handle,handle_start_bit,handle_end_bit;
+    uint64_t first_raw_target,second_raw_target,residual_bits_after_two_refs;
+    uint32_t reactor_count;
+    uint16_t raw_object_type;
+    uint8_t entity_mode,xdictionary_missing,has_color_reference;
+    uint8_t linetype_flags,plotstyle_flags,material_flags,visualstyle_flags;
+    uint8_t first_ref_decoded,first_ref_code,first_ref_count,first_ref_relative;
+    uint8_t second_ref_decoded,second_ref_code,second_ref_count,second_ref_relative;
+    uint8_t zero_tail_padding,one_tail_padding,original_record_crc_verified;
+    uint8_t final_owner_layer_visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032LWPolylineHTailProbe;
+int musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t lwpolyline_handle,
+    MusaDwgAc1032LWPolylineHTailProbe *out);
+
 /* R2018 OT18 original CRC/H forensic probe. first_raw_target and
  * second_raw_target are untrusted H references, NOT certified owner/layer.
  * MSB prefix is copied from the authenticated original HANDLE bitstream.
