@@ -1131,6 +1131,27 @@ int musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
     const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
     MusaDwgAc1032CircleReactorHTailProbe *out);
 
+/* Source-only OT18 CIRCLE with exactly one original reactor.
+ * Verify H12 owner, H4 reactor and H5 layer independently against the
+ * CRC/H index, the OT49 forward child list and original circle geometry.
+ * Layer name and raw flags are evidence, not resolved layer visibility,
+ * BYLAYER/BYBLOCK color, viewport/XREF state or permission to paint.
+ * Unsupported sources leave the caller output unchanged. */
+typedef struct MusaDwgAc1032CircleReactorLayerProvenance {
+    MusaDwgAc1032EntityBlockOwnerLayerSource edge;
+    MusaDwgAc1032CircleReactorHTailProbe tail;
+    MusaDwgAc1032LayerName layer_name;
+    MusaDwgAc1032LayerFlagsEvidence raw_layer_flags;
+    MusaDwgAc1032NativeCurve circle;
+    uint8_t forward_child_membership_verified;
+    uint8_t source_geometry_and_layer_verified;
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032CircleReactorLayerProvenance;
+int musa_dwg_ac1032_scene_index_circle_reactor_layer_provenance(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t circle_handle,
+    MusaDwgAc1032CircleReactorLayerProvenance *out);
+
+
 /* Narrow source-authenticated R2018 OT18 H(C relative owner) + H5 layer.
  * Both referenced original OT49/OT51 records are independently CRC/OT
  * checked and the OT49 forward child list must contain the same OT18 H.

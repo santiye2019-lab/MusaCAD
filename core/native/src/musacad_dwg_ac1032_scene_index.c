@@ -1889,6 +1889,82 @@ int musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
     return 1;
 }
 
+/* Complete source provenance for one-reactor original OT18 children.
+ * No rendering admission: this only joins independently authenticated
+ * H12 owner, H4 reactor, H5 layer, OT49 membership and numeric geometry.
+ * The earlier two-reference CIRCLE reader remains strict/no-reactor. */
+int musa_dwg_ac1032_scene_index_circle_reactor_layer_provenance(
+    const MusaDwgAc1032SceneIndex *s,uint64_t h,
+    MusaDwgAc1032CircleReactorLayerProvenance *out){
+    if(!h||!check_output(s,out,sizeof(*out)))return 0;
+    MusaDwgAc1032CircleReactorLayerProvenance v={0};
+    if(!musa_dwg_ac1032_scene_index_circle_reactor_h_tail_probe(
+           s,h,&v.tail)||
+       !v.tail.original_record_crc_verified||
+       !v.tail.strict_common_verified||
+       v.tail.indexed_handle!=h||
+       v.tail.reactor_count!=1u||
+       v.tail.ref_codes[0]!=12u||
+       !v.tail.ref_relative[0]||
+       v.tail.ref_codes[1]!=4u||
+       v.tail.ref_codes[2]!=5u||
+       !v.tail.raw_targets[1]||
+       v.tail.raw_targets[1]==h||
+       v.tail.raw_targets[1]==v.tail.raw_targets[0]||
+       v.tail.raw_targets[1]==v.tail.raw_targets[2]||
+       v.tail.residual_bits_after_three_refs!=3u||
+       !v.tail.one_tail_padding||v.tail.zero_tail_padding||
+       v.tail.owner_layer_roles_verified||
+       v.tail.final_visibility_and_paint_accepted||
+       !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+           s,h,&v.edge)||
+       !musa_dwg_ac1032_block_child_owner_edge_matches(
+           &v.edge,h,v.tail.raw_targets[0],18u)||
+       v.edge.original_owner_wire_code!=12u||
+       !v.edge.original_relative_h12_owner_verified||
+       v.edge.layer_handle!=v.tail.raw_targets[2])return 0;
+    MusaDwgAc1032BlockHeaderTypedChildren block={0};
+    if(!musa_dwg_ac1032_scene_index_block_header_typed_children(
+           s,v.edge.owner_block_header_handle,&block)||
+       !block.all_child_record_types_crc_verified||
+       !block.prefix.original_record_crc_verified||
+       !block.prefix.h_prefix_decoded||
+       !block.prefix.canonical_h_roles_verified||
+       block.prefix.indexed_handle!=v.edge.owner_block_header_handle||
+       block.prefix.child_count>MUSACAD_AC1032_OT49_CHILD_LIMIT)return 0;
+    unsigned matches=0u;
+    for(uint32_t i=0u;i<block.prefix.child_count;i++){
+        if(block.prefix.child_handles[i]==h){
+            if(block.child_object_types[i]!=18u)return 0;
+            matches++;
+        }
+    }
+    if(matches!=1u||
+       !musa_dwg_ac1032_scene_index_read_layer_name(
+           s,v.edge.layer_handle,&v.layer_name)||
+       !v.layer_name.original_record_crc_verified||
+       v.layer_name.indexed_handle!=v.edge.layer_handle||
+       !v.layer_name.utf8_bytes||!v.layer_name.utf8[0]||
+       !musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+           s,v.edge.layer_handle,&v.raw_layer_flags)||
+       !v.raw_layer_flags.source_crc_verified||
+       v.raw_layer_flags.indexed_handle!=v.edge.layer_handle||
+       v.raw_layer_flags.numeric_flags_end_bit<=
+           v.raw_layer_flags.numeric_flags_start_bit||
+       !musa_dwg_ac1032_scene_index_read_curve(s,h,&v.circle)||
+       !v.circle.geometry_decoded||v.circle.object_type!=18u||
+       v.circle.indexed_handle!=h||
+       !v.circle.common.common_decoded||
+       !v.circle.common.prefix.prefix_decoded||
+       v.circle.common.prefix.indexed_handle!=h||
+       v.circle.common.prefix.raw_object_type!=18u||
+       v.circle.common.prefix.reactor_count!=1u)return 0;
+    v.forward_child_membership_verified=1u;
+    v.source_geometry_and_layer_verified=1u;
+    *out=v;
+    return 1;
+}
+
 /* Exact ORIGINAL OT18 H(C-relative owner),H5(layer) source edge.  This
  * grammar is deliberately limited to an R2018 CIRCLE whose authenticated
  * first handle is relative code 0xC and whose second is code 5.  It is

@@ -68,7 +68,7 @@ static int genuine(const char *filename){
                     if(coverage.child_types[k]==18u&&
                        circle_h>=UINT64_C(0xBE49)&&
                        circle_h<=UINT64_C(0xBE4C)){
-                        fprintf(stderr,"DIAG reactor CIRCLE slot H=%llx block=%llx status=%u\\n",
+                        fprintf(stderr,"DIAG reactor CIRCLE slot H=%llx block=%llx status=%u\n",
                             (unsigned long long)circle_h,
                             (unsigned long long)coverage.block_header_handle,
                             coverage.child_status[k]);
@@ -101,6 +101,43 @@ static int genuine(const char *filename){
                         forged.owner_block_header_handle^=1u;
                         if(musa_dwg_ac1032_block_child_owner_edge_matches(
                                &forged,circle_h,coverage.block_header_handle,18u)){
+                            ok=0;break;
+                        }
+                        MusaDwgAc1032CircleReactorLayerProvenance source={0};
+                        if(!musa_dwg_ac1032_scene_index_circle_reactor_layer_provenance(
+                               scene,circle_h,&source)||
+                           !source.forward_child_membership_verified||
+                           !source.source_geometry_and_layer_verified||
+                           source.final_visibility_color_and_paint_accepted||
+                           source.edge.child_handle!=circle_h||
+                           source.edge.owner_block_header_handle!=UINT64_C(0xBE41)||
+                           source.edge.layer_handle!=UINT64_C(0xBF71)||
+                           source.tail.raw_targets[1]!=UINT64_C(0xBE48)||
+                           !source.layer_name.original_record_crc_verified||
+                           source.layer_name.indexed_handle!=UINT64_C(0xBF71)||
+                           !source.layer_name.utf8_bytes||
+                           !source.raw_layer_flags.source_crc_verified||
+                           source.raw_layer_flags.indexed_handle!=UINT64_C(0xBF71)||
+                           !source.circle.geometry_decoded||
+                           source.circle.indexed_handle!=circle_h||
+                           source.circle.common.prefix.reactor_count!=1u||
+                           !isfinite(source.circle.radius)||
+                           source.circle.radius<=0.0){ok=0;break;}
+                        /* Negative evidence: a reactor object, absent H,
+                         * and a zero H must not yield geometry or mutate
+                         * the caller's sentinel result. */
+                        MusaDwgAc1032CircleReactorLayerProvenance untouched;
+                        memset(&untouched,0xa5,sizeof(untouched));
+                        const MusaDwgAc1032CircleReactorLayerProvenance before=untouched;
+                        if(musa_dwg_ac1032_scene_index_circle_reactor_layer_provenance(
+                               scene,UINT64_C(0xBE48),&untouched)||
+                           memcmp(&untouched,&before,sizeof(untouched))||
+                           musa_dwg_ac1032_scene_index_circle_reactor_layer_provenance(
+                               scene,UINT64_MAX,&untouched)||
+                           memcmp(&untouched,&before,sizeof(untouched))||
+                           musa_dwg_ac1032_scene_index_circle_reactor_layer_provenance(
+                               scene,0u,&untouched)||
+                           memcmp(&untouched,&before,sizeof(untouched))){
                             ok=0;break;
                         }
                         reactor_circle_owner_verified++;
