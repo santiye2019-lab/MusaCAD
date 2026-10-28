@@ -24,7 +24,12 @@ int main(void) {
     e.geometry.arc.start_radians = 0;
     e.geometry.arc.end_radians = 3.141592653589793;
     assert(mc2_entity_bounds(&e,&b));
-    assert(b.min_x == -2 && b.max_y == 2);
+    assert(fabs(b.min_x+2)<1e-12 && b.max_x == 2);
+    assert(b.min_y >= -1e-12 && fabs(b.max_y-2)<1e-12);
+    e.geometry.arc.end_radians = 1.5707963267948966;
+    assert(mc2_entity_bounds(&e,&b));
+    assert(b.min_x >= -1e-12 && fabs(b.max_x-2)<1e-12);
+    assert(b.min_y >= -1e-12 && fabs(b.max_y-2)<1e-12);
     e.geometry.arc.end_radians = NAN;
     assert(!mc2_entity_validate(&e));
     return 0;
