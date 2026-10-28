@@ -23,6 +23,8 @@ int mc2_align_byte(Mc2BitReader *r);
  * neither cursor nor output changes.  Raw payload bytes are little-endian. */
 int mc2_read_dwg_bitshort(Mc2BitReader *r, int16_t *out);
 int mc2_read_dwg_bitlong(Mc2BitReader *r, int32_t *out);
+/* DWG BD: raw IEEE-754 double, implicit 1.0, or implicit 0.0. */
+int mc2_read_dwg_bitdouble(Mc2BitReader *r, double *out);
 #ifdef __cplusplus
 }
 #endif
