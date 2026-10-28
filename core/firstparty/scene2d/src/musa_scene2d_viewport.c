@@ -37,7 +37,8 @@ int musa_scene2d_resolve_viewport(
         return 0;
 
     for (size_t i = 0; i < layer_count; ++i)
-        if (viewport_layer_visible[i] > 1) return 0;
+        if (viewport_layer_visible[i] > 1 || layers[i].visible > 1)
+            return 0;
 
     MusaScene2dLayer *effective = malloc(layer_count * sizeof(*effective));
     if (!effective) return 0;
