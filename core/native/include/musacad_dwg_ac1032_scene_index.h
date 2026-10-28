@@ -1014,28 +1014,29 @@ static inline int musa_dwg_ac1032_scene_index_verified_child_line_xy(
     }
     return 0;
 }
-/* Strict source-only CIRCLE envelope for an original INSERT child.
- * All OT49 siblings require authenticated reverse ownership, the exact
- * child requires its own original H4/H12 owner and H5 OT51 layer, and
- * its OT18 curve must be CRC-decoded and entity-visible. A successful
- * envelope is still NOT a viewport, layer-state, BYLAYER or paint grant.
- * Output is unchanged on any failure. */
-static inline int musa_dwg_ac1032_scene_index_verified_child_circle_bounds(
+/* Source-only CIRCLE envelope for an individually authenticated original
+ * INSERT child. Its OT49 slot, H4/H12 reverse owner and H5 OT51 layer
+ * must match. Other siblings MAY be unsupported: that does not invalidate
+ * this individual geometry source, but forbids claiming complete BLOCK
+ * expansion. The original OT7->OT49 affine must be CRC/H authenticated.
+ * No viewport, layer-state, inherited color or final paint acceptance.
+ * All failures preserve the caller's output unchanged. */
+static inline int musa_dwg_ac1032_scene_index_source_child_circle_bounds(
     const MusaDwgAc1032SceneIndex *index,uint64_t insert_handle,
     uint64_t circle_handle,double out_minmax[4]){
     if(!index||!insert_handle||!circle_handle||!out_minmax)return 0;
     double affine[6],bounds[4];
     MusaDwgAc1032InsertBlockChildLayerSource layer={0};
     MusaDwgAc1032NativeCurve circle={0};
-    if(!musa_dwg_ac1032_scene_index_verified_child_affine(
-           index,insert_handle,circle_handle,affine)||
-       !musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
            index,insert_handle,circle_handle,&layer)||
        !layer.original_owner_layer_and_name_verified||
        layer.final_visibility_color_and_paint_accepted||
        layer.insert_handle!=insert_handle||
        layer.child_handle!=circle_handle||
        layer.raw_child_type!=18u||
+       !musa_dwg_ac1032_scene_index_original_insert_block_affine(
+           index,insert_handle,affine)||
        !musa_dwg_ac1032_scene_index_read_curve(
            index,circle_handle,&circle)||
        circle.indexed_handle!=circle_handle||
