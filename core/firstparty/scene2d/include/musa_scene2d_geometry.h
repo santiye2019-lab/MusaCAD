@@ -20,6 +20,13 @@ int musa_scene2d_circle_bounds(double cx, double cy, double radius,
 int musa_scene2d_arc_bounds(double cx, double cy, double radius,
                             double start_rad, double end_rad,
                             MusaScene2dBox *out);
+/* Full planar ELLIPSE bounds from a major-axis vector (ax,ay) and a
+ * positive minor/major ratio <= 1. This is a full ellipse, NOT a partial
+ * elliptic arc. Angles, bulges, extrusion and DWG decoding are outside
+ * this helper. All inputs must be finite; invalid results preserve *out. */
+int musa_scene2d_ellipse_bounds(double cx, double cy,
+                                double ax, double ay, double minor_ratio,
+                                MusaScene2dBox *out);
 #ifdef __cplusplus
 }
 #endif
