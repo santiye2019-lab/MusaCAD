@@ -20,6 +20,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify source boundary
+        run: python MusaCAD2/tests/check_source_boundary.py
       - name: Configure standalone MusaCAD2
         run: cmake -S MusaCAD2 -B build-musacad2 -DBUILD_TESTING=ON
       - name: Build standalone MusaCAD2
