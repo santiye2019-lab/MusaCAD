@@ -30,9 +30,11 @@ static int genuine(const char *filename){
     size_t inserts=0u,source_rows=0u,joined=0u,unsupported=0u;
     size_t complete_style_positive=0u,partial_style_rejected=0u;
     size_t census_inventories=0u,census_unreadable=0u;
+    size_t ot77_h12_verified=0u;
     uint32_t unreadable_by_type[MUSACAD_AC1032_OWNER_GAP_FAMILIES]={0};
     uint64_t first_insert=0u,first_child=0u;
     uint64_t first_unreadable_ot18=0u,first_unreadable_ot77=0u;
+    uint64_t first_ot77_handle=0u;
     for(size_t i=0u;ok&&i<musa_dwg_ac1032_scene_index_count(scene);i++){
         MusaDwgAc1032HandleEntry entry={0};
         uint16_t type=0u;
@@ -54,6 +56,31 @@ static int genuine(const char *filename){
                    census.block_header_handle!=coverage.block_header_handle||
                    census.child_count!=coverage.child_count){ok=0;break;}
                 census_inventories++;
+                for(uint32_t k=0u;k<coverage.child_count;k++){
+                    if(coverage.child_types[k]!=77u)continue;
+                    const uint64_t child=coverage.child_handles[k];
+                    if(!first_ot77_handle)first_ot77_handle=child;
+                    if(coverage.child_status[k]!=MUSACAD_AC1032_BLOCK_OWNER_VERIFIED)
+                        continue;
+                    MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+                    if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                           scene,child,&edge)||
+                       !musa_dwg_ac1032_block_child_owner_edge_matches(
+                           &edge,child,coverage.block_header_handle,77u)){
+                        ok=0;break;
+                    }
+                    if(edge.original_owner_wire_code==12u){
+                        if(!edge.original_relative_h12_owner_verified){ok=0;break;}
+                        MusaDwgAc1032EntityBlockOwnerLayerSource forged=edge;
+                        forged.owner_block_header_handle^=1u;
+                        if(musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &forged,child,coverage.block_header_handle,77u)){
+                            ok=0;break;
+                        }
+                        ot77_h12_verified++;
+                    }
+                }
+                if(!ok)break;
                 if(census.unreadable[1]&&!first_unreadable_ot18)
                     first_unreadable_ot18=census.first_unreadable_handle[1];
                 if(census.unreadable[5]&&!first_unreadable_ot77)
@@ -169,6 +196,7 @@ static int genuine(const char *filename){
         }
     }
     if(ok)ok=census_inventories>0u&&census_unreadable>0u&&
+             ot77_h12_verified>0u&&
              complete_style_positive>0u&&partial_style_rejected>0u&&
              inserts>0u&&source_rows>0u&&joined>0u&&
              joined+unsupported==source_rows;
@@ -192,16 +220,18 @@ static int genuine(const char *filename){
                scene,first_insert,first_child,NULL);
     }
     /* Original OT77 negative owner evidence; no owner role is inferred. */
-    if(ok&&first_unreadable_ot77){
+    if(ok&&(first_unreadable_ot77||first_ot77_handle)){
+        const uint64_t sample=first_unreadable_ot77?
+            first_unreadable_ot77:first_ot77_handle;
         MusaDwgAc1032LWPolylineHTailProbe p={0};
         ok=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-               scene,first_unreadable_ot77,&p)&&
+               scene,sample,&p)&&
            p.original_record_crc_verified&&
-           p.indexed_handle==first_unreadable_ot77&&
+           p.indexed_handle==sample&&
            p.raw_object_type==77u&&
            !p.final_owner_layer_visibility_and_paint_accepted;
         if(ok){
-            fprintf(stderr,"DIAG genuine OT77 unreadable H=%llx "
+            fprintf(stderr,"DIAG genuine OT77 source H=%llx "
                 "first=%u/%u/%llx second=%u/%u/%llx "
                 "residual=%llu zero_pad=%u one_pad=%u "
                 "entity_mode=%u reactor=%u xdict_missing=%u\n",
@@ -224,10 +254,10 @@ static int genuine(const char *filename){
                      scene,UINT64_MAX,&untouched)&&
                !memcmp(&untouched,&before,sizeof(untouched))&&
                !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-                     NULL,first_unreadable_ot77,&untouched)&&
+                     NULL,sample,&untouched)&&
                !memcmp(&untouched,&before,sizeof(untouched))&&
                !musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
-                     scene,first_unreadable_ot77,NULL);
+                     scene,sample,NULL);
         }
     }
     /* Existing CIRCLE H-tail decoder is independently inspected on the
