@@ -6,5 +6,8 @@
 /* Vertices are connected in order; closed connects last to first. */
 int mc2_polyline_bounds(const Mc2Point2 *vertices,size_t count,int closed,
                         const Mc2Affine2 *transform,Mc2Bounds2 *out);
+/* Signed shoelace area: positive for counterclockwise closed polygons. */
+int mc2_polyline_signed_area(const Mc2Point2 *vertices,size_t count,
+                             int closed,double *out_area);
 double mc2_polyline_length(const Mc2Point2 *vertices,size_t count,int closed);
 #endif
