@@ -565,11 +565,11 @@ typedef struct MusaDwgAc1032EntityBlockOwnerLayerSource {
     uint8_t original_child_record_crc_verified;
     uint8_t original_owner_and_layer_records_crc_verified;
     /* Historical name: verified exact owner + layer graph role. The
-     * canonical original handle stream may encode OT18's owner as absolute
+     * canonical original handle stream may encode OT18/OT19/OT77 owner as absolute
      * H4 or the independently verified H12 base-relative reference.
      * Explicitly retain its raw wire code instead of claiming both H4. */
     uint8_t exact_h4_owner_and_h5_layer_source_verified;
-    uint8_t original_owner_wire_code; /* original 4 or OT18-only 12 */
+    uint8_t original_owner_wire_code; /* original H4 or verified H12 */
     uint8_t original_relative_h12_owner_verified;
     uint8_t visible_scene_and_paint_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032EntityBlockOwnerLayerSource;
@@ -600,7 +600,7 @@ static inline int musa_dwg_ac1032_block_child_owner_edge_matches(
        edge->visible_scene_and_paint_accepted)return 0;
     if(edge->original_owner_wire_code==4u)
         return !edge->original_relative_h12_owner_verified;
-    return (type==18u||type==19u)&&
+    return (type==18u||type==19u||type==77u)&&
            edge->original_owner_wire_code==12u&&
            edge->original_relative_h12_owner_verified;
 }
@@ -986,6 +986,26 @@ typedef struct MusaDwgAc1032LineHTailProbe {
 int musa_dwg_ac1032_scene_index_line_h_tail_probe(
     const MusaDwgAc1032SceneIndex *scene,uint64_t line_handle,
     MusaDwgAc1032LineHTailProbe *out);
+
+/* R2018 OT77 original CRC-indexed HANDLE tail diagnostics.
+ * These are raw decoded references, NOT authenticated owner/layer roles.
+ * Residual bits and padding profiles are observed, never inferred.
+ * No source visibility, color or paint permission is granted. */
+typedef struct MusaDwgAc1032LWPolylineHTailProbe {
+    uint64_t indexed_handle,handle_start_bit,handle_end_bit;
+    uint64_t first_raw_target,second_raw_target,residual_bits_after_two_refs;
+    uint32_t reactor_count;
+    uint16_t raw_object_type;
+    uint8_t entity_mode,xdictionary_missing,has_color_reference;
+    uint8_t linetype_flags,plotstyle_flags,material_flags,visualstyle_flags;
+    uint8_t first_ref_decoded,first_ref_code,first_ref_count,first_ref_relative;
+    uint8_t second_ref_decoded,second_ref_code,second_ref_count,second_ref_relative;
+    uint8_t zero_tail_padding,one_tail_padding,original_record_crc_verified;
+    uint8_t final_owner_layer_visibility_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032LWPolylineHTailProbe;
+int musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
+    const MusaDwgAc1032SceneIndex *scene,uint64_t lwpolyline_handle,
+    MusaDwgAc1032LWPolylineHTailProbe *out);
 
 /* R2018 OT18 original CRC/H forensic probe. first_raw_target and
  * second_raw_target are untrusted H references, NOT certified owner/layer.
