@@ -51,5 +51,15 @@ int main(void) {
     assert(fabs(b.min_y+2)<1e-12 && fabs(b.max_y-2)<1e-12);
     e.geometry.arc.end_radians = NAN;
     assert(!mc2_entity_validate(&e));
+    /* Finite endpoints may still overflow the bounds representation: no partial output. */
+    e.kind = MC2_ENTITY_LINE;
+    e.geometry.line.start = (Mc2Point2){1e308, 0};
+    e.geometry.line.end = (Mc2Point2){-1e308, 1};
+    assert(mc2_entity_bounds(&e, &b));
+    assert(b.min_x == -1e308 && b.max_x == 1e308);
+    e.geometry.line.start.x = INFINITY;
+    b = (Mc2Bounds2){11, 12, 13, 14};
+    assert(!mc2_entity_bounds(&e, &b));
+    assert(b.min_x == 11 && b.min_y == 12 && b.max_x == 13 && b.max_y == 14);
     return 0;
 }
