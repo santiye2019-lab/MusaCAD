@@ -64,6 +64,7 @@ int mc2_entity_bounds(const Mc2Entity2 *e, Mc2Bounds2 *out) {
             }
         }
     }
+    if (!isfinite(b.min_x) || !isfinite(b.min_y) || !isfinite(b.max_x) || !isfinite(b.max_y)) return 0;
     *out = b;
     return 1;
 }
