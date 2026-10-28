@@ -14,8 +14,10 @@ int mc2_entity_validate(const Mc2Entity2 *e) {
         return valid_point(e->geometry.arc.center) && valid_radius(e->geometry.arc.radius) &&
                isfinite(e->geometry.arc.start_radians) && isfinite(e->geometry.arc.end_radians) &&
                e->geometry.arc.start_radians >= 0.0 &&
+               e->geometry.arc.start_radians < 6.28318530717958647693 &&
+               e->geometry.arc.end_radians >= 0.0 &&
                e->geometry.arc.end_radians <= 6.28318530717958647693 &&
-               e->geometry.arc.start_radians < e->geometry.arc.end_radians;
+               e->geometry.arc.start_radians != e->geometry.arc.end_radians;
     default: return 0;
     }
 }
@@ -52,7 +54,9 @@ int mc2_entity_bounds(const Mc2Entity2 *e, Mc2Bounds2 *out) {
             const double pi=3.14159265358979323846;
             for (int k=0;k<4;++k) {
                 double angle=k*pi/2.0;
-                if (angle>=start && angle<=end) {
+                /* Arc sweeps counterclockwise; end < start wraps across 0. */
+                if ((start<end && angle>=start && angle<=end) ||
+                    (start>end && (angle>=start || angle<=end))) {
                     double px=c.x+r*cos(angle),py=c.y+r*sin(angle);
                     if (!isfinite(px)||!isfinite(py)) return 0;
                     add_point(&b,px,py);
