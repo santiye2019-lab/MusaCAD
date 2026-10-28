@@ -86,7 +86,7 @@ static int genuine(const char *filename){
                     }
                     fprintf(stderr,"DIAG genuine OT18 H=%llx stage=%u "
                         "prefix_reason=%u embedded=%llx mode=%u eed=%u "
-                        "preview=%u reactors=%u xdict_missing=%u ds=%u\\n",
+                        "preview=%u reactors=%u xdict_missing=%u ds=%u\n",
                         (unsigned long long)child,prefix.fetch_stage,
                         prefix.prefix_reason,
                         (unsigned long long)prefix.embedded_self_handle,
