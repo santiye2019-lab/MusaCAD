@@ -11,6 +11,7 @@ int mc2_viewport_collect(const Mc2SceneItem *items,size_t count,
         (capacity && !out) || !isfinite(viewport.min_x) || !isfinite(viewport.max_x) ||
         !isfinite(viewport.min_y) || !isfinite(viewport.max_y) ||
         viewport.min_x>viewport.max_x || viewport.min_y>viewport.max_y) return 0;
+    /* Two-pass validation prevents partially populated output on failure. */
     size_t produced=0;
     for (size_t i=0;i<count;++i) {
         Mc2EntityAppearance appearance;
@@ -18,12 +19,21 @@ int mc2_viewport_collect(const Mc2SceneItem *items,size_t count,
         if (!mc2_scene_resolve(items,count,i,layers,layer_count,0xffffff,&appearance) ||
             !mc2_entity_world_bounds(&items[i].entity,&world_transforms[i],&bounds)) return 0;
         if (!appearance.visible || !mc2_bounds_intersects(&bounds,&viewport)) continue;
-        if (produced>=capacity) return 0;
-        out[produced].index=i;
-        out[produced].world_bounds=bounds;
-        out[produced].color_rgb=appearance.effective_rgb;
         ++produced;
     }
-    *out_count=produced;
+    if (produced>capacity) return 0;
+    size_t written=0;
+    for (size_t i=0;i<count;++i) {
+        Mc2EntityAppearance appearance;
+        Mc2Bounds2 bounds;
+        if (!mc2_scene_resolve(items,count,i,layers,layer_count,0xffffff,&appearance) ||
+            !mc2_entity_world_bounds(&items[i].entity,&world_transforms[i],&bounds)) return 0;
+        if (!appearance.visible || !mc2_bounds_intersects(&bounds,&viewport)) continue;
+        out[written].index=i;
+        out[written].world_bounds=bounds;
+        out[written].color_rgb=appearance.effective_rgb;
+        ++written;
+    }
+    *out_count=written;
     return 1;
 }
