@@ -242,7 +242,7 @@ static int genuine(const char *filename){
         if(ok){
             fprintf(stderr,"DIAG genuine OT18 unreadable H=%llx "
                 "status=%u first=%u/%u/%llx second=%u/%u/%llx "
-                "residual=%llu entity_mode=%u reactor=%u\\n",
+                "residual=%llu entity_mode=%u reactor=%u\n",
                 (unsigned long long)p.indexed_handle,p.profile_status,
                 p.first_ref_decoded,p.first_ref_code,
                 (unsigned long long)p.first_raw_target,
