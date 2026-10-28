@@ -30,6 +30,8 @@ int mc2_read_dwg_bitdouble(Mc2BitReader *r, double *out);
 typedef struct { uint8_t code; uint64_t handle; } Mc2DwgHandleRef;
 int mc2_read_dwg_handle(Mc2BitReader *r, uint64_t base_handle,
                         Mc2DwgHandleRef *out);
+/* R2010+ (including AC1032) object type selector. */
+int mc2_read_dwg_object_type(Mc2BitReader *r, uint16_t *out);
 #ifdef __cplusplus
 }
 #endif
