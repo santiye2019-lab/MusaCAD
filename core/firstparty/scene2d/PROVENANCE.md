@@ -39,3 +39,9 @@
 - **License and boundary:** MIT SPDX headers, standard C11 `math.h` and `float.h` only. Part of the isolated `musacad_independent_scene2d` target, not the existing GPL-marked native CAD core or Android DWG JNI.
 - **Coverage:** LINE, CIRCLE and counterclockwise ARC local AABBs; wraparound, full-circle sweeps, zero-sweep arcs, invalid/nonfinite inputs, overflow, output rollback and 5000 sampled arc sweeps.
 - **Limitations:** Requires already decoded primitive coordinates; it does not parse DWG, resolve OCS extrusion or elevation, interpret text/fonts or bulged polylines, render geometry, or demonstrate successful real-file opening. The input coordinates must be in the same local coordinate system as the scene resolver.
+
+## Full-ellipse analytic bounds extension (2026-10-29)
+
+- **Scope:** Added `musa_scene2d_ellipse_bounds` to the same independent MIT C11 geometry module. The implementation follows directly from the norms of the two Cartesian sinusoidal coefficients of an ellipse with major-axis vector `(ax, ay)` and perpendicular minor axis `ratio*(-ay, ax)`. No third-party CAD code, GPL/LGPL/AGPL sources or legacy MusaCAD implementation was imported.
+- **Validation:** Positive finite major-axis length, minor/major ratio in `(0,1]`, finite center and extents; rejects invalid or overflowing input without altering the output. Tests sample 4096 points on a rotated ellipse, check exact axis extrema, invalid inputs, rollback, and composition with nested-block world bounds and viewport culling.
+- **Limits:** Only **full planar ellipses** after coordinate decoding; not partial ELLIPSE arcs, OCS/extrusion, real DWG object parsing, or Android rendering. These limitations must not be represented as full AC1032 support. CI must be checked for the new commits.
