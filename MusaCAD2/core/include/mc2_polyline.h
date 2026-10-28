@@ -4,6 +4,12 @@
 #include "mc2_transform.h"
 #include <stddef.h>
 /* Vertices are connected in order; closed connects last to first. */
+/* Tight affine-space bounds for straight and circular bulge segments.
+ * The bulge at vertex i controls edge i->i+1 (including closing edge).
+ * Returns 0 for malformed geometry without changing out. */
+int mc2_polyline_bulge_bounds(const Mc2Point2 *vertices,
+                              const double *bulges, size_t count, int closed,
+                              const Mc2Affine2 *transform, Mc2Bounds2 *out);
 int mc2_polyline_bounds(const Mc2Point2 *vertices,size_t count,int closed,
                         const Mc2Affine2 *transform,Mc2Bounds2 *out);
 /* Signed shoelace area: positive for counterclockwise closed polygons. */
