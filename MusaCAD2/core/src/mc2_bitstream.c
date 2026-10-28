@@ -130,3 +130,40 @@ int mc2_read_dwg_bitdouble(Mc2BitReader *r, double *out) {
     *r = candidate;
     return 1;
 }
+
+int mc2_read_dwg_handle(Mc2BitReader *r, uint64_t base_handle,
+                        Mc2DwgHandleRef *out) {
+    if (!r || !out) return 0;
+    Mc2BitReader candidate = *r;
+    uint32_t code, count;
+    if (!mc2_read_bits_msb(&candidate, 4, &code) ||
+        !mc2_read_bits_msb(&candidate, 4, &count)) return 0;
+    if (count > 8) return 0;
+    if (code != 0 && code != 2 && code != 3 && code != 4 &&
+        code != 5 && code != 6 && code != 8 && code != 10 && code != 12)
+        return 0;
+    if ((code == 6 || code == 8) && count != 0) return 0;
+    uint64_t value = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t octet;
+        if (!mc2_read_bits_msb(&candidate, 8, &octet)) return 0;
+        value = (value << 8) | (uint64_t)octet;
+    }
+    if (code == 6) {
+        if (base_handle == UINT64_MAX) return 0;
+        value = base_handle + 1;
+    } else if (code == 8) {
+        if (base_handle == 0) return 0;
+        value = base_handle - 1;
+    } else if (code == 10) {
+        if (value > UINT64_MAX - base_handle) return 0;
+        value += base_handle;
+    } else if (code == 12) {
+        if (value > base_handle) return 0;
+        value = base_handle - value;
+    }
+    Mc2DwgHandleRef result = {(uint8_t)code, value};
+    *out = result;
+    *r = candidate;
+    return 1;
+}
