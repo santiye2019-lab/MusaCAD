@@ -14,6 +14,8 @@ int mc2_bitreader_init(Mc2BitReader *r, const uint8_t *data, size_t length);
 size_t mc2_bits_remaining(const Mc2BitReader *r);
 int mc2_read_bits_msb(Mc2BitReader *r, unsigned count, uint32_t *out);
 int mc2_read_bits_msb64(Mc2BitReader *r, unsigned count, uint64_t *out);
+/* Little-endian bit fields: first bit read has numeric weight 2^0. */
+int mc2_read_bits_lsb64(Mc2BitReader *r, unsigned count, uint64_t *out);
 int mc2_seek_bits(Mc2BitReader *r, size_t position);
 int mc2_skip_bits(Mc2BitReader *r, size_t count);
 int mc2_align_byte(Mc2BitReader *r);
