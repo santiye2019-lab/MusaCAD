@@ -259,7 +259,7 @@ static int genuine(const char *filename){
             const int r3=musa_dwg_ac1032_scene_index_lwpolyline_h_tail_probe(
                 scene,sample,NULL);
             fprintf(stderr,"DIAG genuine OT77 negative probes "
-                "r=%d/%d/%d/%d unchanged=%d/%d/%d\\n",
+                "r=%d/%d/%d/%d unchanged=%d/%d/%d\n",
                 r0,r1,r2,r3,b0,b1,b2);
             ok=!r0&&b0&&!r1&&b1&&!r2&&b2&&!r3;
         }
@@ -272,7 +272,7 @@ static int genuine(const char *filename){
             scene,first_unreadable_ot18,&p);
         fprintf(stderr,"DIAG genuine OT18 unreadable H=%llx "
             "profile_readable=%d status=%u first=%u/%u/%llx "
-            "second=%u/%u/%llx residual=%llu\\n",
+            "second=%u/%u/%llx residual=%llu\n",
             (unsigned long long)first_unreadable_ot18,profile_ok,
             p.profile_status,p.first_ref_decoded,p.first_ref_code,
             (unsigned long long)p.first_raw_target,
@@ -295,7 +295,7 @@ static int genuine(const char *filename){
                 scene,UINT64_MAX,&untouched)&&
            !memcmp(&untouched,before,sizeof(before));
     }
-    fprintf(stderr,"DIAG genuine OT77 verified H12 owner edges=%zu\\n",
+    fprintf(stderr,"DIAG genuine OT77 verified H12 owner edges=%zu\n",
             ot77_h12_verified);
     fprintf(stderr,"DIAG genuine R2018 owner gap by OT: "
                    "OT17=%u OT18=%u OT19=%u OT27=%u OT35=%u OT77=%u "
