@@ -28,5 +28,15 @@ int main(void) {
     assert(mc2_read_bits_msb64(&r,12,&large) && large == 0x234);
     assert(!mc2_seek_bits(&r,65) && r.bit_position == 16);
     assert(!mc2_read_bits_msb64(&r,65,&large));
+    const uint8_t little[] = {0x96,0x31,0xff,0xff,0xff,0xff,0xff,0xff};
+    assert(mc2_bitreader_init(&r,little,sizeof little));
+    assert(mc2_read_bits_lsb64(&r,4,&large) && large==6);
+    assert(mc2_read_bits_lsb64(&r,8,&large) && large==0x19);
+    assert(mc2_seek_bits(&r,0));
+    assert(mc2_read_bits_lsb64(&r,64,&large) && large==UINT64_C(0xffffffffffff3196));
+    assert(!mc2_read_bits_lsb64(&r,1,&large) && r.bit_position==64);
+    assert(!mc2_read_bits_lsb64(&r,65,&large) && r.bit_position==64);
+    assert(mc2_seek_bits(&r,7));
+    assert(mc2_read_bits_lsb64(&r,2,&large) && large==3);
     return 0;
 }
