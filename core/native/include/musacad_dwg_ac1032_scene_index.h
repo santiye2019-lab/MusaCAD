@@ -294,6 +294,46 @@ static inline int musa_dwg_ac1032_transform_planar_segment(
     for(unsigned i=0;i<4u;i++)out_xy[i]=transformed[i];
     return 1;
 }
+/* Source-only exact planar CIRCLE -> affine WCS XY envelope.
+ * A nonuniform INSERT transform makes a circle an ellipse; the extrema
+ * of each transformed coordinate are radius*hypot(row coefficients).
+ * Admit only OCS +Z and zero thickness; tilted or mirrored OCS requires
+ * a separate proven basis conversion. Round outward for view culling.
+ * The caller must independently verify original owner, layer, space,
+ * visibility and color before drawing. Fail-atomic on unsupported data. */
+static inline int musa_dwg_ac1032_planar_circle_affine_bounds(
+    const MusaDwgAc1032NativeCurve *circle,
+    const double m[6],double out_minmax[4]){
+    if(!circle||!m||!out_minmax||
+       !circle->geometry_decoded||circle->object_type!=18u||
+       !circle->indexed_handle||
+       !isfinite(circle->radius)||circle->radius<=0.0||
+       !isfinite(circle->thickness)||circle->thickness!=0.0||
+       circle->extrusion[0]!=0.0||
+       circle->extrusion[1]!=0.0||
+       circle->extrusion[2]!=1.0)return 0;
+    for(unsigned i=0u;i<3u;i++)
+        if(!isfinite(circle->center[i])||
+           !isfinite(circle->extrusion[i]))return 0;
+    for(unsigned i=0u;i<6u;i++)if(!isfinite(m[i]))return 0;
+    const double x=m[0]*circle->center[0]+
+                   m[1]*circle->center[1]+m[2];
+    const double y=m[3]*circle->center[0]+
+                   m[4]*circle->center[1]+m[5];
+    const double rx=circle->radius*hypot(m[0],m[1]);
+    const double ry=circle->radius*hypot(m[3],m[4]);
+    if(!isfinite(x)||!isfinite(y)||!isfinite(rx)||!isfinite(ry))
+        return 0;
+    const double bounds[4]={
+        nextafter(x-rx,-INFINITY),nextafter(y-ry,-INFINITY),
+        nextafter(x+rx,INFINITY),nextafter(y+ry,INFINITY)};
+    for(unsigned i=0u;i<4u;i++)
+        if(!isfinite(bounds[i]))return 0;
+    if(bounds[0]>bounds[2]||bounds[1]>bounds[3])return 0;
+    for(unsigned i=0u;i<4u;i++)out_minmax[i]=bounds[i];
+    return 1;
+}
+
 /* Fold any representable number of ancestor-to-descendant INSERT transforms; caller
  * must independently authenticate each owner edge. No graph traversal. */
 static inline int musa_dwg_ac1032_fold_planar_affine_chain(
