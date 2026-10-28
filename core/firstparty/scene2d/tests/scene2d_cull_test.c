@@ -32,6 +32,24 @@ int main(void) {
     assert(musa_scene2d_collect_visible(nodes,resolved,boxes,5,
                                         near_child,indices,5,&written));
     assert(written == 1 && indices[0] == 1);
+    /* Exact viewport-edge contact must not be dropped. */
+    const MusaScene2dBox touch = {14,25,14,25};
+    assert(musa_scene2d_collect_visible(nodes,resolved,boxes,5,
+                                        touch,indices,5,&written));
+    assert(written == 1 && indices[0] == 1);
+    /* Reflection and shear: four-corner bounds, not just two corners. */
+    MusaScene2dNode sheared[5];
+    memcpy(sheared,nodes,sizeof sheared);
+    sheared[3].affine[0] = -1;
+    sheared[3].affine[1] = 0.5;
+    sheared[3].affine[2] = 0.5;
+    sheared[3].affine[3] = 1;
+    assert(musa_scene2d_resolve(sheared,5,layers,3,resolved,5,&written));
+    const MusaScene2dBox shear_corner = {0.75,2.75,1,3};
+    assert(musa_scene2d_collect_visible(sheared,resolved,boxes,5,
+                                        shear_corner,indices,5,&written));
+    assert(written == 1 && indices[0] == 3);
+    assert(musa_scene2d_resolve(nodes,5,layers,3,resolved,5,&written));
     const MusaScene2dBox near_rotated = {-2,0,0,2};
     assert(musa_scene2d_collect_visible(nodes,resolved,boxes,5,
                                         near_rotated,indices,5,&written));
