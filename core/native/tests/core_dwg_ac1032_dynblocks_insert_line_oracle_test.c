@@ -187,7 +187,11 @@ static int original(const char *filename){
             if(!ok)break;
             /* Real unchanged R2018: only fully owner-verified OT49 blocks
              * may release source affine or LINE WCS. Partial blocks reject. */
-            if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)){
+            uint32_t owner_verified_line_children=0u;
+            for(uint32_t z=0u;z<coverage.child_count;z++)
+                if(coverage.child_types[z]==19u)owner_verified_line_children++;
+            if(musa_dwg_ac1032_block_owner_coverage_complete(&coverage)&&
+               owner_verified_line_children){
                 double source_affine[6]={0};
                 MusaDwgAc1032InsertBlockLineSources source_lines={0};
                 MusaDwgAc1032InsertLineSourceSegments independent_lines={0};
@@ -474,6 +478,32 @@ static int original(const char *filename){
                 }
                 complete_layer_negative++;
                 owner_affine_negative++;
+            }else if(musa_dwg_ac1032_block_owner_coverage_complete(
+                          &coverage)){
+                /* A valid BLOCK can contain only LWPOLYLINE/CIRCLE/etc.
+                 * Complete ownership does not imply it has LINE rows. */
+                MusaDwgAc1032InsertBlockLineSources empty={0};
+                if(owner_verified_line_children||
+                   !musa_dwg_ac1032_scene_index_complete_block_line_sources(
+                       scene,entry.handle,&empty)||
+                   empty.insert_handle!=entry.handle||
+                   empty.block_header_handle!=coverage.block_header_handle||
+                   !empty.original_source_geometry_verified||
+                   empty.line_count||empty.final_display_accepted){
+                    ok=0;break;
+                }
+                double affine[6]={0};
+                if(!musa_dwg_ac1032_scene_index_original_insert_block_affine(
+                       scene,entry.handle,affine)){ok=0;break;}
+                for(uint32_t z=0u;z<coverage.child_count;z++){
+                    double verified[6]={0};
+                    if(!musa_dwg_ac1032_scene_index_verified_child_affine(
+                           scene,entry.handle,coverage.child_handles[z],
+                           verified)){ok=0;break;}
+                    for(unsigned k=0u;k<6u;k++)
+                        if(!near(verified[k],affine[k]))ok=0;
+                }
+                if(!ok)break;
             }else if(coverage.child_count){
                 MusaDwgAc1032InsertBlockLineSources unchanged_bulk;
                 memset(&unchanged_bulk,0xa5,sizeof(unchanged_bulk));
