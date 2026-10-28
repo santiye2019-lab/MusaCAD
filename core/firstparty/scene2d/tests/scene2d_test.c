@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_scene2d.h"
+#ifdef NDEBUG
+#undef NDEBUG /* Assertions must run in Release CI builds too. */
+#endif
 #include <assert.h>
 #include <math.h>
 #include <stdint.h>
