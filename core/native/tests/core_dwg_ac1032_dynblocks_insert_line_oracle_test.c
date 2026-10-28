@@ -7,6 +7,7 @@
 #include "musacad_dwg_ac1032_insert_line_source_segments.h"
 #include "musacad_dwg_ac1032_complete_block_line_batch.h"
 #include "musacad_dwg_ac1032_complete_block_line_bounds.h"
+#include "musacad_dwg_ac1032_complete_block_line_rebased.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -58,6 +59,7 @@ static int original(const char *filename){
     size_t complete_layer_partial_rejected=0u;
     size_t complete_batch_positive=0u,complete_batch_partial_rejected=0u;
     size_t complete_bounds_positive=0u,complete_bounds_partial_rejected=0u;
+    size_t rebased_positive=0u,rebased_partial_rejected=0u;
     size_t child_layer_joined=0u,child_layer_unavailable=0u;
     uint64_t first_rejected_insert=0u;
     size_t source_graph_first_failure=0u;
@@ -263,6 +265,100 @@ static int original(const char *filename){
                    (double)framed[1]>expected_min[1]||
                    (double)framed[2]<expected_max[0]||
                    (double)framed[3]<expected_max[1]){ok=0;break;}
+                /* Genuine R2018 source -> bounded double-origin/float
+                 * transport, checked against independently read WCS XY.
+                 * This is source geometry only, NEVER a paint permit. */
+                const double span_x=bounds.max_xy[0]-bounds.min_xy[0];
+                const double span_y=bounds.max_xy[1]-bounds.min_xy[1];
+                const double tolerance=1e-4+fmax(span_x,span_y)*1e-5;
+                MusaDwgAc1032CompleteBlockLineRebased rebased={0};
+                if(!musa_dwg_ac1032_complete_block_line_rebased(
+                       scene,entry.handle,tolerance,&rebased)||
+                   !rebased.original_complete_source_rebased_verified||
+                   rebased.final_visibility_color_and_paint_accepted||
+                   rebased.insert_handle!=entry.handle||
+                   rebased.block_header_handle!=bounds.block_header_handle||
+                   rebased.line_count!=batch.line_count||
+                   rebased.max_absolute_roundtrip_error>tolerance||
+                   rebased.origin_xy[0]!=bounds.min_xy[0]||
+                   rebased.origin_xy[1]!=bounds.min_xy[1]){ok=0;break;}
+                for(uint32_t q=0u;q<rebased.line_count;q++){
+                    if(rebased.child_handles[q]!=
+                       batch.lines[q].source.child_handle){ok=0;break;}
+                    const double original_xy[4]={
+                        batch.lines[q].source.world_start[0],
+                        batch.lines[q].source.world_start[1],
+                        batch.lines[q].source.world_end[0],
+                        batch.lines[q].source.world_end[1]};
+                    for(unsigned k=0u;k<4u;k++){
+                        const double reconstructed=
+                            rebased.origin_xy[k%2u]+
+                            (double)rebased.relative_xy[q][k];
+                        if(!isfinite(reconstructed)||
+                           fabs(reconstructed-original_xy[k])>tolerance)
+                            ok=0;
+                    }
+                }
+                if(!ok)break;
+                MusaDwgAc1032CompleteBlockLineRebased unchanged_rebased;
+                memset(&unchanged_rebased,0xa5,sizeof(unchanged_rebased));
+                const MusaDwgAc1032CompleteBlockLineRebased before_rebased=
+                    unchanged_rebased;
+                if(musa_dwg_ac1032_complete_block_line_rebased(
+                       scene,entry.handle,-1.0,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))||
+                   musa_dwg_ac1032_complete_block_line_rebased(
+                       scene,entry.handle,NAN,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineBatch forged_batch=batch;
+                forged_batch.lines[0].source.layer_handle=0u;
+                if(musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &forged_batch,&bounds,tolerance,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))){ok=0;break;}
+                forged_batch=batch;
+                forged_batch.lines[0].source.world_start[0]=NAN;
+                if(musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &forged_batch,&bounds,tolerance,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineBounds forged_bounds=bounds;
+                forged_bounds.min_xy[0]-=1.0;
+                if(musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &batch,&forged_bounds,tolerance,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))){ok=0;break;}
+                /* Independent synthetic precision oracle: a strict zero
+                 * WCS error budget must reject a non-exact float delta,
+                 * whereas a bounded error budget must reconstruct it. */
+                MusaDwgAc1032CompleteBlockLineBatch precision=batch;
+                MusaDwgAc1032CompleteBlockLineBounds precision_bounds=bounds;
+                precision.line_count=1u;
+                precision_bounds.line_count=1u;
+                precision.lines[0].source.world_start[0]=0.1;
+                precision.lines[0].source.world_start[1]=0.1;
+                precision.lines[0].source.world_end[0]=0.3;
+                precision.lines[0].source.world_end[1]=0.4;
+                precision_bounds.min_xy[0]=0.1;
+                precision_bounds.min_xy[1]=0.1;
+                precision_bounds.max_xy[0]=0.3;
+                precision_bounds.max_xy[1]=0.4;
+                if(musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &precision,&precision_bounds,0.0,&unchanged_rebased)||
+                   memcmp(&unchanged_rebased,&before_rebased,
+                          sizeof(unchanged_rebased))){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineRebased bounded={0};
+                if(!musa_dwg_ac1032_complete_block_line_rebase_checked(
+                       &precision,&precision_bounds,1e-5,&bounded)||
+                   !bounded.original_complete_source_rebased_verified||
+                   bounded.final_visibility_color_and_paint_accepted||
+                   bounded.line_count!=1u||
+                   bounded.max_absolute_roundtrip_error>1e-5){
+                    ok=0;break;
+                }
+                rebased_positive++;
                 complete_bounds_positive++;
                 complete_batch_positive++;
                 owner_bulk_positive++;
@@ -404,6 +500,15 @@ static int original(const char *filename){
                        scene,entry.handle,&unchanged_bounds)||
                    memcmp(&unchanged_bounds,&before_bounds,
                           sizeof(unchanged_bounds))){ok=0;break;}
+                MusaDwgAc1032CompleteBlockLineRebased rejected_rebased;
+                memset(&rejected_rebased,0xa5,sizeof(rejected_rebased));
+                const MusaDwgAc1032CompleteBlockLineRebased
+                    before_rejected_rebased=rejected_rebased;
+                if(musa_dwg_ac1032_complete_block_line_rebased(
+                       scene,entry.handle,1.0,&rejected_rebased)||
+                   memcmp(&rejected_rebased,&before_rejected_rebased,
+                          sizeof(rejected_rebased))){ok=0;break;}
+                rebased_partial_rejected++;
                 complete_bounds_partial_rejected++;
                 complete_batch_partial_rejected++;
                 owner_bulk_partial_rejected++;
@@ -748,6 +853,9 @@ static int original(const char *filename){
              owner_affine_negative>0u&&owner_affine_partial_rejected>0u&&
              owner_bulk_positive>0u&&owner_bulk_partial_rejected>0u&&
              complete_batch_positive==owner_bulk_positive&&
+             rebased_positive==complete_bounds_positive&&
+             rebased_positive>0u&&
+             rebased_partial_rejected==complete_bounds_partial_rejected&&
              complete_bounds_positive==complete_batch_positive&&
              complete_bounds_partial_rejected==complete_batch_partial_rejected&&
              complete_batch_partial_rejected==owner_bulk_partial_rejected&&
