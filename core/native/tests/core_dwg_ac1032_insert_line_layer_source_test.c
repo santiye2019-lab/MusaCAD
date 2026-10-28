@@ -31,6 +31,8 @@ static int genuine(const char *filename){
     size_t complete_style_positive=0u,partial_style_rejected=0u;
     size_t census_inventories=0u,census_unreadable=0u;
     size_t ot77_h12_verified=0u;
+    uint32_t circle_unreadable_stages[6]={0};
+    size_t circle_unreadable=0u;
     uint32_t unreadable_by_type[MUSACAD_AC1032_OWNER_GAP_FAMILIES]={0};
     uint64_t first_insert=0u,first_child=0u;
     uint64_t first_unreadable_ot18=0u,first_unreadable_ot77=0u;
@@ -56,6 +58,37 @@ static int genuine(const char *filename){
                    census.block_header_handle!=coverage.block_header_handle||
                    census.child_count!=coverage.child_count){ok=0;break;}
                 census_inventories++;
+                for(uint32_t k=0u;k<coverage.child_count;k++){
+                    if(coverage.child_types[k]!=18u||
+                       coverage.child_status[k]!=
+                           MUSACAD_AC1032_BLOCK_OWNER_UNREADABLE)continue;
+                    MusaDwgAc1032CircleDecodeStage stage={0};
+                    const uint64_t child=coverage.child_handles[k];
+                    if(!musa_dwg_ac1032_scene_index_circle_decode_stage(
+                           scene,child,&stage)||
+                       stage.indexed_handle!=child||
+                       stage.raw_object_type!=18u||
+                       stage.fetch_stage>5u||
+                       !stage.original_record_crc_verified||
+                       stage.owner_layer_visibility_and_paint_accepted){
+                        ok=0;break;
+                    }
+                    circle_unreadable_stages[stage.fetch_stage]++;
+                    circle_unreadable++;
+                    MusaDwgAc1032CircleDecodeStage untouched;
+                    memset(&untouched,0xa5,sizeof(untouched));
+                    unsigned char before[sizeof(untouched)];
+                    memcpy(before,&untouched,sizeof(before));
+                    if(musa_dwg_ac1032_scene_index_circle_decode_stage(
+                           scene,0u,&untouched)||
+                       memcmp(&untouched,before,sizeof(before))||
+                       musa_dwg_ac1032_scene_index_circle_decode_stage(
+                           scene,UINT64_MAX,&untouched)||
+                       memcmp(&untouched,before,sizeof(before))){
+                        ok=0;break;
+                    }
+                }
+                if(!ok)break;
                 for(uint32_t k=0u;k<coverage.child_count;k++){
                     if(coverage.child_types[k]!=77u)continue;
                     const uint64_t child=coverage.child_handles[k];
@@ -209,6 +242,7 @@ static int genuine(const char *filename){
         }
     }
     if(ok)ok=census_inventories>0u&&census_unreadable>0u&&
+             circle_unreadable>0u&&
              ot77_h12_verified>0u&&
              complete_style_positive>0u&&partial_style_rejected>0u&&
              inserts>0u&&source_rows>0u&&joined>0u&&
@@ -308,6 +342,13 @@ static int genuine(const char *filename){
                 scene,UINT64_MAX,&untouched)&&
            !memcmp(&untouched,before,sizeof(before));
     }
+    fprintf(stderr,"DIAG genuine R2018 OT18 unreadable fetch stages: "
+                   "stage0=%u stage1=%u stage2=%u stage3=%u "
+                   "stage4=%u stage5=%u total=%zu\\n",
+            circle_unreadable_stages[0],circle_unreadable_stages[1],
+            circle_unreadable_stages[2],circle_unreadable_stages[3],
+            circle_unreadable_stages[4],circle_unreadable_stages[5],
+            circle_unreadable);
     fprintf(stderr,"DIAG genuine OT77 verified H12 owner edges=%zu\n",
             ot77_h12_verified);
     fprintf(stderr,"DIAG genuine R2018 owner gap by OT: "
