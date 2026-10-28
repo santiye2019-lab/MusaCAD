@@ -67,5 +67,33 @@ int main(void) {
     assert(musa_scene2d_collect_prepared(cache,2,
              (MusaScene2dBox){50,50,60,60},indices,2,&written));
     assert(written == 0);
+    /* Rotated full ELLIPSE: both Cartesian extrema must be included. */
+    assert(musa_scene2d_ellipse_bounds(0,0,4,0,0.5,&b));
+    assert(contains(b,4,0) && contains(b,-4,0) &&
+           contains(b,0,2) && contains(b,0,-2));
+    assert(musa_scene2d_ellipse_bounds(100,-200,3,4,0.5,&b));
+    assert(b.min_x < 100-sqrt(13.0) && b.max_x > 100+sqrt(13.0));
+    assert(b.min_y < -200-sqrt(18.25) && b.max_y > -200+sqrt(18.25));
+    for (int i=0; i<4096; ++i) {
+        const double t=(2*pi*i)/4096.0;
+        const double x=100+3*cos(t)-2*sin(t);
+        const double y=-200+4*cos(t)+1.5*sin(t);
+        assert(contains(b,x,y));
+    }
+    keep=b;
+    assert(!musa_scene2d_ellipse_bounds(0,0,0,0,0.5,&b));
+    assert(!musa_scene2d_ellipse_bounds(0,0,1,0,0,&b));
+    assert(!musa_scene2d_ellipse_bounds(0,0,1,0,1.01,&b));
+    assert(!musa_scene2d_ellipse_bounds(0,0,NAN,1,0.5,&b));
+    assert(!musa_scene2d_ellipse_bounds(0,0,DBL_MAX,DBL_MAX,1,&b));
+    assert(!musa_scene2d_ellipse_bounds(0,0,1,1,0.5,NULL));
+    assert(b.min_x==keep.min_x && b.max_y==keep.max_y);
+    /* Analytic ELLIPSE bounds work with the existing block world transform. */
+    assert(musa_scene2d_ellipse_bounds(0,0,3,0,0.5,&local[1]));
+    assert(musa_scene2d_prepare_bounds(nodes,resolved,local,2,
+                                       cache,2,&written));
+    assert(musa_scene2d_collect_prepared(cache,2,
+             (MusaScene2dBox){15,23,15,23},indices,2,&written));
+    assert(written == 1 && indices[0] == 1);
     return 0;
 }
