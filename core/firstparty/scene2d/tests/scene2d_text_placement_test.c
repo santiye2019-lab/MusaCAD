@@ -1,0 +1,52 @@
+/* SPDX-License-Identifier: MIT */
+#include "musa_scene2d_text_placement.h"
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <assert.h>
+#include <math.h>
+#include <string.h>
+static int near(double x,double y) { return fabs(x-y)<1e-10; }
+static void point(const double a[6],double x,double y,double *ox,double *oy) {
+    *ox=a[0]*x+a[2]*y+a[4];
+    *oy=a[1]*x+a[3]*y+a[5];
+}
+int main(void) {
+    MusaScene2dTextPlacement p={10,20,2,1,0,0,0,0};
+    double a[6],x,y;
+    assert(musa_scene2d_text_affine(&p,a));
+    assert(near(a[0],2) && near(a[1],0) && near(a[2],0) &&
+           near(a[3],2) && near(a[4],10) && near(a[5],20));
+    p.anchor_x=3; p.anchor_y=1;
+    assert(musa_scene2d_text_affine(&p,a));
+    point(a,3,1,&x,&y); assert(near(x,10) && near(y,20));
+    p.width_factor=-0.5;
+    p.oblique_rad=atan(1.0);
+    p.rotation_rad=acos(-1.0)/2;
+    assert(musa_scene2d_text_affine(&p,a));
+    point(a,3,1,&x,&y); assert(near(x,10) && near(y,20));
+    point(a,4,1,&x,&y); assert(near(x,10) && near(y,19));
+    point(a,3,2,&x,&y); assert(near(x,8) && near(y,22));
+    double saved[6]; memcpy(saved,a,sizeof(a));
+    p.height=0; assert(!musa_scene2d_text_affine(&p,a));
+    p.height=2; p.width_factor=0;
+    assert(!musa_scene2d_text_affine(&p,a));
+    p.width_factor=1; p.rotation_rad=NAN;
+    assert(!musa_scene2d_text_affine(&p,a));
+    p.rotation_rad=0; p.height=1e308; p.width_factor=1e308;
+    assert(!musa_scene2d_text_affine(&p,a));
+    p.height=2; p.width_factor=1;
+    assert(!musa_scene2d_text_affine(&p,(double *)(void *)&p));
+    assert(!musa_scene2d_text_affine(NULL,a));
+    assert(!musa_scene2d_text_affine(&p,NULL));
+    assert(memcmp(saved,a,sizeof(a))==0);
+    for (int i=0;i<20000;++i) {
+        const double k=(double)(i%101-50)/20.0;
+        p=(MusaScene2dTextPlacement){k*3,k-4,2.0,0.1+(i%7)/4.0,
+                                   k/5.0,k/3.0,k/2.0,k/4.0};
+        assert(musa_scene2d_text_affine(&p,a));
+        point(a,p.anchor_x,p.anchor_y,&x,&y);
+        assert(near(x,p.insertion_x) && near(y,p.insertion_y));
+    }
+    return 0;
+}
