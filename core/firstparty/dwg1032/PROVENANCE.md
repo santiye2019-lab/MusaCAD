@@ -63,3 +63,8 @@
 - New MIT C11 module `musa_dwg1032_modular` handles bounded modular chars (signed file offsets, unsigned handle deltas) and modular shorts (object sizes), with rollback on malformed/truncated input and overflow.
 - Implementation was independently authored using the *descriptive* integer encoding conventions in the publicly published Open Design Alliance DWG specification (section 2.6/2.7, https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf). No third-party source code was copied, adapted, linked or imported.
 - The decoder has synthetic positive/negative/limit/corruption tests. It does not parse AC1032 section maps, decompress pages, decode objects, or enable Android DWG opening; these remain unverified acceptance gates.
+
+## 2026-10-29 — bounded object-map delta decoding
+- Original MIT C11 `musa_dwg1032_object_map_decode` converts a caller-verified, already decompressed object-map payload into monotonic handles and bounded absolute byte offsets. Signed offset deltas, malformed encodings, overflow, trailing bytes and output rollback are covered by regression tests including 10,000 records.
+- Encoding conventions referenced only as technical facts from the published Open Design Alliance specification (MC, object-map chapter). No copyleft or third-party source code copied, adapted or linked.
+- This does **not** locate or decompress AC1032 sections, validate map-page CRCs, infer object lengths, decode actual entity records, or enable Android drawing import. The caller must verify map provenance and boundaries before use.
