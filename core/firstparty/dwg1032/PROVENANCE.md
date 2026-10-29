@@ -58,3 +58,8 @@
 - **Behavior:** Resolves root handles and depths for all caller-decoded owner relationships in O(n log n) time without recursion or heap allocation, using caller-owned scratch space. Rejects dangling references, self-ownership, longer cycles and overlapping buffers. Published outputs are untouched on failure; scratch may be modified.
 - **Coverage:** 20,000-object deep chain, multiple roots, branching and rollback; an independent slow reference walk checks 12,000 deterministic forest nodes and a late corruption. GCC and Clang ASan/UBSan local tests used a minimal compatible object-index stub; full repository build and GitHub CI are separate gates.
 - **Boundary:** Inputs are **already decoded** object handles and owners. This does not locate AC1032 objects, parse compressed pages, validate CAD-specific block ownership semantics, open real DWG files or enable Android JNI. Existing 3D sources, `MusaCAD2/` and `main` remain untouched.
+
+## 2026-10-29 — independent MC/MS scalar reader
+- New MIT C11 module `musa_dwg1032_modular` handles bounded modular chars (signed file offsets, unsigned handle deltas) and modular shorts (object sizes), with rollback on malformed/truncated input and overflow.
+- Implementation was independently authored using the *descriptive* integer encoding conventions in the publicly published Open Design Alliance DWG specification (section 2.6/2.7, https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf). No third-party source code was copied, adapted, linked or imported.
+- The decoder has synthetic positive/negative/limit/corruption tests. It does not parse AC1032 section maps, decompress pages, decode objects, or enable Android DWG opening; these remain unverified acceptance gates.
