@@ -20,6 +20,21 @@ int musa_scene2d_utf16le_to_utf8(const uint8_t *utf16le,
                                  uint8_t *utf8,
                                  size_t utf8_capacity,
                                  size_t *written);
+/* Converts a NUL-terminated UTF-16LE field within a bounded byte record.
+ * The first aligned 00 00 code unit terminates the field; bytes after it
+ * belong to the enclosing record and are not decoded. The bound may be odd
+ * when the next field starts immediately after a complete string.
+ * On success, *consumed includes the two-byte terminator; *written is the
+ * UTF-8 byte count excluding its terminator. Size-query mode is supported.
+ * No terminator, invalid Unicode, aliasing or insufficient capacity fails
+ * without modifying output, *written or *consumed. No DWG record framing
+ * or version-specific string layout is inferred by this adapter. */
+int musa_scene2d_utf16le_cstr_to_utf8(const uint8_t *record,
+                                      size_t record_bytes,
+                                      uint8_t *utf8,
+                                      size_t utf8_capacity,
+                                      size_t *written,
+                                      size_t *consumed);
 #ifdef __cplusplus
 }
 #endif
