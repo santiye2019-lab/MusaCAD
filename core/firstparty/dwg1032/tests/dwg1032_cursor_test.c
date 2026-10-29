@@ -105,8 +105,38 @@ static void exhaustive_small_buffers(void) {
         }
     }
 }
+static void raw_byte_reads(void) {
+    const uint8_t data[]={0,0xff,0x81,0x42,0};
+    MusaDwg1032Cursor c;
+    uint8_t out[4]={9,9,9,9}, v=7;
+    assert(musa_dwg1032_cursor_init(&c,data,sizeof data));
+    assert(musa_dwg1032_cursor_read_u8(&c,&v) && v==0);
+    assert(c.bit_position==8);
+    assert(musa_dwg1032_cursor_read_bytes(&c,out,3));
+    assert(out[0]==0xff && out[1]==0x81 && out[2]==0x42);
+    assert(out[3]==9 && c.bit_position==32);
+    assert(!musa_dwg1032_cursor_read_bytes(&c,out,2));
+    assert(out[0]==0xff && c.bit_position==32);
+    assert(musa_dwg1032_cursor_read_bytes(&c,NULL,0));
+    assert(c.bit_position==32);
+    assert(!musa_dwg1032_cursor_read_bytes(&c,NULL,1));
+    assert(!musa_dwg1032_cursor_read_bytes(&c,out,SIZE_MAX));
+    assert(!musa_dwg1032_cursor_read_bytes(&c,(uint8_t *)&c,1));
+    assert(!musa_dwg1032_cursor_read_bytes(&c,(uint8_t *)data,1));
+    assert(c.bit_position==32);
+    assert(musa_dwg1032_cursor_read_u8(&c,&v) && v==0);
+    assert(c.bit_position==40);
+    assert(!musa_dwg1032_cursor_read_u8(&c,&v) && v==0);
+    assert(musa_dwg1032_cursor_init(&c,data,sizeof data));
+    assert(musa_dwg1032_cursor_skip_bits(&c,1));
+    assert(!musa_dwg1032_cursor_read_u8(&c,&v) && c.bit_position==1);
+    assert(!musa_dwg1032_cursor_read_bytes(&c,out,0));
+    assert(musa_dwg1032_cursor_init(&c,NULL,0));
+    assert(musa_dwg1032_cursor_read_bytes(&c,NULL,0));
+    assert(!musa_dwg1032_cursor_read_u8(&c,&v));
+}
 int main(void) {
-    bit_fields(); byte_fields(); slices_and_bad_state();
+    bit_fields(); byte_fields(); raw_byte_reads(); slices_and_bad_state();
     exhaustive_small_buffers();
     return 0;
 }
