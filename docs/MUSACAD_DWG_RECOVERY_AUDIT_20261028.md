@@ -21,6 +21,12 @@ The Android runtime no longer linking LibreDWG does **not** mean full DWG import
 5. Test on representative AC1015, AC1018 and AC1032 files, including blocks, text, layers and 3D, across host and Android.
 6. Verify third-party linkage and provenance with build artifacts, dependency tree, source headers and legal review; do not infer permissive licensing from the absence of runtime linkage.
 
+## Independent bounded file-page assembly (2026-10-30)
+- `core/firstparty/dwg1032/include/musa_dwg1032_section_assembly.h` and `src/musa_dwg1032_section_assembly.c` now accept caller-verified physical file offsets and contiguous logical page positions. Physical file order may differ from logical order; the entire file mapping and destination must be disjoint.
+- The routine validates all physical and logical bounds before writing, has no dynamic allocations, and runs in O(page count + copied bytes). The existing section-assembly regression test covers reordered physical pages, a late truncated page, aliasing, gaps, overlaps, and 16,384 reversed single-byte pages.
+- **Provenance:** independently authored C11 bounds validation and memory copying using only standard C headers. No GPL/AGPL/LGPL or undocumented third-party code was consulted or imported for this change.
+- **Scope limit:** this is a bounded raw/already-decompressed page copier, not an AC1032 section-map decoder, decompressor, page authenticator, or proof of opening real DWG files. The production Android JNI guard remains unchanged.
+
 ## Existing 3D capabilities requiring regression coverage
 Mesh topology, signed volume/centroid, surface primitives, BVH picking, camera/viewport and UCS are present in source. This is not proof of full ACIS/SAB or AutoCAD feature parity.
 
