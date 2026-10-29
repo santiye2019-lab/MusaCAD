@@ -101,4 +101,68 @@ static void partitions(void) {
     }
     free(f);free(dst);free(src);
 }
-int main(void) {basic();stress();partitions();return 0;}
+static void file_backed_pages(void) {
+    const uint8_t physical[]={7,8,9,1,2,3,4,5,6};
+    const uint8_t expected[]={1,2,3,4,5,6,7,8,9};
+    MusaDwg1032FilePage pages[]={{0,3,3},{3,6,3},{6,0,3}};
+    uint8_t out[9];
+    memset(out,0xAA,sizeof(out));
+    assert(musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,out,sizeof(out)));
+    assert(!memcmp(out,expected,sizeof(out)));
+    memset(out,0xAA,sizeof(out));
+    pages[2].file_offset=7; /* late truncated physical page */
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,out,sizeof(out)));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xAA);
+    pages[2].file_offset=0;
+    pages[1].logical_offset=4; /* gap */
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,out,sizeof(out)));
+    pages[1].logical_offset=2; /* logical overlap */
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,out,sizeof(out)));
+    pages[1].logical_offset=3;
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,(uint8_t *)(void *)physical,9));
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),
+        (const MusaDwg1032FilePage *)(const void *)out,1,out,sizeof(out)));
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        NULL,sizeof(physical),pages,3,out,sizeof(out)));
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),NULL,3,out,sizeof(out)));
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,NULL,sizeof(out)));
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        physical,sizeof(physical),pages,3,out,0));
+    assert(musa_dwg1032_section_assemble_file_pages(
+        NULL,0,NULL,0,NULL,0));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xAA);
+}
+static void file_backed_large_reverse_physical_order(void) {
+    enum { COUNT=16384 };
+    uint8_t *src=malloc(COUNT), *dst=malloc(COUNT);
+    MusaDwg1032FilePage *pages=malloc(COUNT*sizeof(*pages));
+    assert(src && dst && pages);
+    for (size_t i=0;i<COUNT;++i) {
+        src[i]=(uint8_t)((i*31u)^(i>>4));
+        pages[i]=(MusaDwg1032FilePage){(uint64_t)i,
+                                      (uint64_t)(COUNT-1u-i),1u};
+    }
+    memset(dst,0xCC,COUNT);
+    assert(musa_dwg1032_section_assemble_file_pages(
+        src,COUNT,pages,COUNT,dst,COUNT));
+    for (size_t i=0;i<COUNT;++i) assert(dst[i]==src[COUNT-1u-i]);
+    memset(dst,0xCC,COUNT);
+    pages[COUNT-1u].file_offset=COUNT; /* late invalid page, no partial writes */
+    assert(!musa_dwg1032_section_assemble_file_pages(
+        src,COUNT,pages,COUNT,dst,COUNT));
+    for (size_t i=0;i<COUNT;++i) assert(dst[i]==0xCC);
+    free(pages);free(dst);free(src);
+}
+int main(void) {
+    basic();stress();partitions();
+    file_backed_pages();file_backed_large_reverse_physical_order();
+    return 0;
+}
