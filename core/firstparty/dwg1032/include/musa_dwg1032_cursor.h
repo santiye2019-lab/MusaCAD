@@ -55,6 +55,12 @@ int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
 int musa_dwg1032_cursor_take_bytes(MusaDwg1032Cursor *parent,
                                    size_t span_bytes,
                                    MusaDwg1032Cursor *child);
+/* Generic little-endian uint32 length followed by a byte frame. The caller
+ * sets a strict allocation/processing limit. Atomic on every failure.
+ * This is NOT an asserted AC1032 section or object framing convention. */
+int musa_dwg1032_cursor_take_u32le_frame(MusaDwg1032Cursor *parent,
+                                          size_t max_frame_bytes,
+                                          MusaDwg1032Cursor *child);
 #ifdef __cplusplus
 }
 #endif
