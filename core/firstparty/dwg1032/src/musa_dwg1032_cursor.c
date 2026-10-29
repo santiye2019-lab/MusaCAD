@@ -149,3 +149,22 @@ int musa_dwg1032_cursor_take_bytes(MusaDwg1032Cursor *parent,
     parent->bit_position+=span_bytes*8u;
     return 1;
 }
+
+int musa_dwg1032_cursor_take_u32le_frame(MusaDwg1032Cursor *parent,
+                                          size_t max_frame_bytes,
+                                          MusaDwg1032Cursor *child) {
+    if (!valid(parent) || !child ||
+        overlaps(parent,sizeof(*parent),child,sizeof(*child)) ||
+        overlaps(parent->bytes,parent->byte_count,child,sizeof(*child)))
+        return 0;
+    MusaDwg1032Cursor trial=*parent;
+    MusaDwg1032Cursor frame;
+    uint32_t length=0;
+    if (!musa_dwg1032_cursor_read_u32le(&trial,&length) ||
+        (size_t)length>max_frame_bytes ||
+        !musa_dwg1032_cursor_take_bytes(&trial,(size_t)length,&frame))
+        return 0;
+    *child=frame;
+    *parent=trial;
+    return 1;
+}
