@@ -38,6 +38,18 @@ static void basic(void) {
     f[0].data=a;
     f[1].logical_offset=UINT64_MAX;
     assert(!musa_dwg1032_section_assemble(f,2,out,5));
+    /* Source and destination may be adjacent, but must not overlap. */
+    uint8_t adjacent[]={1,2,3,4,5,9,9,9,9,9};
+    MusaDwg1032PageFragment contiguous[]={{0,adjacent,5}};
+    assert(musa_dwg1032_section_assemble(contiguous,1,adjacent+5,5));
+    assert(!memcmp(adjacent,adjacent+5,5));
+    /* A source range crossing into destination must fail without writes. */
+    memset(adjacent+5,9,5);
+    contiguous[0].data=adjacent+1;
+    assert(!musa_dwg1032_section_assemble(contiguous,1,adjacent+5,5));
+    for (size_t i=5;i<10;++i) assert(adjacent[i]==9);
+    /* Empty assembly cannot silently accept a nonempty output. */
+    assert(!musa_dwg1032_section_assemble(NULL,0,out,5));
 }
 static void stress(void) {
     const size_t n=20000;
