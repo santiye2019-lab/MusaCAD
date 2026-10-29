@@ -20,7 +20,27 @@ static void invalid(const uint8_t *input, size_t length) {
     assert(!musa_scene2d_utf16le_to_utf8(input,length,NULL,0,&written));
     assert(written==777);
 }
+static void boundary_scalars(void) {
+    const uint8_t utf16[]={
+        0x7f,0, 0x80,0, 0xff,0x07, 0,0x08,
+        0xff,0xd7, 0,0xe0, 0xff,0xff,
+        0,0xd8,0,0xdc, 0xff,0xdb,0xff,0xdf
+    };
+    const uint8_t expected[]={
+        0x7f, 0xc2,0x80, 0xdf,0xbf, 0xe0,0xa0,0x80,
+        0xed,0x9f,0xbf, 0xee,0x80,0x80, 0xef,0xbf,0xbf,
+        0xf0,0x90,0x80,0x80, 0xf4,0x8f,0xbf,0xbf
+    };
+    uint8_t out[sizeof(expected)+1];
+    size_t written=0, count=0;
+    assert(musa_scene2d_utf16le_to_utf8(utf16,sizeof utf16,
+                                         out,sizeof out,&written));
+    assert(written==sizeof expected && out[written]==0);
+    assert(memcmp(out,expected,sizeof expected)==0);
+    assert(musa_scene2d_utf8_count(out,written,&count) && count==9);
+}
 int main(void) {
+    boundary_scalars();
     /* A, c-cedilla, euro, CJK, supplementary smile, combining acute. */
     const uint8_t input[]={0x41,0,0xe7,0,0xac,0x20,0x2d,0x4e,
                            0x3d,0xd8,0x00,0xde,0x01,0x03};
