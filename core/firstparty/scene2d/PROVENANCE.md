@@ -116,3 +116,10 @@
 
 - `musa_scene2d_array_fill` emits row-major affine matrices for already-decoded arrays, with a preflight pass before any output writes, checked size multiplication and no allocation. The 20,000-instance test checks coordinates, negative scaling, count/capacity rejection and rollback.
 - All source is independently authored MIT C11, with no legacy CAD or GPL/AGPL/LGPL code linked. This is not a DWG array-record parser or a verified renderer. Caller inputs must stay immutable during the two passes; large arrays still require caller-owned output memory.
+
+## Decoded layer color and visibility adapter (2026-10-29)
+
+- **Files:** `include/musa_scene2d_layer.h`, `src/musa_scene2d_layer.c`, `tests/scene2d_layer_test.c` and `tests/scene2d_layer_integration_test.c`. Independently authored MIT C11 logic; standard integer sign/flag tests and the existing first-party color adapter only. No GPL/AGPL/LGPL, LibreDWG, legacy native core or uncertain-origin source was copied, adapted or linked.
+- **Behavior:** Maps a previously decoded signed ACI (-255..-1 means off), frozen flag, selected-viewport frozen flag and optional truecolor to a scene layer. Truecolor never erases the layer-off sign; an indexed ACI 8..255 requires a separately verified RGB palette. ACI 7 uses the supplied foreground or vetted palette. The batch converter preflights all records before writing, with O(n) time and O(1) scratch memory.
+- **Tests:** Single-record and 20,000-record mapping, off/frozen/viewport-frozen combinations, truecolor and palette colors, invalid values, output aliasing, atomic batch rollback; a scene-graph regression checks layer-0 and BYBLOCK inheritance and rejects non-INSERT ownership.
+- **Limits:** Inputs are already decoded. This is not AC1032 DWG layer-table decoding, per-viewport overrides, entity invisibility flags, a vetted ACI palette, Android rendering, or real-file evidence. Preserve fail-closed import until independently licensed real DWG fixtures pass. Existing 3D sources and MusaCAD2 remain unchanged.
