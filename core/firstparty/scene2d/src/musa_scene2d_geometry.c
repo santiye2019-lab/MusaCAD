@@ -100,3 +100,53 @@ int musa_scene2d_ellipse_bounds(double cx, double cy,
         !isfinite(rx) || !isfinite(ry)) return 0;
     return widen((MusaScene2dBox){cx-rx,cy-ry,cx+rx,cy+ry},out);
 }
+
+/* Partial planar ellipse bounds from the extrema of each Cartesian
+ * sinusoid. This uses only elementary trigonometry on decoded geometry. */
+int musa_scene2d_ellipse_arc_bounds(double cx, double cy,
+                                    double ax, double ay, double minor_ratio,
+                                    double start_rad, double end_rad,
+                                    MusaScene2dBox *out) {
+    if (!out || !isfinite(cx) || !isfinite(cy) ||
+        !isfinite(ax) || !isfinite(ay) ||
+        !isfinite(minor_ratio) || minor_ratio <= 0.0 ||
+        minor_ratio > 1.0 || (ax == 0.0 && ay == 0.0) ||
+        !isfinite(start_rad) || !isfinite(end_rad))
+        return 0;
+    const double tau = 2.0*MUSA_PI;
+    if (fabs(end_rad-start_rad) >= tau)
+        return musa_scene2d_ellipse_bounds(cx,cy,ax,ay,minor_ratio,out);
+    const double bx = -ay*minor_ratio, by = ax*minor_ratio;
+    if (!isfinite(bx) || !isfinite(by)) return 0;
+    const double start = wrap_angle(start_rad);
+    const double end = wrap_angle(end_rad);
+    const double sweep = end >= start ? end-start : end+tau-start;
+    const double sx = cx+ax*cos(start)+bx*sin(start);
+    const double sy = cy+ay*cos(start)+by*sin(start);
+    const double ex = cx+ax*cos(end)+bx*sin(end);
+    const double ey = cy+ay*cos(end)+by*sin(end);
+    if (!isfinite(sx) || !isfinite(sy) ||
+        !isfinite(ex) || !isfinite(ey)) return 0;
+    MusaScene2dBox b = {fmin(sx,ex),fmin(sy,ey),
+                        fmax(sx,ex),fmax(sy,ey)};
+    const double critical[4] = {
+        atan2(bx,ax), atan2(bx,ax)+MUSA_PI,
+        atan2(by,ay), atan2(by,ay)+MUSA_PI
+    };
+    for (unsigned k=0; k<4; ++k) {
+        const double t = wrap_angle(critical[k]);
+        if (!in_sweep(t,start,sweep)) continue;
+        const double x = cx+ax*cos(t)+bx*sin(t);
+        const double y = cy+ay*cos(t)+by*sin(t);
+        if (!isfinite(x) || !isfinite(y)) return 0;
+        b.min_x = fmin(b.min_x,x); b.max_x = fmax(b.max_x,x);
+        b.min_y = fmin(b.min_y,y); b.max_y = fmax(b.max_y,y);
+    }
+    /* Outward rounding also covers small platform trig differences. */
+    const double mx = 64.0*DBL_EPSILON*(fabs(cx)+fabs(ax)+fabs(bx));
+    const double my = 64.0*DBL_EPSILON*(fabs(cy)+fabs(ay)+fabs(by));
+    if (!isfinite(mx) || !isfinite(my)) return 0;
+    b.min_x -= mx; b.max_x += mx;
+    b.min_y -= my; b.max_y += my;
+    return widen(b,out);
+}
