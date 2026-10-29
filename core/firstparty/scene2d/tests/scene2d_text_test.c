@@ -26,7 +26,7 @@ int main(void) {
         assert(n==99);
     }
     n=99;
-    assert(!musa_scene2d_utf8_count(valid,3,&n) && n==99);
+    assert(!musa_scene2d_utf8_count(valid,2,&n) && n==99);
     assert(!musa_scene2d_utf8_count(valid,sizeof(valid),NULL));
     uint8_t aliased[sizeof(size_t)+8]={65,66,67};
     assert(!musa_scene2d_utf8_count(aliased,sizeof(aliased),
