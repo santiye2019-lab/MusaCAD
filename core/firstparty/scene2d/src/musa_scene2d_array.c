@@ -31,3 +31,29 @@ int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
     memcpy(out,candidate,sizeof(candidate));
     return 1;
 }
+
+int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
+                             double *out, size_t capacity, size_t *written) {
+    if (!array || !out || !written || !array->columns || !array->rows ||
+        array->columns>SIZE_MAX/array->rows) return 0;
+    const size_t count=array->columns*array->rows;
+    if (count>SIZE_MAX/(6u*sizeof(double)) || capacity<count ||
+        array_overlap(array,sizeof(*array),out,count*6u*sizeof(double)) ||
+        array_overlap(written,sizeof(*written),out,count*6u*sizeof(double)) ||
+        array_overlap(array,sizeof(*array),written,sizeof(*written)))
+        return 0;
+    /* The first pass validates every result without touching the output. */
+    double affine[6];
+    for (size_t row=0;row<array->rows;++row)
+        for (size_t col=0;col<array->columns;++col)
+            if (!musa_scene2d_array_affine(array,col,row,affine)) return 0;
+    /* Caller keeps the input immutable throughout both passes. */
+    for (size_t row=0;row<array->rows;++row)
+        for (size_t col=0;col<array->columns;++col) {
+            const size_t i=row*array->columns+col;
+            if (!musa_scene2d_array_affine(array,col,row,affine)) return 0;
+            memcpy(out+6u*i,affine,sizeof(affine));
+        }
+    *written=count;
+    return 1;
+}

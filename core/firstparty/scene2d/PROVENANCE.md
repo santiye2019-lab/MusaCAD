@@ -111,3 +111,8 @@
 - **Source:** `musa_scene2d_array.h/.c` and `scene2d_array_test.c` are independently authored from planar affine algebra, MIT SPDX and standard C11. No GPL/AGPL/LGPL or uncertain-origin code imported or linked.
 - **Behavior:** A selected row/column of a predecoded rectangular array receives the original block-base transform plus a block-local spacing offset transformed by scale and rotation. Invalid dimensions, nonfinite arithmetic, aliases and out-of-range indices fail without modifying output.
 - **Limits:** Array spacing is defined here in local block axes; this contract must be checked against actual DWG fixtures. No AC1032 MINSERT decoding, OCS/extrusion, Android JNI or real-file rendering. Existing 3D source remains unchanged.
+
+## Batch expansion of decoded planar INSERT arrays (2026-10-29)
+
+- `musa_scene2d_array_fill` emits row-major affine matrices for already-decoded arrays, with a preflight pass before any output writes, checked size multiplication and no allocation. The 20,000-instance test checks coordinates, negative scaling, count/capacity rejection and rollback.
+- All source is independently authored MIT C11, with no legacy CAD or GPL/AGPL/LGPL code linked. This is not a DWG array-record parser or a verified renderer. Caller inputs must stay immutable during the two passes; large arrays still require caller-owned output memory.

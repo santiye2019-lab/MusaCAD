@@ -21,6 +21,13 @@ typedef struct MusaScene2dInsertArray {
  * Does not parse MINSERT, OCS, extrusion, or any AC1032 DWG bytes. */
 int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
                                size_t column, size_t row, double out[6]);
+/* Generate every instance in row-major order, columns varying fastest.
+ * Capacity is measured in affine transforms, not doubles; out has room for
+ * 6*capacity doubles. Uses two validation passes and no heap allocation.
+ * On failure, out and *written are unchanged. Inputs remain immutable.
+ * Rejects dimension/count overflow and output/input aliasing. */
+int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
+                             double *out, size_t capacity, size_t *written);
 #ifdef __cplusplus
 }
 #endif
