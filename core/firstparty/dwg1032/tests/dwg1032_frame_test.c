@@ -7,7 +7,43 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static void length_prefixed_frames(void) {
+    const uint8_t data[]={3,0,0,0,0xa1,0xb2,0xc3,0,0,0,0};
+    MusaDwg1032Cursor c, child, saved;
+    uint8_t value=0;
+    assert(musa_dwg1032_cursor_init(&c,data,sizeof data));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,2,&child));
+    assert(c.bit_position==0);
+    assert(musa_dwg1032_cursor_take_u32le_frame(&c,3,&child));
+    assert(c.bit_position==56 && child.byte_count==3);
+    assert(musa_dwg1032_cursor_read_u8(&child,&value) && value==0xa1);
+    assert(c.bit_position==56);
+    assert(musa_dwg1032_cursor_take_u32le_frame(&c,0,&child));
+    assert(c.bit_position==88 && child.byte_count==0);
+    saved=child;
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,100,&child));
+    assert(c.bit_position==88 && child.bytes==saved.bytes);
+    assert(child.bit_position==saved.bit_position);
+    assert(musa_dwg1032_cursor_init(&c,data,6));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,3,&child));
+    assert(c.bit_position==0 && child.bytes==saved.bytes);
+    assert(musa_dwg1032_cursor_init(&c,data,sizeof data));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,3,&c));
+    assert(c.bit_position==0);
+    assert(musa_dwg1032_cursor_skip_bits(&c,1));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,3,&child));
+    assert(c.bit_position==1);
+    const uint8_t oversized[]={0xff,0xff,0xff,0xff,1};
+    assert(musa_dwg1032_cursor_init(&c,oversized,sizeof oversized));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,1024,&child));
+    assert(c.bit_position==0);
+    assert(musa_dwg1032_cursor_init(&c,NULL,0));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,0,&child));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(NULL,0,&child));
+    assert(!musa_dwg1032_cursor_take_u32le_frame(&c,0,NULL));
+}
 int main(void) {
+    length_prefixed_frames();
     const uint8_t data[]={1,2,3,4,5,6};
     MusaDwg1032Cursor parent, child;
     uint32_t v=0;
