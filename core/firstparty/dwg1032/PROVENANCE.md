@@ -22,3 +22,9 @@
 
 - Added a byte-aligned, allocation-free `musa_dwg1032_cursor_take_bytes` that advances the parent only when a bounded child frame is valid. Rejects truncated lengths, unaligned parent positions, aliased output and invalid state; a zero-length frame is allowed. Tests exercise successful sequential frames, rollback and empty input.
 - This is a general-purpose framing primitive; AC1032 section directories, compression and object layout have **not** been decoded. The returned child is a borrowed view of caller-owned memory, not an independently verified DWG page. No production DWG opening or JNI fallback is enabled.
+
+## Generic aligned byte reads and length-prefixed frames (2026-10-29)
+
+- Independently implemented byte-aligned raw reads, single-byte reads, and a transactional uint32 little-endian length-prefixed frame reader. These use only standard C11, explicit bounds and disjoint destination checks; no third-party parser, GPL/AGPL/LGPL implementation, or unverified CAD decoder code was consulted or linked.
+- Negative tests cover misalignment, empty buffers, aliased output, truncated payloads, oversized lengths, and unchanged cursor/output on failure. The caller supplies a maximum frame size.
+- **Scope:** Generic binary building blocks only. No claim that AC1032 uses this frame layout. AC1032 section/page/object parsing, real DWG fixtures, and production JNI integration remain blocked pending independently verified format evidence.
