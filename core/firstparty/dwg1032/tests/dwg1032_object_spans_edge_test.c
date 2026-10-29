@@ -45,6 +45,28 @@ static void section_guard(void) {
     entries[1].length=4u;
     assert(!musa_dwg1032_object_span_cursor(&index,&section,1u,(MusaDwg1032Cursor *)bytes));
 }
+static void reject_alias_and_preserve_output(void) {
+    uint8_t bytes[8]={0};
+    MusaDwg1032ObjectLocation entries[]={{1u,0u,4u},{2u,4u,4u}};
+    MusaDwg1032ObjectIndex index={entries,2u,8u};
+    size_t order[2]={91u,92u};
+    assert(!musa_dwg1032_object_spans_prepare(
+        &index,(size_t *)(void *)entries,2u));
+    assert(entries[0].handle==1u && entries[1].handle==2u);
+    entries[1].offset=3u;
+    assert(!musa_dwg1032_object_spans_prepare(&index,order,2u));
+    entries[1].offset=4u;
+    assert(musa_dwg1032_object_spans_prepare(&index,order,2u));
+    size_t position=77u;
+    assert(!musa_dwg1032_object_spans_find(&index,order,8u,&position));
+    assert(position==77u);
+    MusaDwg1032Cursor section={bytes,8u,0u};
+    MusaDwg1032Cursor object={NULL,99u,11u};
+    section.bit_position=1u;
+    assert(!musa_dwg1032_object_span_cursor(&index,&section,0u,&object));
+    assert(object.bytes==NULL && object.byte_count==99u &&
+           object.bit_position==11u);
+}
 static void deterministic_stress(void) {
     enum { N=4096 };
     static MusaDwg1032ObjectLocation entries[N];
@@ -64,4 +86,4 @@ static void deterministic_stress(void) {
     entries[N/2u].length=6u;
     assert(!musa_dwg1032_object_spans_prepare(&index,order,N));
 }
-int main(void) {adjacent_and_extreme();section_guard();deterministic_stress();return 0;}
+int main(void) {adjacent_and_extreme();section_guard();reject_alias_and_preserve_output();deterministic_stress();return 0;}
