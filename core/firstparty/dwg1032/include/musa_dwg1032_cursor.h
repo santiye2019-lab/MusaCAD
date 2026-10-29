@@ -37,6 +37,14 @@ int musa_dwg1032_cursor_read_u32le(MusaDwg1032Cursor *cursor,
                                    uint32_t *value);
 int musa_dwg1032_cursor_read_u64le(MusaDwg1032Cursor *cursor,
                                    uint64_t *value);
+/* Byte-aligned raw bytes. Zero-length reads are allowed, including a NULL
+ * destination. Nonempty destinations must be disjoint from the cursor and
+ * the entire source buffer. No output or cursor changes on failure. These
+ * are generic binary primitives, not decoded AC1032 fields. */
+int musa_dwg1032_cursor_read_bytes(MusaDwg1032Cursor *cursor,
+                                   uint8_t *destination, size_t count);
+int musa_dwg1032_cursor_read_u8(MusaDwg1032Cursor *cursor,
+                                uint8_t *value);
 /* Returns a bounded byte-aligned subspan without changing the parent.
  * start_byte and span_bytes are relative to the buffer, not bit_position. */
 int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
