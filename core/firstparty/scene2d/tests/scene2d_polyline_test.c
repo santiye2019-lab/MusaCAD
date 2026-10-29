@@ -2,6 +2,7 @@
  * Independent regression coverage for already-decoded polyline geometry.
  */
 #include "musa_scene2d_polyline.h"
+#include "musa_scene2d_cache.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -54,6 +55,32 @@ int main(void) {
     assert(musa_scene2d_polyline_bounds(closed,3,1,&b));
     assert(contains(b,0,0) && contains(b,10,10));
     assert(b.min_x <= open_bounds.min_x && b.max_x >= open_bounds.max_x);
+
+    /* Polyline bounds must reach the same nested-block viewport pipeline
+     * used by LINE, CIRCLE, ARC and ELLIPSE primitives. */
+    const MusaScene2dLayer layers[] = {
+        {0,0xffffffffu,1}, {10,0xff00ff00u,1}
+    };
+    const MusaScene2dNode nodes[] = {
+        {100,0,10,0,MUSA_SCENE2D_INSERT,1,MUSA_SCENE2D_BYLAYER,
+         {1,0,0,1,100,200}},
+        {200,100,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYBLOCK,
+         {1,0,0,1,3,4}}
+    };
+    MusaScene2dBox local[] = {{NAN,NAN,NAN,NAN},{0,0,0,0}};
+    assert(musa_scene2d_polyline_bounds(lower,2,0,&local[1]));
+    MusaScene2dResolved resolved[2];
+    MusaScene2dPreparedBounds prepared[2];
+    size_t written = 0, indices[2] = {99,99};
+    assert(musa_scene2d_resolve(nodes,2,layers,2,resolved,2,&written));
+    assert(musa_scene2d_prepare_bounds(nodes,resolved,local,2,
+                                       prepared,2,&written));
+    assert(musa_scene2d_collect_prepared(prepared,2,
+             (MusaScene2dBox){108,199,108,199},indices,2,&written));
+    assert(written == 1 && indices[0] == 1);
+    assert(musa_scene2d_collect_prepared(prepared,2,
+             (MusaScene2dBox){108,205,108,205},indices,2,&written));
+    assert(written == 0);
 
     /* Failure never mutates the previous output. */
     const MusaScene2dBox keep = b;
