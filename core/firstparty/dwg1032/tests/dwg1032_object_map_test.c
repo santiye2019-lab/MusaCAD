@@ -42,4 +42,60 @@ static void stress(void) {
     assert(!musa_dwg1032_object_map_decode(bytes,sizeof bytes,N,N+1,out,N));
     assert(out[N-1].handle==N && out[N-1].offset==N);
 }
-int main(void) {small();stress();return 0;}
+static void candidate_spans(void) {
+    MusaDwg1032MapEntry entries[]={{1u,9u},{3u,0u},{5u,4u}};
+    MusaDwg1032ObjectLocation out[3]={{99u,99u,99u},
+                                      {99u,99u,99u},{99u,99u,99u}};
+    size_t order[3]={99u,99u,99u};
+    assert(musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,3u,order,3u));
+    assert(out[0].handle==1u && out[0].offset==9u && out[0].length==3u);
+    assert(out[1].handle==3u && out[1].offset==0u && out[1].length==4u);
+    assert(out[2].handle==5u && out[2].offset==4u && out[2].length==5u);
+    assert(order[0]==1u && order[1]==2u && order[2]==0u);
+    const MusaDwg1032ObjectLocation saved=out[2];
+    entries[2].offset=9u; /* Duplicate physical location. */
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,3u,order,3u));
+    assert(out[2].handle==saved.handle && out[2].length==saved.length);
+    entries[2].offset=12u; /* Past section end. */
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,3u,order,3u));
+    entries[2].offset=4u;
+    entries[2].handle=3u; /* Duplicate handle. */
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,3u,order,3u));
+    entries[2].handle=5u;
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,2u,order,3u));
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,3u,order,2u));
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,(MusaDwg1032ObjectLocation *)(void *)entries,
+        3u,order,3u));
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,3u,12u,out,3u,(size_t *)(void *)out,3u));
+    assert(musa_dwg1032_object_map_candidate_spans(
+        NULL,0u,0u,NULL,0u,NULL,0u));
+}
+static void candidate_stress(void) {
+    enum { N=20000 };
+    static MusaDwg1032MapEntry entries[N];
+    static MusaDwg1032ObjectLocation out[N];
+    static size_t order[N];
+    for (size_t i=0;i<N;++i)
+        entries[i]=(MusaDwg1032MapEntry){i+1u,(N-1u-i)*3u};
+    assert(musa_dwg1032_object_map_candidate_spans(
+        entries,N,N*3u,out,N,order,N));
+    for (size_t i=0;i<N;++i) {
+        assert(out[i].handle==i+1u);
+        assert(out[i].offset==(N-1u-i)*3u);
+        assert(out[i].length==3u);
+        assert(order[i]==N-1u-i);
+    }
+    entries[N-1u].offset=entries[N-2u].offset;
+    assert(!musa_dwg1032_object_map_candidate_spans(
+        entries,N,N*3u,out,N,order,N));
+    assert(out[N-1u].length==3u); /* No partial publication. */
+}
+int main(void) {small();stress();candidate_spans();candidate_stress();return 0;}
