@@ -4,6 +4,7 @@
 #include "musa_dwg1032_cursor.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
@@ -108,6 +109,22 @@ int musa_dwg1032_cursor_read_u64le(MusaDwg1032Cursor *cursor,
     *value=decoded;
     cursor->bit_position+=64u;
     return 1;
+}
+int musa_dwg1032_cursor_read_bytes(MusaDwg1032Cursor *cursor,
+                                   uint8_t *destination, size_t count) {
+    if (!valid(cursor) || (cursor->bit_position%8u) ||
+        (count && !destination) ||
+        count>cursor->byte_count-cursor->bit_position/8u ||
+        overlaps(cursor,sizeof(*cursor),destination,count) ||
+        overlaps(cursor->bytes,cursor->byte_count,destination,count)) return 0;
+    if (count)
+        memcpy(destination,cursor->bytes+cursor->bit_position/8u,count);
+    cursor->bit_position+=count*8u;
+    return 1;
+}
+int musa_dwg1032_cursor_read_u8(MusaDwg1032Cursor *cursor,
+                                uint8_t *value) {
+    return musa_dwg1032_cursor_read_bytes(cursor,value,1u);
 }
 int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
                               size_t start_byte, size_t span_bytes,
