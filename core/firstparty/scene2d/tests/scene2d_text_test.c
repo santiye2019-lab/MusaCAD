@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_scene2d_text.h"
+#include "musa_scene2d_cache.h"
+#include "musa_scene2d_viewport.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -8,6 +10,42 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+static void test_nested_text_scene(void) {
+    const MusaScene2dLayer layers[]={
+        {0,0xffffffffu,1}, {10,0xff00ff00u,1}
+    };
+    const MusaScene2dNode nodes[]={
+        {100,0,10,0,MUSA_SCENE2D_INSERT,1,MUSA_SCENE2D_BYLAYER,
+         {1,0,0,1,100,200}},
+        {200,100,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYBLOCK,
+         {1,0,0,1,2,3}}
+    };
+    const MusaScene2dTextGlyph glyph={
+        {0,0,2,1},2,0,1
+    };
+    const double text_transform[6]={0,1,-1,0,10,20};
+    MusaScene2dBox local[2]={{NAN,NAN,NAN,NAN},{0,0,0,0}};
+    assert(musa_scene2d_text_run_bounds(&glyph,1,text_transform,&local[1]));
+    MusaScene2dResolved resolved[2];
+    MusaScene2dPreparedBounds prepared[2];
+    size_t written=99, indices[2]={99,99};
+    assert(musa_scene2d_resolve(nodes,2,layers,2,resolved,2,&written));
+    assert(resolved[1].effective_layer==10 &&
+           resolved[1].rgba==0xff00ff00u);
+    assert(musa_scene2d_prepare_bounds(nodes,resolved,local,2,
+                                       prepared,2,&written));
+    assert(musa_scene2d_collect_prepared(prepared,2,
+            (MusaScene2dBox){110,223,112,225},indices,2,&written));
+    assert(written==1 && indices[0]==1);
+    const uint8_t frozen[]={1,0};
+    assert(musa_scene2d_resolve_viewport(nodes,2,layers,2,frozen,
+                                         resolved,2,&written));
+    assert(musa_scene2d_prepare_bounds(nodes,resolved,local,2,
+                                       prepared,2,&written));
+    assert(musa_scene2d_collect_prepared(prepared,2,
+            (MusaScene2dBox){0,0,1000,1000},indices,2,&written));
+    assert(written==0);
+}
 int main(void) {
     size_t n=99;
     const uint8_t valid[]={0x41,0xc3,0xa7,0xe2,0x82,0xac,
@@ -77,5 +115,6 @@ int main(void) {
     assert(box.min_x<0 && box.max_x>20000 &&
            box.min_y<0 && box.max_y>1);
     free(many);
+    test_nested_text_scene();
     return 0;
 }
