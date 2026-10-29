@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_dwg1032_section_assembly.h"
+#ifdef NDEBUG
+#undef NDEBUG /* Keep checks active in CMake Release and MSVC /DNDEBUG builds. */
+#endif
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
