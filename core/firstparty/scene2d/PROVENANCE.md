@@ -52,3 +52,11 @@
 - **Build:** The independent MIT C11 target compiles the polyline module and runs its dedicated regression test on supported CI platforms. The only dependency is the same target's standalone primitive bounds helper and standard C math library.
 - **Coverage:** Open and closed polylines, line segments, signed semicircles, major circular arcs, near-straight bulges, degenerate segments, malformed or nonfinite inputs, numeric overflow, overlapping output storage and rollback.
 - **Limits:** The API consumes **already decoded planar XY vertices and bulges**. It does not parse DWG LWPOLYLINE/POLYLINE records, decode extrusion/OCS or thickness, perform stroke rendering, or establish actual AC1032 interoperability. No connection to the legacy GPL-marked native core or Android JNI is made.
+
+## Partial ELLIPSE arc analytic bounds (2026-10-29)
+
+- **Files:** Added `musa_scene2d_ellipse_arc_bounds` to the independently authored MIT C11 geometry header and source, with `tests/scene2d_ellipse_arc_test.c` and a dedicated CTest target.
+- **Source origin:** Elementary parametric ellipse differentiation: each Cartesian component is `A*cos(t)+B*sin(t)`, whose stationary parameters are `atan2(B,A)` and that angle plus pi. No legacy MusaCAD, LibreDWG, third-party CAD, GPL/AGPL/LGPL source or codec was copied, adapted or linked.
+- **Behavior:** Conservative axis-aligned bounds for decoded planar ELLIPSE segments, including rotated major axes, wrapped CCW parameter intervals, zero-sweep points, and full revolutions. Rejects invalid, nonfinite or overflowing inputs without modifying the caller's output.
+- **Tests:** Analytic quarter-ellipse and wrapped extrema, full and zero sweep, 1000 sampled rotated sweeps, invalid-input rollback, and nested INSERT/viewport cache composition. GitHub CI outcomes must be checked separately.
+- **Limitations:** Requires already decoded ellipse geometry and planar coordinates; it does not parse AC1032 records, resolve OCS/extrusion, draw glyphs or integrate with production Android JNI. This does not establish real-file DWG reading or rendering. The module remains separate from the historical GPL-marked native core.
