@@ -25,6 +25,9 @@ int musa_dwg1032_cursor_init(MusaDwg1032Cursor *cursor,
 /* All read/skip operations preserve cursor and output on failure. */
 int musa_dwg1032_cursor_read_bits(MusaDwg1032Cursor *cursor,
                                   unsigned bit_count, uint32_t *value);
+/* Generic unsigned 64-bit MSB-first fields; NOT verified DWG bitcodes. */
+int musa_dwg1032_cursor_read_bits64(MusaDwg1032Cursor *cursor,
+                                    unsigned bit_count, uint64_t *value);
 int musa_dwg1032_cursor_skip_bits(MusaDwg1032Cursor *cursor,
                                   size_t bit_count);
 /* Fixed-width little-endian fields require byte alignment. */
@@ -32,6 +35,8 @@ int musa_dwg1032_cursor_read_u16le(MusaDwg1032Cursor *cursor,
                                    uint16_t *value);
 int musa_dwg1032_cursor_read_u32le(MusaDwg1032Cursor *cursor,
                                    uint32_t *value);
+int musa_dwg1032_cursor_read_u64le(MusaDwg1032Cursor *cursor,
+                                   uint64_t *value);
 /* Returns a bounded byte-aligned subspan without changing the parent.
  * start_byte and span_bytes are relative to the buffer, not bit_position. */
 int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,

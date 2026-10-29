@@ -43,6 +43,22 @@ int musa_dwg1032_cursor_read_bits(MusaDwg1032Cursor *cursor,
     cursor->bit_position+=(size_t)bit_count;
     return 1;
 }
+int musa_dwg1032_cursor_read_bits64(MusaDwg1032Cursor *cursor,
+                                    unsigned bit_count, uint64_t *value) {
+    if (!valid(cursor) || !value || !bit_count || bit_count>64u ||
+        overlaps(cursor,sizeof(*cursor),value,sizeof(*value)) ||
+        overlaps(cursor->bytes,cursor->byte_count,value,sizeof(*value)) ||
+        (size_t)bit_count>cursor->byte_count*8u-cursor->bit_position) return 0;
+    uint64_t decoded=0;
+    for (unsigned i=0;i<bit_count;++i) {
+        const size_t bit=cursor->bit_position+i;
+        decoded=(decoded<<1u)|
+                (uint64_t)((cursor->bytes[bit/8u]>>(7u-(bit%8u)))&1u);
+    }
+    *value=decoded;
+    cursor->bit_position+=(size_t)bit_count;
+    return 1;
+}
 int musa_dwg1032_cursor_skip_bits(MusaDwg1032Cursor *cursor,
                                   size_t bit_count) {
     if (!valid(cursor) || bit_count>cursor->byte_count*8u-cursor->bit_position)
@@ -77,6 +93,20 @@ int musa_dwg1032_cursor_read_u32le(MusaDwg1032Cursor *cursor,
     if (!read_le(cursor,4u,&decoded,value,sizeof(*value))) return 0;
     *value=decoded;
     cursor->bit_position+=32u;
+    return 1;
+}
+int musa_dwg1032_cursor_read_u64le(MusaDwg1032Cursor *cursor,
+                                   uint64_t *value) {
+    if (!valid(cursor) || !value || (cursor->bit_position%8u) ||
+        overlaps(cursor,sizeof(*cursor),value,sizeof(*value)) ||
+        overlaps(cursor->bytes,cursor->byte_count,value,sizeof(*value)) ||
+        8u>cursor->byte_count-cursor->bit_position/8u) return 0;
+    const size_t start=cursor->bit_position/8u;
+    uint64_t decoded=0;
+    for (unsigned i=0;i<8u;++i)
+        decoded|=((uint64_t)cursor->bytes[start+i])<<(8u*i);
+    *value=decoded;
+    cursor->bit_position+=64u;
     return 1;
 }
 int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
