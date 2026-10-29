@@ -27,6 +27,16 @@ int musa_scene2d_arc_bounds(double cx, double cy, double radius,
 int musa_scene2d_ellipse_bounds(double cx, double cy,
                                 double ax, double ay, double minor_ratio,
                                 MusaScene2dBox *out);
+/* Conservative bounds for a decoded planar ELLIPSE arc, parameterized by
+ * p(t)=(cx,cy)+(ax,ay)*cos(t)+ratio*(-ay,ax)*sin(t).
+ * The sweep is counterclockwise; end before start wraps through 2*pi.
+ * Equal parameters describe a point; absolute span >= 2*pi is full.
+ * No OCS/extrusion or DWG byte decoding is performed. On failure the
+ * output is unchanged. */
+int musa_scene2d_ellipse_arc_bounds(double cx, double cy,
+                                    double ax, double ay, double minor_ratio,
+                                    double start_rad, double end_rad,
+                                    MusaScene2dBox *out);
 #ifdef __cplusplus
 }
 #endif
