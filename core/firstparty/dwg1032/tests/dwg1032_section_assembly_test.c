@@ -56,4 +56,34 @@ static void stress(void) {
     for(size_t i=0;i<n;++i) assert(dst[i]==0xAA);
     free(f);free(src);free(dst);
 }
-int main(void) {basic();stress();return 0;}
+static void partitions(void) {
+    enum { TOTAL=65536, MAX_PARTS=65536 };
+    uint8_t *src=malloc(TOTAL), *dst=malloc(TOTAL);
+    MusaDwg1032PageFragment *f=malloc(MAX_PARTS*sizeof(*f));
+    assert(src && dst && f);
+    for (size_t i=0;i<TOTAL;++i) src[i]=(uint8_t)((i*37u)^ (i>>5));
+    for (size_t stride=1;stride<=1024;stride*=2) {
+        size_t count=0, pos=0;
+        while (pos<TOTAL) {
+            size_t width=stride;
+            if (width>TOTAL-pos) width=TOTAL-pos;
+            assert(count<MAX_PARTS);
+            f[count].logical_offset=pos;
+            f[count].data=src+pos;
+            f[count].byte_count=width;
+            pos+=width;
+            ++count;
+        }
+        memset(dst,0xCD,TOTAL);
+        assert(musa_dwg1032_section_assemble(f,count,dst,TOTAL));
+        assert(!memcmp(src,dst,TOTAL));
+        if (count>1) {
+            memset(dst,0xCD,TOTAL);
+            f[count-1].data=dst+TOTAL-1; /* late alias */
+            assert(!musa_dwg1032_section_assemble(f,count,dst,TOTAL));
+            for (size_t i=0;i<TOTAL;++i) assert(dst[i]==0xCD);
+        }
+    }
+    free(f);free(dst);free(src);
+}
+int main(void) {basic();stress();partitions();return 0;}
