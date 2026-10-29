@@ -105,3 +105,9 @@
 - **Behavior:** Given already decoded insertion point, block base point, planar X/Y scales and rotation (radians), computes the scene resolver's six-coefficient affine transform. Preserves block base-point alignment, negative mirrored scales, zero-scale degenerate geometry, and nesting through the existing scene graph. Tests also check inherited layer-0/BYBLOCK colors and 20,000 deterministic base-point placements.
 - **Safety:** Rejects nonfinite inputs, nonfinite output coefficients, null pointers, and input/output aliasing. Failed conversions preserve output. The source is included only in the independent scene2d static target and a dedicated CTest; this does not change Android JNI or existing 3D sources.
 - **Boundary:** This adapter does not decode AC1032 DWG object records, recover INSERT base points, perform OCS/extrusion-to-WCS conversion, resolve arbitrary 3D blocks, or prove that any real DWG opens. Production import must remain fail-closed pending end-to-end real-file tests. CI outcomes must be checked independently.
+
+## Decoded planar INSERT arrays (2026-10-29)
+
+- **Source:** `musa_scene2d_array.h/.c` and `scene2d_array_test.c` are independently authored from planar affine algebra, MIT SPDX and standard C11. No GPL/AGPL/LGPL or uncertain-origin code imported or linked.
+- **Behavior:** A selected row/column of a predecoded rectangular array receives the original block-base transform plus a block-local spacing offset transformed by scale and rotation. Invalid dimensions, nonfinite arithmetic, aliases and out-of-range indices fail without modifying output.
+- **Limits:** Array spacing is defined here in local block axes; this contract must be checked against actual DWG fixtures. No AC1032 MINSERT decoding, OCS/extrusion, Android JNI or real-file rendering. Existing 3D source remains unchanged.
