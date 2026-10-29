@@ -39,8 +39,74 @@ static void boundary_scalars(void) {
     assert(memcmp(out,expected,sizeof expected)==0);
     assert(musa_scene2d_utf8_count(out,written,&count) && count==9);
 }
+static void terminated_fields(void) {
+    /* UTF-16LE 'A' + U+1F600 + NUL, followed by an unrelated odd byte. */
+    const uint8_t record[]={0x41,0,0x3d,0xd8,0x00,0xde,0,0,0xff};
+    const uint8_t expected[]={0x41,0xf0,0x9f,0x98,0x80};
+    uint8_t output[16];
+    size_t written=123, consumed=456;
+    assert(musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                               NULL,0,&written,&consumed));
+    assert(written==sizeof expected && consumed==8);
+    memset(output,0xa5,sizeof output);
+    written=123; consumed=456;
+    assert(musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                               output,sizeof output,
+                                               &written,&consumed));
+    assert(written==sizeof expected && consumed==8);
+    assert(memcmp(output,expected,sizeof expected)==0 &&
+           output[written]==0 && output[written+1]==0xa5);
+    memset(output,0xa5,sizeof output);
+    written=123; consumed=456;
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                                output,sizeof expected,
+                                                &written,&consumed));
+    assert(written==123 && consumed==456);
+    for (size_t i=0;i<sizeof output;++i) assert(output[i]==0xa5);
+    const uint8_t no_nul[]={0x41,0,0x42,0,0x7f};
+    const uint8_t bad_pair[]={0x00,0xd8,0,0,0x7f};
+    const uint8_t empty[]={0,0,0x7f};
+    written=123; consumed=456;
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(no_nul,sizeof no_nul,
+                                                output,sizeof output,
+                                                &written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(bad_pair,sizeof bad_pair,
+                                                output,sizeof output,
+                                                &written,&consumed));
+    assert(written==123 && consumed==456 && output[0]==0xa5);
+    assert(musa_scene2d_utf16le_cstr_to_utf8(empty,sizeof empty,
+                                               output,sizeof output,
+                                               &written,&consumed));
+    assert(written==0 && consumed==2 && output[0]==0);
+    written=123; consumed=456;
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(NULL,2,output,
+                                                sizeof output,
+                                                &written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,1,output,
+                                                sizeof output,
+                                                &written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,SIZE_MAX,NULL,0,
+                                                &written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                                (uint8_t *)(void *)record,
+                                                sizeof record,
+                                                &written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                                output,sizeof output,
+                                                &written,&written));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                                output,sizeof output,
+                                                (size_t *)(void *)output,
+                                                &consumed));
+    assert(!musa_scene2d_utf16le_cstr_to_utf8(record,sizeof record,
+                                                output,sizeof output,
+                                                &written,
+                                                (size_t *)(void *)output));
+    assert(written==123 && consumed==456);
+}
 int main(void) {
     boundary_scalars();
+    terminated_fields();
     /* A, c-cedilla, euro, CJK, supplementary smile, combining acute. */
     const uint8_t input[]={0x41,0,0xe7,0,0xac,0x20,0x2d,0x4e,
                            0x3d,0xd8,0x00,0xde,0x01,0x03};
