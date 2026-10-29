@@ -27,6 +27,23 @@ int main(void) {
     point(a,3,1,&x,&y); assert(near(x,10) && near(y,20));
     point(a,4,1,&x,&y); assert(near(x,10) && near(y,19));
     point(a,3,2,&x,&y); assert(near(x,8) && near(y,22));
+    /* A shaped unit-height glyph box (0,0)..(3,1), rotated 90 degrees. */
+    p=(MusaScene2dTextPlacement){10,20,2,1,0,acos(-1.0)/2,0,0};
+    assert(musa_scene2d_text_affine(&p,a));
+    double minx=INFINITY,miny=INFINITY,maxx=-INFINITY,maxy=-INFINITY;
+    for (int j=0;j<4;++j) {
+        point(a,(j&1)?3:0,(j&2)?1:0,&x,&y);
+        if (x<minx) minx=x;
+        if (x>maxx) maxx=x;
+        if (y<miny) miny=y;
+        if (y>maxy) maxy=y;
+    }
+    assert(near(minx,8) && near(maxx,10) &&
+           near(miny,20) && near(maxy,26));
+    p.oblique_rad=atan(1.0); p.rotation_rad=0;
+    assert(musa_scene2d_text_affine(&p,a));
+    point(a,3,1,&x,&y);
+    assert(near(x,18) && near(y,22));
     double saved[6]; memcpy(saved,a,sizeof(a));
     p.height=0; assert(!musa_scene2d_text_affine(&p,a));
     p.height=2; p.width_factor=0;
