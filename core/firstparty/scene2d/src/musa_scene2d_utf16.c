@@ -79,3 +79,32 @@ int musa_scene2d_utf16le_to_utf8(const uint8_t *utf16le,
     *written=out;
     return 1;
 }
+
+/* Record-bound UTF-16LE NUL string adapter. Deliberately independent of
+ * DWG string framing: the caller must supply a verified record boundary. */
+int musa_scene2d_utf16le_cstr_to_utf8(const uint8_t *record,
+                                      size_t record_bytes,
+                                      uint8_t *utf8,
+                                      size_t utf8_capacity,
+                                      size_t *written,
+                                      size_t *consumed) {
+    if (!record || record_bytes<2u || record_bytes>PTRDIFF_MAX ||
+        !written || !consumed || utf8_capacity>PTRDIFF_MAX ||
+        ((utf8==NULL)!=(utf8_capacity==0)) ||
+        overlaps(record,record_bytes,utf8,utf8_capacity) ||
+        overlaps(record,record_bytes,written,sizeof(*written)) ||
+        overlaps(record,record_bytes,consumed,sizeof(*consumed)) ||
+        overlaps(utf8,utf8_capacity,written,sizeof(*written)) ||
+        overlaps(utf8,utf8_capacity,consumed,sizeof(*consumed)) ||
+        overlaps(written,sizeof(*written),consumed,sizeof(*consumed))) return 0;
+    for (size_t i=0; i<=record_bytes-2u; i+=2u) {
+        if (record[i]==0u && record[i+1u]==0u) {
+            if (!musa_scene2d_utf16le_to_utf8(record,i,utf8,
+                                                utf8_capacity,written))
+                return 0;
+            *consumed=i+2u;
+            return 1;
+        }
+    }
+    return 0;
+}
