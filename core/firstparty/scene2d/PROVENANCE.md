@@ -90,3 +90,11 @@
 - **Safety:** Missing terminator, unpaired surrogate, malformed pointers, overlap, or insufficient destination capacity fail without changing the output or either count. The original bounded non-terminated converter is unchanged.
 - **Tests:** Dedicated assertions in `scene2d_utf16_test.c` exercise supplementary Unicode, trailing record bytes, empty strings, size queries, truncated records, invalid surrogates, aliasing and rollback. CI status must be verified independently.
 - **Limitations:** This is a general bounded UTF-16LE field adapter, **not** a DWG object/section reader. It cannot locate AC1032 fields, interpret compressed/encoded string sections, decode font information, or establish real-file interoperability. Existing Android DWG JNI remains fail-closed and 3D code is untouched.
+
+
+## Caller-owned spatial index for large 2D drawings (2026-10-29)
+
+- Added `musa_scene2d_index_build` and `musa_scene2d_index_query` to the original MusaCAD first-party 2D scene module. Source is independently authored from elementary binary-tree bounding-box unions and standard C11; no external CAD source, GPL/AGPL/LGPL implementation, or legacy core linkage.
+- A complete binary tree of conservative world-space AABBs prunes whole subtrees outside the viewport. It uses caller-provided storage, no recursion in building, and bounded logarithmic recursion during queries. Query results retain source draw order. Building is O(n), query is O(n) worst case; clustered input can significantly reduce visited nodes. No benchmark speedup is asserted without measurements.
+- The index consumes only previously resolved and cached 2D entity bounds. Rebuild on any geometry, layer visibility, transform, or viewport-freeze change. Its storage must not be mutated after successful build. Failed builds and insufficient query capacity preserve caller outputs.
+- Standalone CTest compares 500 viewports against the existing linear collector across 20,000 synthetic entities and checks edge inclusion, hidden nodes, invalid bounds, aliases and atomic failure. This does not validate real AC1032 DWG reading, rendering or Android performance.
