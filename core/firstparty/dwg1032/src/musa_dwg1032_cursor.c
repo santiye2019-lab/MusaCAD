@@ -1,0 +1,93 @@
+/* SPDX-License-Identifier: MIT
+ * First-party bounded bit and byte cursor; standard C11 only.
+ */
+#include "musa_dwg1032_cursor.h"
+#include <stdint.h>
+#include <stddef.h>
+
+static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
+    if (!an || !bn) return 0;
+    const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
+    return x<=y ? y-x<an : x-y<bn;
+}
+static int valid(const MusaDwg1032Cursor *cursor) {
+    return cursor && cursor->byte_count<=PTRDIFF_MAX/8u &&
+           (!cursor->byte_count || cursor->bytes) &&
+           cursor->bit_position<=cursor->byte_count*8u &&
+           !overlaps(cursor,cursor?sizeof(*cursor):0u,
+                     cursor?cursor->bytes:NULL,
+                     cursor?cursor->byte_count:0u);
+}
+int musa_dwg1032_cursor_init(MusaDwg1032Cursor *cursor,
+                             const uint8_t *bytes, size_t byte_count) {
+    if (!cursor || byte_count>PTRDIFF_MAX/8u ||
+        (byte_count && !bytes) ||
+        overlaps(cursor,sizeof(*cursor),bytes,byte_count)) return 0;
+    MusaDwg1032Cursor next={bytes,byte_count,0};
+    *cursor=next;
+    return 1;
+}
+int musa_dwg1032_cursor_read_bits(MusaDwg1032Cursor *cursor,
+                                  unsigned bit_count, uint32_t *value) {
+    if (!valid(cursor) || !value || !bit_count || bit_count>32u ||
+        overlaps(cursor,sizeof(*cursor),value,sizeof(*value)) ||
+        overlaps(cursor->bytes,cursor->byte_count,value,sizeof(*value)) ||
+        (size_t)bit_count>cursor->byte_count*8u-cursor->bit_position) return 0;
+    uint32_t decoded=0;
+    for (unsigned i=0;i<bit_count;++i) {
+        const size_t bit=cursor->bit_position+i;
+        decoded=(decoded<<1u)|
+                (uint32_t)((cursor->bytes[bit/8u]>>(7u-(bit%8u)))&1u);
+    }
+    *value=decoded;
+    cursor->bit_position+=(size_t)bit_count;
+    return 1;
+}
+int musa_dwg1032_cursor_skip_bits(MusaDwg1032Cursor *cursor,
+                                  size_t bit_count) {
+    if (!valid(cursor) || bit_count>cursor->byte_count*8u-cursor->bit_position)
+        return 0;
+    cursor->bit_position+=bit_count;
+    return 1;
+}
+static int read_le(MusaDwg1032Cursor *cursor, unsigned count,
+                   uint32_t *result, const void *out, size_t out_size) {
+    if (!valid(cursor) || !result || !out || (cursor->bit_position%8u) ||
+        overlaps(cursor,sizeof(*cursor),out,out_size) ||
+        overlaps(cursor->bytes,cursor->byte_count,out,out_size) ||
+        (size_t)count>cursor->byte_count-cursor->bit_position/8u) return 0;
+    const size_t start=cursor->bit_position/8u;
+    uint32_t decoded=0;
+    for (unsigned i=0;i<count;++i)
+        decoded|=((uint32_t)cursor->bytes[start+i])<<(8u*i);
+    *result=decoded;
+    return 1;
+}
+int musa_dwg1032_cursor_read_u16le(MusaDwg1032Cursor *cursor,
+                                   uint16_t *value) {
+    uint32_t decoded=0;
+    if (!read_le(cursor,2u,&decoded,value,sizeof(*value))) return 0;
+    *value=(uint16_t)decoded;
+    cursor->bit_position+=16u;
+    return 1;
+}
+int musa_dwg1032_cursor_read_u32le(MusaDwg1032Cursor *cursor,
+                                   uint32_t *value) {
+    uint32_t decoded=0;
+    if (!read_le(cursor,4u,&decoded,value,sizeof(*value))) return 0;
+    *value=decoded;
+    cursor->bit_position+=32u;
+    return 1;
+}
+int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
+                              size_t start_byte, size_t span_bytes,
+                              MusaDwg1032Cursor *slice) {
+    if (!valid(parent) || !slice ||
+        overlaps(parent,sizeof(*parent),slice,sizeof(*slice)) ||
+        overlaps(parent->bytes,parent->byte_count,slice,sizeof(*slice)) ||
+        start_byte>parent->byte_count ||
+        span_bytes>parent->byte_count-start_byte) return 0;
+    /* Pointer arithmetic on NULL is forbidden even for an empty slice. */
+    const uint8_t *first=parent->bytes ? parent->bytes+start_byte : NULL;
+    return musa_dwg1032_cursor_init(slice,first,span_bytes);
+}
