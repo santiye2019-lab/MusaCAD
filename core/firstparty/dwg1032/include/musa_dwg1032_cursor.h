@@ -42,6 +42,11 @@ int musa_dwg1032_cursor_read_u64le(MusaDwg1032Cursor *cursor,
 int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
                               size_t start_byte, size_t span_bytes,
                               MusaDwg1032Cursor *slice);
+/* Atomically consumes a byte-aligned bounded frame. On failure, parent and
+ * child remain unchanged. The child owns no memory and cannot outlive bytes. */
+int musa_dwg1032_cursor_take_bytes(MusaDwg1032Cursor *parent,
+                                   size_t span_bytes,
+                                   MusaDwg1032Cursor *child);
 #ifdef __cplusplus
 }
 #endif

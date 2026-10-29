@@ -121,3 +121,14 @@ int musa_dwg1032_cursor_slice(const MusaDwg1032Cursor *parent,
     const uint8_t *first=parent->bytes ? parent->bytes+start_byte : NULL;
     return musa_dwg1032_cursor_init(slice,first,span_bytes);
 }
+
+int musa_dwg1032_cursor_take_bytes(MusaDwg1032Cursor *parent,
+                                   size_t span_bytes,
+                                   MusaDwg1032Cursor *child) {
+    if (!valid(parent) || !child || (parent->bit_position%8u) ||
+        span_bytes>parent->byte_count-parent->bit_position/8u) return 0;
+    if (!musa_dwg1032_cursor_slice(parent,parent->bit_position/8u,
+                                   span_bytes,child)) return 0;
+    parent->bit_position+=span_bytes*8u;
+    return 1;
+}

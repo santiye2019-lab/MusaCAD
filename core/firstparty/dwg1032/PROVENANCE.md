@@ -17,3 +17,8 @@
 
 - Added standalone unsigned 64-bit MSB-first generic bit fields and byte-aligned unsigned little-endian 64-bit reads, including rollback on truncation, misalignment and aliased outputs. No external CAD decoder, licensed implementation, or historical GPL source was used.
 - Exhaustive 0–9-byte field-length/offset/width regression test. This remains a generic binary reader, not verified AC1032 DWG bitcode interpretation; no production import is enabled.
+
+## Transactional bounded byte frames (2026-10-29)
+
+- Added a byte-aligned, allocation-free `musa_dwg1032_cursor_take_bytes` that advances the parent only when a bounded child frame is valid. Rejects truncated lengths, unaligned parent positions, aliased output and invalid state; a zero-length frame is allowed. Tests exercise successful sequential frames, rollback and empty input.
+- This is a general-purpose framing primitive; AC1032 section directories, compression and object layout have **not** been decoded. The returned child is a borrowed view of caller-owned memory, not an independently verified DWG page. No production DWG opening or JNI fallback is enabled.
