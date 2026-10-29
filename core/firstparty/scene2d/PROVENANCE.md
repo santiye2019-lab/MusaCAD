@@ -60,3 +60,11 @@
 - **Behavior:** Conservative axis-aligned bounds for decoded planar ELLIPSE segments, including rotated major axes, wrapped CCW parameter intervals, zero-sweep points, and full revolutions. Rejects invalid, nonfinite or overflowing inputs without modifying the caller's output.
 - **Tests:** Analytic quarter-ellipse and wrapped extrema, full and zero sweep, 1000 sampled rotated sweeps, invalid-input rollback, and nested INSERT/viewport cache composition. GitHub CI outcomes must be checked separately.
 - **Limitations:** Requires already decoded ellipse geometry and planar coordinates; it does not parse AC1032 records, resolve OCS/extrusion, draw glyphs or integrate with production Android JNI. This does not establish real-file DWG reading or rendering. The module remains separate from the historical GPL-marked native core.
+
+## Independent UTF-8 and decoded text ink bounds (2026-10-29)
+
+- **Files:** `include/musa_scene2d_text.h`, `src/musa_scene2d_text.c`, `tests/scene2d_text_test.c`, and the standalone CMake/CTest registration.
+- **Origin:** Independently authored strict UTF-8 Unicode-scalar validation and elementary pen-advance plus four-corner affine bounds accumulation. No GPL/AGPL/LGPL source, legacy CAD code, font shaping implementation, DWG decoder, or third-party library was imported, adapted or linked. MIT SPDX, C11 standard library and math only.
+- **Coverage:** Rejects overlong encodings, surrogates, out-of-range scalars, embedded NUL, truncation and malformed continuation bytes; text glyph bounds handle per-glyph advances, blank glyphs, rotated/sheared/scaled text transforms, numeric overflow, aliasing and rollback. Includes a 20,000-glyph synthetic test.
+- **Critical limitation:** The input is already-decoded UTF-8 and **externally shaped font glyph ink metrics**. Glyph count can differ from codepoint count. The code does **not** decode AC1032 TEXT/MTEXT records, process MTEXT controls, implement SHX/TTF fonts or shaping, handle alignment, prove glyph accuracy, render text, or enable Android DWG import. Real-file and font-license/provenance tests are still required. Keep the existing production JNI fail-closed gate intact.
+- **Validation:** The new CTest target is `independent_scene2d_utf8_text_ink_bounds`. Successful CI must be independently confirmed; adding tests is not evidence that they passed.
