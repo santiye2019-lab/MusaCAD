@@ -31,6 +31,31 @@ static void test_hierarchy(void) {
     assert(result[3].rgba == 0xff0000ffu && result[3].visible == 0);
     assert(result[4].rgba == 0xff00ff00u && result[4].visible == 1);
 }
+static void test_nested_block_visibility(void) {
+    MusaScene2dNode nodes[5];
+    MusaScene2dLayer layer_copy[3];
+    MusaScene2dResolved result[5];
+    size_t written=0;
+    memcpy(nodes,sample,sizeof nodes);
+    memcpy(layer_copy,layers,sizeof layer_copy);
+    nodes[0].visible=0; /* A hidden INSERT hides its descendants. */
+    assert(musa_scene2d_resolve(nodes,5,layer_copy,3,result,5,&written));
+    assert(written==5 && !result[0].visible && !result[1].visible &&
+           !result[2].visible && result[4].visible);
+    assert(result[2].effective_layer==10u &&
+           result[2].rgba==0xffff0000u);
+    nodes[0].visible=1;
+    layer_copy[1].visible=0; /* A hidden inherited layer also hides children. */
+    assert(musa_scene2d_resolve(nodes,5,layer_copy,3,result,5,&written));
+    assert(!result[0].visible && !result[1].visible &&
+           !result[2].visible && !result[4].visible);
+    layer_copy[1].visible=1;
+    nodes[2].layer=20u; /* Explicit child layer overrides layer-0 inheritance. */
+    assert(musa_scene2d_resolve(nodes,5,layer_copy,3,result,5,&written));
+    assert(result[0].visible && result[1].visible && !result[2].visible);
+    assert(result[2].effective_layer==20u &&
+           result[2].rgba==0xffff0000u); /* BYBLOCK still inherits color. */
+}
 static void test_atomic_failures(void) {
     MusaScene2dNode n[5];
     MusaScene2dResolved out[5];
@@ -97,6 +122,7 @@ static void test_deep_chain(void) {
 }
 int main(void) {
     test_hierarchy();
+    test_nested_block_visibility();
     test_atomic_failures();
     test_deep_chain();
     return 0;
