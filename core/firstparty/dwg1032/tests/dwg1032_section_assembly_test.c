@@ -207,9 +207,50 @@ static void physical_directory_stress(void) {
     free(order);
     free(pages);
 }
+static void strict_file_page_assembly(void) {
+    const uint8_t file[]={7,8,9,1,2,3};
+    MusaDwg1032FilePage pages[]={{0,3,3},{3,0,3}};
+    size_t order[2]={99u,99u};
+    uint8_t out[6]={0xAA,0xAA,0xAA,0xAA,0xAA,0xAA};
+    const uint8_t expected[]={1,2,3,7,8,9};
+    assert(musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,order,2));
+    assert(!memcmp(out,expected,6));
+    assert(order[0]==1u && order[1]==0u);
+    memset(out,0xAA,6);
+    pages[1].file_offset=4; /* Partial physical overlap, logical order valid. */
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,order,2));
+    pages[1].file_offset=3; /* Exact duplicate physical span. */
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,order,2));
+    /* The permissive API intentionally accepts physical reuse. */
+    assert(musa_dwg1032_section_assemble_file_pages(
+        file,6,pages,2,out,6));
+    memset(out,0xAA,6);
+    pages[1].file_offset=0;
+    pages[1].logical_offset=4; /* Physical valid, logical gap. */
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,order,2));
+    pages[1].logical_offset=3;
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,order,1));
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,(size_t *)(void *)pages,2));
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,(size_t *)(void *)out,2));
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,(size_t *)(void *)file,2));
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        file,6,pages,2,out,6,NULL,2));
+    for (size_t i=0;i<6;++i) assert(out[i]==0xAA);
+    assert(musa_dwg1032_section_assemble_checked_file_pages(
+        NULL,0,NULL,0,NULL,0,NULL,0));
+}
 int main(void) {
     basic();stress();partitions();
     file_backed_pages();file_backed_large_reverse_physical_order();
     physical_directory_validation();physical_directory_stress();
+    strict_file_page_assembly();
     return 0;
 }
