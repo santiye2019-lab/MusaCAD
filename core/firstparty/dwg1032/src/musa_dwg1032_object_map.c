@@ -49,6 +49,34 @@ int musa_dwg1032_object_map_iterator_next(
     *iterator=trial;
     return 1;
 }
+int musa_dwg1032_object_map_iterator_page(
+    MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *out,
+    size_t count, size_t capacity) {
+    if (!iterator || count>capacity ||
+        count>SIZE_MAX/sizeof(*out) ||
+        (count && !out) ||
+        overlaps(iterator,sizeof(*iterator),out,count*sizeof(*out)) ||
+        overlaps(iterator->cursor.bytes,iterator->cursor.byte_count,
+                 out,count*sizeof(*out))) return 0;
+    /* Validate the entire requested page before publishing any entry. */
+    MusaDwg1032MapIterator trial=*iterator;
+    for (size_t i=0;i<count;++i) {
+        MusaDwg1032MapEntry entry;
+        if (!musa_dwg1032_object_map_iterator_next(&trial,&entry))
+            return 0;
+    }
+    /* The verified source is immutable; replaying the same bytes is
+     * deterministic and requires no temporary page-sized allocation. */
+    MusaDwg1032MapIterator publish=*iterator;
+    for (size_t i=0;i<count;++i) {
+        MusaDwg1032MapEntry entry;
+        if (!musa_dwg1032_object_map_iterator_next(&publish,&entry))
+            return 0;
+        out[i]=entry;
+    }
+    *iterator=publish;
+    return 1;
+}
 static int parse(const uint8_t *bytes, size_t byte_count, size_t count,
                  uint64_t section_bytes, MusaDwg1032MapEntry *out) {
     MusaDwg1032MapIterator iterator;
