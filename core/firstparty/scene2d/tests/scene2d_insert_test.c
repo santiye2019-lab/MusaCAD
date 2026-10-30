@@ -49,6 +49,22 @@ static void hierarchy(void) {
     /* Entity point (1,1) -> (3,4), inner -> (3,10), outer -> (12,27). */
     assert(near(x,12) && near(y,27));
 }
+/* Large, finite CAD coordinates must not be rejected because an
+ * intermediate multiply overflows before cancellation with insertion. */
+static void extreme_finite_translations(void) {
+    MusaScene2dInsertPlacement p={
+        1e308,1e308,2.0,2.0,1e308,1e308,0.0
+    };
+    double out[6]={0};
+    assert(musa_scene2d_insert_affine(&p,out));
+    assert(out[0]==1e308 && out[3]==1e308);
+    assert(out[4]==-1e308 && out[5]==-1e308);
+    double saved[6];
+    memcpy(saved,out,sizeof(out));
+    p.base_x=4.0; /* The final translation really is out of range. */
+    assert(!musa_scene2d_insert_affine(&p,out));
+    assert(memcmp(out,saved,sizeof(out))==0);
+}
 static void rollback(void) {
     MusaScene2dInsertPlacement p={1,2,3,4,5,6,0};
     double out[6]={11,12,13,14,15,16},saved[6];
@@ -163,4 +179,4 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();hierarchy();rollback();many();bulk_placements();paged_placements();return 0;}
+int main(void) {basic();hierarchy();extreme_finite_translations();rollback();many();bulk_placements();paged_placements();return 0;}
