@@ -21,7 +21,9 @@ static void basic_and_rollback(void) {
     const size_t at=parent.bit_position;
     const MusaDwg1032Cursor saved=payload;
     assert(!musa_dwg1032_record_take_ms_frame(&parent,2,&payload));
-    assert(parent.bit_position==at && !memcmp(&payload,&saved,sizeof(saved)));
+    assert(parent.bit_position==at && payload.bytes==saved.bytes &&
+           payload.byte_count==saved.byte_count &&
+           payload.bit_position==saved.bit_position);
     parent.bit_position=0;
     assert(!musa_dwg1032_record_take_ms_frame(&parent,1,&payload));
     assert(parent.bit_position==0 && payload.bytes==saved.bytes);
