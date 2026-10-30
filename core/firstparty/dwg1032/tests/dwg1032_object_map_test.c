@@ -7,6 +7,18 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+static int same_iterator(const MusaDwg1032MapIterator *a,
+                         const MusaDwg1032MapIterator *b) {
+    return a->cursor.bytes==b->cursor.bytes &&
+           a->cursor.byte_count==b->cursor.byte_count &&
+           a->cursor.bit_position==b->cursor.bit_position &&
+           a->handle==b->handle && a->offset==b->offset &&
+           a->section_bytes==b->section_bytes;
+}
+static int same_entry(const MusaDwg1032MapEntry *a,
+                      const MusaDwg1032MapEntry *b) {
+    return a->handle==b->handle && a->offset==b->offset;
+}
 /* Incremental decoding needs no full-map output buffer. A failed late
  * delta must preserve both the stream position and the last good entry. */
 static void iterator_streaming(void) {
@@ -25,19 +37,19 @@ static void iterator_streaming(void) {
     MusaDwg1032MapIterator saved=iterator;
     MusaDwg1032MapEntry last=entry;
     assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
-    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
-    assert(memcmp(&last,&entry,sizeof(last))==0);
+    assert(same_iterator(&saved,&iterator));
+    assert(same_entry(&last,&entry));
     assert(!musa_dwg1032_object_map_iterator_next(
         &iterator,(MusaDwg1032MapEntry *)(void *)&iterator));
-    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
+    assert(same_iterator(&saved,&iterator));
     const uint8_t truncated[]={1,10,2};
     assert(musa_dwg1032_object_map_iterator_init(
         &iterator,truncated,sizeof(truncated),26));
     assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
     saved=iterator;last=entry;
     assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
-    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
-    assert(memcmp(&last,&entry,sizeof(last))==0);
+    assert(same_iterator(&saved,&iterator));
+    assert(same_entry(&last,&entry));
     assert(!musa_dwg1032_object_map_iterator_init(
         (MusaDwg1032MapIterator *)(void *)bytes,
         bytes,sizeof(bytes),26));
@@ -68,8 +80,8 @@ static void iterator_large_map(void) {
     const MusaDwg1032MapIterator saved=iterator;
     const MusaDwg1032MapEntry last=entry;
     assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
-    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
-    assert(memcmp(&last,&entry,sizeof(last))==0);
+    assert(same_iterator(&saved,&iterator));
+    assert(same_entry(&last,&entry));
 }
 static void small(void) {
     const uint8_t payload[]={1,10,2,0x45,3,20};
