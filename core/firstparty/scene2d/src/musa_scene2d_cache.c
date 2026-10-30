@@ -3,6 +3,7 @@
  */
 #include "musa_scene2d_cache.h"
 #include <math.h>
+#include <float.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -11,11 +12,7 @@ static int finite_box(MusaScene2dBox b) {
            isfinite(b.max_x) && isfinite(b.max_y) &&
            b.min_x <= b.max_x && b.min_y <= b.max_y;
 }
-static int ordered_box(MusaScene2dBox b) {
-    return !isnan(b.min_x) && !isnan(b.min_y) &&
-           !isnan(b.max_x) && !isnan(b.max_y) &&
-           b.min_x <= b.max_x && b.min_y <= b.max_y;
-}
+/* Prepared bounds must remain finite to be indexable. */
 static int ranges_overlap(const void *a, size_t na, const void *b, size_t nb) {
     if (!na || !nb) return 0;
     const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
@@ -47,11 +44,11 @@ static int prepare_one(const MusaScene2dNode *n,
         if (wy < miny) miny = wy;
         if (wy > maxy) maxy = wy;
     }
-    /* One representable step guards against edge loss from rounding.
-     * The widened bound may reach infinity near DBL_MAX. */
+    /* Widen by one representable step without creating infinities at
+     * +/-DBL_MAX; the spatial index requires finite world bounds. */
     dst->box = (MusaScene2dBox){
-        nextafter(minx,-INFINITY), nextafter(miny,-INFINITY),
-        nextafter(maxx,INFINITY), nextafter(maxy,INFINITY)
+        nextafter(minx,-DBL_MAX), nextafter(miny,-DBL_MAX),
+        nextafter(maxx,DBL_MAX), nextafter(maxy,DBL_MAX)
     };
     dst->visible = 1;
     return 1;
@@ -103,7 +100,7 @@ int musa_scene2d_collect_prepared(
     size_t hits = 0;
     for (size_t i = 0; i < count; ++i) {
         const MusaScene2dPreparedBounds *p = &prepared[i];
-        if (p->visible > 1 || (p->visible && !ordered_box(p->box)))
+        if (p->visible > 1 || (p->visible && !finite_box(p->box)))
             return 0;
         if (p->visible && p->box.min_x <= viewport.max_x &&
             p->box.max_x >= viewport.min_x &&
