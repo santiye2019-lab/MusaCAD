@@ -131,3 +131,28 @@ int musa_dwg1032_file_pages_validate_physical(
     }
     return 1;
 }
+
+/* A strict caller opt-in: the existing assembly API intentionally allows
+ * reused physical ranges, but untrusted page directories should not. */
+int musa_dwg1032_section_assemble_checked_file_pages(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    uint8_t *destination, size_t destination_size,
+    size_t *order, size_t order_capacity) {
+    if (page_count > order_capacity ||
+        page_count > SIZE_MAX / sizeof(*order) ||
+        (page_count && !order))
+        return 0;
+    const size_t scratch_bytes = page_count * sizeof(*order);
+    if (overlaps(order, scratch_bytes, file_bytes, file_size) ||
+        overlaps(order, scratch_bytes, destination, destination_size) ||
+        overlaps(order, scratch_bytes, pages,
+                 page_count * sizeof(*pages)))
+        return 0;
+    if (!musa_dwg1032_file_pages_validate_physical(
+            pages, page_count, file_size, order, order_capacity))
+        return 0;
+    return musa_dwg1032_section_assemble_file_pages(
+        file_bytes, file_size, pages, page_count,
+        destination, destination_size);
+}
