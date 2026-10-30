@@ -48,4 +48,36 @@ static void long_chain(void) {
     assert(musa_dwg1032_owner_chain_root(&index,parents,4095u,4095u,&root,&depth));
     assert(root==1u && depth==4095u);
 }
-int main(void) {paths();long_chain();return 0;}
+static void stale_index_and_alias(void) {
+    MusaDwg1032ObjectLocation entries[]={{2u,0u,1u},{4u,1u,1u}};
+    MusaDwg1032ObjectIndex index;
+    assert(musa_dwg1032_object_index_init(&index,entries,2u,2u));
+    const uint64_t owners[]={0u,2u};
+    uint64_t root=123u;
+    size_t hops=456u;
+    assert(musa_dwg1032_owner_chain_root(
+        &index,owners,1u,2u,&root,&hops));
+    assert(root==2u && hops==1u);
+    root=123u;hops=456u;
+    entries[0].length=0u; /* Stale index: reject a malformed ancestor. */
+    assert(!musa_dwg1032_owner_chain_root(
+        &index,owners,1u,2u,&root,&hops));
+    assert(root==123u && hops==456u);
+    entries[0].length=1u;
+    entries[0].offset=2u; /* Root span now extends beyond section. */
+    assert(!musa_dwg1032_owner_chain_root(
+        &index,owners,0u,2u,&root,&hops));
+    assert(root==123u && hops==456u);
+    entries[0].offset=0u;
+    entries[0].handle=0u; /* A zero handle cannot become a valid root. */
+    assert(!musa_dwg1032_owner_chain_root(
+        &index,owners,0u,2u,&root,&hops));
+    assert(root==123u && hops==456u);
+    entries[0].handle=2u;
+    /* Reject owner storage that aliases the index header itself. */
+    assert(!musa_dwg1032_owner_chain_root(
+        &index,(const uint64_t *)(const void *)&index,0u,2u,
+        &root,&hops));
+    assert(root==123u && hops==456u);
+}
+int main(void) {paths();long_chain();stale_index_and_alias();return 0;}
