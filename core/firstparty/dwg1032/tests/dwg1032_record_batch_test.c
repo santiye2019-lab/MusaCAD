@@ -27,10 +27,11 @@ static void three_candidates(void) {
     assert(musa_dwg1032_record_batch_extract(
         &index,&section,1,out,3,order,3));
     const uint64_t offsets[]={10,2,6};
+    const uint8_t values[]={0x43u,0x21u,0x32u};
     for (size_t i=0;i<3;++i) {
         assert(out[i].handle==i+1u && out[i].offset==offsets[i] &&
                out[i].length==1u);
-        assert(bytes[(size_t)out[i].offset]==(uint8_t)(0x43u-i*0x11u));
+        assert(bytes[(size_t)out[i].offset]==values[i]);
     }
     const MusaDwg1032ObjectLocation saved[3]={out[0],out[1],out[2]};
     bytes[4]=0; /* Late malformed record; no earlier result published. */
