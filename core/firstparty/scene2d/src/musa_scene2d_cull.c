@@ -3,6 +3,7 @@
  */
 #include "musa_scene2d_cull.h"
 #include <math.h>
+#include <float.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -44,12 +45,12 @@ static int candidate(const MusaScene2dNode *node,
         if (wy < min_y) min_y = wy;
         if (wy > max_y) max_y = wy;
     }
-    /* Widen one representable step to avoid rejecting edge candidates
-     * due to the final rounding of affine arithmetic. */
-    min_x = nextafter(min_x, -INFINITY);
-    max_x = nextafter(max_x, INFINITY);
-    min_y = nextafter(min_y, -INFINITY);
-    max_y = nextafter(max_y, INFINITY);
+    /* Widen one representable step without introducing infinite bounds
+     * at +/-DBL_MAX, consistent with the cached spatial index. */
+    min_x = nextafter(min_x, -DBL_MAX);
+    max_x = nextafter(max_x, DBL_MAX);
+    min_y = nextafter(min_y, -DBL_MAX);
+    max_y = nextafter(max_y, DBL_MAX);
     *hit = min_x <= view.max_x && max_x >= view.min_x &&
            min_y <= view.max_y && max_y >= view.min_y;
     return 1;
