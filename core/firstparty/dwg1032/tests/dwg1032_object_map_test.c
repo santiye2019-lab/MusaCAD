@@ -56,6 +56,51 @@ static void iterator_streaming(void) {
     assert(!musa_dwg1032_object_map_iterator_init(
         &iterator,NULL,1,26));
 }
+static void iterator_paged_atomic(void) {
+    uint8_t bytes[]={1,10,2,0x45,3,20};
+    MusaDwg1032MapIterator iterator;
+    MusaDwg1032MapEntry out[3]={{99,99},{99,99},{99,99}};
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,bytes,sizeof(bytes),26));
+    assert(musa_dwg1032_object_map_iterator_page(
+        &iterator,out,2,3));
+    assert(out[0].handle==1 && out[0].offset==10);
+    assert(out[1].handle==3 && out[1].offset==5);
+    assert(out[2].handle==99 && out[2].offset==99);
+    assert(iterator.cursor.bit_position==32u);
+    MusaDwg1032MapIterator saved=iterator;
+    MusaDwg1032MapEntry snapshot[3];
+    memcpy(snapshot,out,sizeof(out));
+    bytes[5]=0x40; /* Late negative zero: reject entire requested page. */
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,out,1,3));
+    assert(same_iterator(&saved,&iterator));
+    assert(memcmp(snapshot,out,sizeof(out))==0);
+    bytes[5]=20;
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,out,2,3)); /* One pair exists, not two. */
+    assert(same_iterator(&saved,&iterator));
+    assert(memcmp(snapshot,out,sizeof(out))==0);
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,out,1,0));
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,(MusaDwg1032MapEntry *)(void *)bytes,1,1));
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,(MusaDwg1032MapEntry *)(void *)&iterator,1,1));
+    assert(same_iterator(&saved,&iterator));
+    assert(musa_dwg1032_object_map_iterator_page(
+        &iterator,out+2,1,1));
+    assert(out[2].handle==6 && out[2].offset==25);
+    assert(iterator.cursor.bit_position==sizeof(bytes)*8u);
+    saved=iterator;
+    assert(musa_dwg1032_object_map_iterator_page(
+        &iterator,NULL,0,0));
+    assert(same_iterator(&saved,&iterator));
+    assert(!musa_dwg1032_object_map_iterator_page(
+        NULL,out,1,3));
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,NULL,1,1));
+}
 static void iterator_large_map(void) {
     enum { N=20000 };
     static uint8_t bytes[N*2];
@@ -175,4 +220,4 @@ static void candidate_stress(void) {
         entries,N,N*3u,out,N,order,N));
     assert(out[N-1u].length==3u); /* No partial publication. */
 }
-int main(void) {iterator_streaming();iterator_large_map();small();stress();candidate_spans();candidate_stress();return 0;}
+int main(void) {iterator_streaming();iterator_paged_atomic();iterator_large_map();small();stress();candidate_spans();candidate_stress();return 0;}
