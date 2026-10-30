@@ -24,6 +24,9 @@ int musa_scene2d_text_affine(const MusaScene2dTextPlacement *placement,
     const double s=sin(placement->rotation_rad);
     const double sx=placement->height*placement->width_factor;
     const double sy=placement->height;
+    /* A nonzero width factor can still underflow to a zero x-axis scale.
+     * Publishing that singular transform silently collapses CAD glyphs. */
+    if (!isfinite(sx) || sx==0.0) return 0;
     const double skew=sy*tan(placement->oblique_rad);
     const double a=c*sx, b=s*sx;
     const double cc=c*skew-s*sy, d=s*skew+c*sy;
