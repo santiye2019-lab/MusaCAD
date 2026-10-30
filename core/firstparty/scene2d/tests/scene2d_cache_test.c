@@ -173,6 +173,41 @@ static void test_extreme_coordinate_consistency(void) {
     assert(!musa_scene2d_index_build(prepared,2,tree,4,&leaves));
     assert(leaves==55);
 }
+/* Large-site-plan coordinates can cancel to a sub-unit viewport target.
+ * Direct culling, cached bounds and the index must all agree. */
+static void test_fused_large_coordinate_viewport(void) {
+    const MusaScene2dNode n[] = {
+        {1,0,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,I}
+    };
+    const MusaScene2dResolved r[] = {
+        {1,0,0xff000000u,1,
+         {0.1,0.0,0.0,0.1,1e15+0.25,1e15+0.25}}
+    };
+    const MusaScene2dBox local[] = {
+        {-1e16,-1e16,-1e16,-1e16}
+    };
+    const double expected=fma(0.1,-1e16,1e15+0.25);
+    const MusaScene2dBox view={expected,expected,expected,expected};
+    MusaScene2dPreparedBounds prepared[1];
+    size_t written=99u;
+    assert(musa_scene2d_prepare_bounds(n,r,local,1,prepared,1,&written));
+    assert(written==1u && prepared[0].visible);
+    assert(prepared[0].box.min_x<=expected &&
+           prepared[0].box.max_x>=expected &&
+           prepared[0].box.min_y<=expected &&
+           prepared[0].box.max_y>=expected);
+    MusaScene2dIndexNode tree[2];
+    size_t leaves=0;
+    assert(musa_scene2d_index_build(prepared,1,tree,2,&leaves));
+    assert(leaves==1u);
+    size_t direct[1]={99u}, cached[1]={98u}, indexed[1]={97u};
+    size_t nd=99u,nc=99u,ni=99u;
+    assert(musa_scene2d_collect_visible(n,r,local,1,view,direct,1,&nd));
+    assert(musa_scene2d_collect_prepared(prepared,1,view,cached,1,&nc));
+    assert(musa_scene2d_index_query(tree,1,leaves,view,indexed,1,&ni));
+    assert(nd==1u && nc==1u && ni==1u);
+    assert(direct[0]==0u && cached[0]==0u && indexed[0]==0u);
+}
 static void test_large_scene(void) {
     const size_t count = 20000;
     MusaScene2dNode *n = calloc(count,sizeof *n);
@@ -203,6 +238,7 @@ int main(void) {
     test_cache_equivalence();
     test_atomic_failures();
     test_extreme_coordinate_consistency();
+    test_fused_large_coordinate_viewport();
     test_large_scene();
     return 0;
 }
