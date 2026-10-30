@@ -30,12 +30,17 @@ static int overlap(const void *a, size_t na, const void *b, size_t nb) {
     return x <= y ? y - x < na : x - y < nb;
 }
 static int compose(const double parent[6], const double child[6], double dst[6]) {
-    dst[0] = parent[0]*child[0] + parent[2]*child[1];
-    dst[1] = parent[1]*child[0] + parent[3]*child[1];
-    dst[2] = parent[0]*child[2] + parent[2]*child[3];
-    dst[3] = parent[1]*child[2] + parent[3]*child[3];
-    dst[4] = parent[0]*child[4] + parent[2]*child[5] + parent[4];
-    dst[5] = parent[1]*child[4] + parent[3]*child[5] + parent[5];
+    /* A multiply may overflow before a finite translation or shear term
+     * cancels it. FMA evaluates the product and sum with one rounding,
+     * retaining valid world transforms at large drawing coordinates. */
+    dst[0] = fma(parent[0],child[0],parent[2]*child[1]);
+    dst[1] = fma(parent[1],child[0],parent[3]*child[1]);
+    dst[2] = fma(parent[0],child[2],parent[2]*child[3]);
+    dst[3] = fma(parent[1],child[2],parent[3]*child[3]);
+    dst[4] = fma(parent[0],child[4],
+                 fma(parent[2],child[5],parent[4]));
+    dst[5] = fma(parent[1],child[4],
+                 fma(parent[3],child[5],parent[5]));
     for (size_t j = 0; j < 6; ++j) if (!isfinite(dst[j])) return 0;
     return 1;
 }
