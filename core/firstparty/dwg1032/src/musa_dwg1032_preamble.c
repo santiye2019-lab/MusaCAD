@@ -19,14 +19,15 @@ static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
     return x<=y ? y-x<an : x-y<bn;
 }
-static int address_ok(uint32_t offset, size_t length) {
+static int address_ok(uint32_t offset, uint64_t length) {
     return offset==0u || (offset>=0x100u && (uint64_t)offset<(uint64_t)length);
 }
-int musa_dwg1032_read_preamble(const uint8_t *file, size_t file_bytes,
-                               MusaDwg1032Preamble *out) {
-    if (!file || !out || file_bytes<0x100u ||
-        file_bytes>PTRDIFF_MAX ||
-        overlaps(file,file_bytes,out,sizeof(*out)) ||
+int musa_dwg1032_read_preamble_prefix(const uint8_t *file,
+                                      size_t prefix_bytes,
+                                      uint64_t file_bytes,
+                                      MusaDwg1032Preamble *out) {
+    if (!file || !out || prefix_bytes!=0x100u || file_bytes<0x100u ||
+        overlaps(file,prefix_bytes,out,sizeof(*out)) ||
         file[0]!='A' || file[1]!='C' || file[2]!='1' ||
         file[3]!='0' || file[4]!='3' || file[5]!='2')
         return 0;
@@ -54,4 +55,14 @@ int musa_dwg1032_read_preamble(const uint8_t *file, size_t file_bytes,
         !address_ok(next.vba_offset,file_bytes)) return 0;
     *out=next;
     return 1;
+}
+
+/* Retain the legacy whole-buffer API and its stricter full-file alias guard.
+ * The prefix variant never dereferences bytes beyond the first 0x100. */
+int musa_dwg1032_read_preamble(const uint8_t *file, size_t file_bytes,
+                               MusaDwg1032Preamble *out) {
+    if (!file || !out || file_bytes<0x100u || file_bytes>PTRDIFF_MAX ||
+        overlaps(file,file_bytes,out,sizeof(*out))) return 0;
+    return musa_dwg1032_read_preamble_prefix(file,0x100u,
+                                              (uint64_t)file_bytes,out);
 }
