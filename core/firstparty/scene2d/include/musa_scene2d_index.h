@@ -41,6 +41,19 @@ int musa_scene2d_index_query_page(const MusaScene2dIndexNode *storage,
                                   MusaScene2dBox viewport, size_t skip,
                                   size_t *indices, size_t capacity,
                                   size_t *written, size_t *total_hits);
+
+/* Cursor-style pagination by SOURCE INDEX rather than hit count. Supply
+ * start_index=0 for the first page, then indices[written-1]+1 for the next.
+ * No global recount or O(skip) scan: branches entirely before start_index
+ * are pruned. Results preserve draw order, including viewport edge touches.
+ * Returns up to capacity hits. A short page means there are no later hits.
+ * When capacity is zero, returns zero without visiting the tree.
+ * The tree must be an unmodified successful build result. */
+int musa_scene2d_index_query_from(const MusaScene2dIndexNode *storage,
+                                  size_t count, size_t leaf_count,
+                                  MusaScene2dBox viewport, size_t start_index,
+                                  size_t *indices, size_t capacity,
+                                  size_t *written);
 #ifdef __cplusplus
 }
 #endif

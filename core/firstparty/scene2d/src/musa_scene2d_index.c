@@ -184,3 +184,52 @@ int musa_scene2d_index_query_page(const MusaScene2dIndexNode *storage,
     *total_hits=total;
     return 1;
 }
+
+/* Resumable, source-index-based pagination avoids recounting all earlier
+ * viewport hits on every page. It does not allocate or mutate the index. */
+static void visit_from(const MusaScene2dIndexNode *tree, size_t node,
+                       size_t first, size_t span, size_t count,
+                       MusaScene2dBox view, size_t start_index,
+                       size_t *indices, size_t capacity, size_t *hits) {
+    if (*hits==capacity || first>=count ||
+        first+span<=start_index || !tree[node].occupied ||
+        !intersects(tree[node].box,view)) return;
+    if (span==1u) {
+        indices[(*hits)++]=first;
+        return;
+    }
+    const size_t half=span/2u;
+    visit_from(tree,node*2u,first,half,count,view,start_index,
+               indices,capacity,hits);
+    visit_from(tree,node*2u+1u,first+half,half,count,view,start_index,
+               indices,capacity,hits);
+}
+
+int musa_scene2d_index_query_from(const MusaScene2dIndexNode *storage,
+                                  size_t count, size_t leaf_count,
+                                  MusaScene2dBox viewport, size_t start_index,
+                                  size_t *indices, size_t capacity,
+                                  size_t *written) {
+    if (!written || !finite_box(viewport) ||
+        capacity>SIZE_MAX/sizeof(*indices) ||
+        (capacity && !indices)) return 0;
+    if (!count) {
+        if (leaf_count) return 0;
+        *written=0;
+        return 1;
+    }
+    if (!storage || !leaf_count || (leaf_count&(leaf_count-1u)) ||
+        count>leaf_count || leaf_count>SIZE_MAX/2u ||
+        2u*leaf_count>SIZE_MAX/sizeof(*storage)) return 0;
+    const size_t tbytes=2u*leaf_count*sizeof(*storage);
+    const size_t obytes=capacity*sizeof(*indices);
+    if (overlap(storage,tbytes,indices,obytes) ||
+        overlap(storage,tbytes,written,sizeof(*written)) ||
+        overlap(indices,obytes,written,sizeof(*written))) return 0;
+    size_t hits=0;
+    if (capacity && start_index<count)
+        visit_from(storage,1u,0u,leaf_count,count,viewport,start_index,
+                   indices,capacity,&hits);
+    *written=hits;
+    return 1;
+}
