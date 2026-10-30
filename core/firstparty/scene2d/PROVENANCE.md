@@ -138,3 +138,11 @@
 - **Origin:** Independently authored from elementary binary-tree traversal and checked integer bounds, MIT SPDX; no code from LibreDWG, legacy MusaCAD CAD readers, GPL/AGPL/LGPL or uncertain-origin implementations was imported, adapted or linked.
 - **Tests:** Page offsets, zero capacity, out-of-range offsets, invalid viewports, aliased output buffers, rollback, and ordered equivalence against a full query over 20,000 synthetic objects. GitHub CI must be checked for the final commit before marking tests passed.
 - **Performance boundary:** One page needs a count pass and a pruned traversal; repeatedly requesting many pages revisits the tree. This is a memory-bounded API, **not** a measured speedup. It works on already prepared 2D bounds and does not read AC1032 pages, extract entities, render Android geometry, or prove real DWG interoperability. Production JNI remains fail-closed. Existing 3D code, `MusaCAD2/`, and `main` were not changed.
+
+## Spatial-index finite-bound and output-pointer hardening (2026-10-30)
+
+- **Scope:** Existing independently authored MIT C11 `musa_scene2d_index.c` and its standalone regression tests only; no production DWG reader, Android JNI, 3D code, `main`, or `MusaCAD2/` changes.
+- **Fixes:** A nonempty query output capacity now requires a non-null indices pointer, including zero-hit viewports, preventing a null write when hits exist. Visible prepared AABBs must have finite, ordered coordinates; nonfinite visible bounds can no longer enter the spatial index. Hidden entries remain excluded even when their geometry is unavailable.
+- **Safety tests:** Null query output with and without viewport hits, output-count rollback, infinity in minimum/maximum bounds, index-storage rollback, and hidden malformed bounds.
+- **Origin:** Independently reasoned from C pointer validity and IEEE-754 finite-coordinate requirements; no external CAD source, GPL/AGPL/LGPL implementation, or copied algorithm.
+- **Limit:** These are scene-level robustness fixes for predecoded geometry, not AC1032 decoding or evidence that real DWG drawings render. Confirm GitHub CI for the final commit before calling tests successful.
