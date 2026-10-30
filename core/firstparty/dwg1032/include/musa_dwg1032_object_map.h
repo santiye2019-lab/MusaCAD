@@ -31,6 +31,18 @@ int musa_dwg1032_object_map_iterator_init(
     size_t byte_count, uint64_t section_bytes);
 int musa_dwg1032_object_map_iterator_next(
     MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *entry);
+/* Read exactly count consecutive entries from an immutable, caller-verified
+ * object-map payload into a bounded page. The iterator and every output
+ * entry remain unchanged if any pair in the requested page is malformed.
+ * Unlike the full-map decoder, this needs only one page of output storage;
+ * it makes two allocation-free passes over that page to ensure rollback.
+ * count == 0 succeeds without consuming data. The source buffer must stay
+ * immutable throughout the call; output must not overlap source or iterator.
+ * Caller must verify the final entry count and complete byte consumption
+ * before treating the entire object map as validated. */
+int musa_dwg1032_object_map_iterator_page(
+    MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *out,
+    size_t count, size_t capacity);
 /* Decode exactly count (unsigned MC handle delta, signed MC file-offset
  * delta) pairs from a verified, already decompressed object-map payload.
  * Enforces strictly increasing nonzero handles, in-section offsets, no
