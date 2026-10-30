@@ -37,8 +37,11 @@ static int candidate(const MusaScene2dNode *node,
     for (unsigned j = 0; j < 4; ++j) {
         const double x = (j & 1u) ? local.max_x : local.min_x;
         const double y = (j & 2u) ? local.max_y : local.min_y;
-        const double wx = r->world[0]*x + r->world[2]*y + r->world[4];
-        const double wy = r->world[1]*x + r->world[3]*y + r->world[5];
+        /* Match cached bounds exactly for large-coordinate cancellation. */
+        const double wx = fma(r->world[0],x,
+                              fma(r->world[2],y,r->world[4]));
+        const double wy = fma(r->world[1],x,
+                              fma(r->world[3],y,r->world[5]));
         if (!isfinite(wx) || !isfinite(wy)) return 0;
         if (wx < min_x) min_x = wx;
         if (wx > max_x) max_x = wx;
