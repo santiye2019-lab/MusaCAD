@@ -57,3 +57,42 @@ int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
     *written=count;
     return 1;
 }
+
+/* Page only the requested row-major instances: O(page_size), independent
+ * of the number of preceding instances in a very large block array. */
+int musa_scene2d_array_fill_page(const MusaScene2dInsertArray *array,
+                                  size_t start, double *out, size_t capacity,
+                                  size_t *written, size_t *total) {
+    if (!array || !written || !total ||
+        array_overlap(array,sizeof(*array),written,sizeof(*written)) ||
+        array_overlap(array,sizeof(*array),total,sizeof(*total)) ||
+        array_overlap(written,sizeof(*written),total,sizeof(*total)) ||
+        !array->columns || !array->rows ||
+        array->columns>SIZE_MAX/array->rows) return 0;
+    const size_t count=array->columns*array->rows;
+    const size_t remaining=start<count ? count-start : 0u;
+    const size_t page_count=remaining<capacity ? remaining:capacity;
+    if (page_count>SIZE_MAX/(6u*sizeof(double)) ||
+        (page_count && !out)) return 0;
+    const size_t output_bytes=page_count*6u*sizeof(double);
+    if (array_overlap(array,sizeof(*array),out,output_bytes) ||
+        array_overlap(written,sizeof(*written),out,output_bytes) ||
+        array_overlap(total,sizeof(*total),out,output_bytes)) return 0;
+    double affine[6];
+    /* Validate even an empty page's base placement and spacings. */
+    if (!musa_scene2d_array_affine(array,0u,0u,affine)) return 0;
+    for (size_t i=0;i<page_count;++i) {
+        const size_t at=start+i; /* <= count-1; checked by remaining. */
+        if (!musa_scene2d_array_affine(array,at%array->columns,
+                                        at/array->columns,affine)) return 0;
+    }
+    for (size_t i=0;i<page_count;++i) {
+        const size_t at=start+i;
+        (void)musa_scene2d_array_affine(array,at%array->columns,
+                                         at/array->columns,affine);
+        memcpy(out+6u*i,affine,sizeof(affine));
+    }
+    *written=page_count;
+    *total=count;
+    return 1;
+}
