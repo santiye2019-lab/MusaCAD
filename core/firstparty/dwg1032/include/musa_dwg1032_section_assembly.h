@@ -46,6 +46,18 @@ int musa_dwg1032_section_assemble_file_pages(
     const MusaDwg1032FilePage *pages, size_t page_count,
     uint8_t *destination, size_t destination_size);
 
+
+/* Optional corruption gate for a caller-verified physical page directory.
+ * Sorts physical file ranges in caller-provided scratch space and rejects
+ * duplicate/overlapping source ranges, empty pages and out-of-file spans.
+ * Does not infer AC1032 page headers, compression or authentication.
+ * O(page_count log page_count), no allocation. On failure order may change;
+ * pages are never modified. This is deliberately separate from assembly:
+ * some callers may legitimately reuse physical byte ranges. */
+int musa_dwg1032_file_pages_validate_physical(
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    size_t file_size, size_t *order, size_t order_capacity);
+
 #ifdef __cplusplus
 }
 #endif
