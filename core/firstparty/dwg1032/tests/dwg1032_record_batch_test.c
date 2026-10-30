@@ -39,6 +39,14 @@ static void three_candidates(void) {
         &index,&section,1,out,3,order,3));
     assert(memcmp(saved,out,sizeof(out))==0);
     bytes[4]=1;
+    /* Payload limits must reject oversized records without output changes. */
+    assert(!musa_dwg1032_record_batch_extract(
+        &index,&section,0,out,3,order,3));
+    assert(memcmp(saved,out,sizeof(out))==0);
+    /* Index entries are immutable inputs, never writable result storage. */
+    assert(!musa_dwg1032_record_batch_extract(
+        &index,&section,1,spans,3,order,3));
+    assert(memcmp(saved,out,sizeof(out))==0);
     assert(!musa_dwg1032_record_batch_extract(
         &index,&section,0,out,3,order,3));
     assert(!musa_dwg1032_record_batch_extract(
