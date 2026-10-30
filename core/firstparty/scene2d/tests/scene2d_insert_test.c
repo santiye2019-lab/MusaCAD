@@ -65,6 +65,28 @@ static void extreme_finite_translations(void) {
     assert(!musa_scene2d_insert_affine(&p,out));
     assert(memcmp(out,saved,sizeof(out))==0);
 }
+/* Rotated INSERT base offsets: the first evaluation order produces an
+ * intermediate infinity, although the final world X is finite. */
+static void extreme_rotated_base_cancellation(void) {
+    MusaScene2dInsertPlacement p={
+        0.0,1.5e308,1.0,2.0,1.4e308,1.4e308,acos(-1.0)/4.0
+    };
+    double out[6];
+    assert(musa_scene2d_insert_affine(&p,out));
+    assert(isfinite(out[4]) && isfinite(out[5]));
+    const double expected_x=fma(-out[2],p.base_y,
+                                -out[0]*p.base_x);
+    const double expected_y=fma(-out[1],p.base_x,
+                                fma(-out[3],p.base_y,p.insertion_y));
+    assert(isfinite(expected_x) && isfinite(expected_y));
+    assert(fabs((out[4]-expected_x)/expected_x)<1e-14);
+    assert(fabs((out[5]-expected_y)/expected_y)<1e-14);
+    double saved[6];
+    memcpy(saved,out,sizeof(saved));
+    p.base_y=4.0; /* Genuine final overflow remains a hard failure. */
+    assert(!musa_scene2d_insert_affine(&p,out));
+    assert(memcmp(out,saved,sizeof(saved))==0);
+}
 static void rollback(void) {
     MusaScene2dInsertPlacement p={1,2,3,4,5,6,0};
     double out[6]={11,12,13,14,15,16},saved[6];
@@ -179,4 +201,4 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();hierarchy();extreme_finite_translations();rollback();many();bulk_placements();paged_placements();return 0;}
+int main(void) {basic();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
