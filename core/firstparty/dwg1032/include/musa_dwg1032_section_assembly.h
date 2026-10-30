@@ -58,6 +58,19 @@ int musa_dwg1032_file_pages_validate_physical(
     const MusaDwg1032FilePage *pages, size_t page_count,
     size_t file_size, size_t *order, size_t order_capacity);
 
+
+/* Strict one-shot physical directory validation plus logical assembly.
+ * Requires a caller-owned order array with at least page_count elements.
+ * Rejects overlapping physical pages (unlike the permissive assembly API),
+ * and rejects scratch overlap with source, destination or page metadata.
+ * Validates both physical and logical ranges before writing destination.
+ * Failure leaves destination unchanged; scratch may change. */
+int musa_dwg1032_section_assemble_checked_file_pages(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    uint8_t *destination, size_t destination_size,
+    size_t *order, size_t order_capacity);
+
 #ifdef __cplusplus
 }
 #endif
