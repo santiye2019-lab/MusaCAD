@@ -218,7 +218,7 @@ static void strict_file_page_assembly(void) {
     assert(!memcmp(out,expected,6));
     assert(order[0]==1u && order[1]==0u);
     memset(out,0xAA,6);
-    pages[1].file_offset=4; /* Partial physical overlap, logical order valid. */
+    pages[1].file_offset=2; /* Partial physical overlap, logical order valid. */
     assert(!musa_dwg1032_section_assemble_checked_file_pages(
         file,6,pages,2,out,6,order,2));
     pages[1].file_offset=3; /* Exact duplicate physical span. */
