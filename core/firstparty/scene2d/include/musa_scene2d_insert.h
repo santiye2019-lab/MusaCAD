@@ -34,6 +34,17 @@ int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
 int musa_scene2d_insert_affine_batch(
     const MusaScene2dInsertPlacement *placements, size_t count,
     double (*out)[6], size_t capacity);
+/* Read only the requested page of arbitrary decoded INSERT placements.
+ * start >= count returns an empty page; capacity is in transforms.
+ * An empty page permits NULL out. The input array must remain immutable.
+ * Validates the requested page before writing, O(page_count) time with
+ * no allocation. Failure leaves out, *written and *total unchanged.
+ * A zero-capacity call returns total without examining any placement.
+ * This is not DWG framing, ownership or extrusion interpretation. */
+int musa_scene2d_insert_affine_page(
+    const MusaScene2dInsertPlacement *placements, size_t count,
+    size_t start, double (*out)[6], size_t capacity,
+    size_t *written, size_t *total);
 #ifdef __cplusplus
 }
 #endif
