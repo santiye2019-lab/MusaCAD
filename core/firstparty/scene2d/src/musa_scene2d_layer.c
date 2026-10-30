@@ -64,3 +64,47 @@ int musa_scene2d_layers_from_cad(const MusaScene2dCadLayer *cad,
     }
     return 1;
 }
+
+/* Bounded, transactional page conversion of predecoded CAD layer records. */
+int musa_scene2d_layers_from_cad_page(const MusaScene2dCadLayer *cad,
+                                      size_t count, size_t start,
+                                      const uint32_t *palette_rgb,
+                                      size_t palette_count,
+                                      uint32_t foreground_rgb,
+                                      MusaScene2dLayer *out, size_t capacity,
+                                      size_t *written, size_t *total) {
+    if (!written || !total || (count && !cad) ||
+        count>SIZE_MAX/sizeof(*cad) ||
+        palette_count>SIZE_MAX/sizeof(*palette_rgb) ||
+        ((palette_rgb==NULL)!=(palette_count==0u)) ||
+        (palette_rgb && palette_count!=256u) ||
+        foreground_rgb>0xffffffu ||
+        overlaps(written,sizeof(*written),total,sizeof(*total)) ||
+        overlaps(cad,count*sizeof(*cad),written,sizeof(*written)) ||
+        overlaps(cad,count*sizeof(*cad),total,sizeof(*total)) ||
+        overlaps(palette_rgb,palette_count*sizeof(*palette_rgb),
+                 written,sizeof(*written)) ||
+        overlaps(palette_rgb,palette_count*sizeof(*palette_rgb),
+                 total,sizeof(*total))) return 0;
+    const size_t remaining=start<count ? count-start : 0u;
+    const size_t page_count=remaining<capacity ? remaining : capacity;
+    if (page_count>SIZE_MAX/sizeof(*out) || (page_count && !out)) return 0;
+    const size_t output_bytes=page_count*sizeof(*out);
+    if (overlaps(cad,count*sizeof(*cad),out,output_bytes) ||
+        overlaps(palette_rgb,palette_count*sizeof(*palette_rgb),
+                 out,output_bytes) ||
+        overlaps(out,output_bytes,written,sizeof(*written)) ||
+        overlaps(out,output_bytes,total,sizeof(*total))) return 0;
+    MusaScene2dLayer converted={0,0,0};
+    for (size_t i=0;i<page_count;++i)
+        if (!convert(&cad[start+i],palette_rgb,palette_count,
+                     foreground_rgb,&converted)) return 0;
+    for (size_t i=0;i<page_count;++i) {
+        (void)convert(&cad[start+i],palette_rgb,palette_count,
+                      foreground_rgb,&converted);
+        out[i]=converted;
+    }
+    *written=page_count;
+    *total=count;
+    return 1;
+}

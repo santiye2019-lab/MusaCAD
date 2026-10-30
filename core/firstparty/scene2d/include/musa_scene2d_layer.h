@@ -32,6 +32,19 @@ int musa_scene2d_layers_from_cad(const MusaScene2dCadLayer *cad,
                                  size_t palette_count,
                                  uint32_t foreground_rgb,
                                  MusaScene2dLayer *out, size_t capacity);
+/* Convert a bounded page of caller-decoded layer attributes without
+ * visiting preceding layers or allocating a whole-document output.
+ * start >= count returns an empty page; capacity counts layers, not bytes.
+ * Only requested layers are validated. All input/output buffers must be
+ * disjoint; on failure out, *written and *total remain unchanged.
+ * This is NOT a DWG layer-table reader. */
+int musa_scene2d_layers_from_cad_page(const MusaScene2dCadLayer *cad,
+                                      size_t count, size_t start,
+                                      const uint32_t *palette_rgb,
+                                      size_t palette_count,
+                                      uint32_t foreground_rgb,
+                                      MusaScene2dLayer *out, size_t capacity,
+                                      size_t *written, size_t *total);
 #ifdef __cplusplus
 }
 #endif
