@@ -131,6 +131,29 @@ static void test_large_nested_transform_cancellation(void) {
     assert(musa_scene2d_resolve(nodes,2,layer,1,out,2,&written));
     assert(out[1].world[0]==1e308 && out[1].world[4]==0);
 }
+/* A finite shear or translation must not be rejected merely because
+ * the second multiplication overflowed before the first FMA. */
+static void test_reversed_fma_large_coordinates(void) {
+    const MusaScene2dLayer layer[]={{0,0xff123456u,1}};
+    MusaScene2dNode nodes[]={
+        {1,0,0,0,MUSA_SCENE2D_INSERT,1,MUSA_SCENE2D_BYLAYER,
+         {1e308,0,-1e308,1,0,0}},
+        {2,1,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,
+         {1,2,0,1,1,2}}
+    };
+    MusaScene2dResolved out[2];
+    size_t written=99;
+    assert(musa_scene2d_resolve(nodes,2,layer,1,out,2,&written));
+    assert(written==2 && out[1].visible==1);
+    assert(out[1].world[0]==-1e308 && out[1].world[4]==-1e308);
+    assert(out[1].world[1]==2 && out[1].world[5]==2);
+    MusaScene2dResolved saved[2];
+    memcpy(saved,out,sizeof(saved));
+    nodes[1].affine[1]=3; /* Genuine shear overflow is still rejected. */
+    written=99;
+    assert(!musa_scene2d_resolve(nodes,2,layer,1,out,2,&written));
+    assert(written==99 && memcmp(out,saved,sizeof(saved))==0);
+}
 static void test_deep_chain(void) {
     const size_t count=20000;
     MusaScene2dNode *n=calloc(count,sizeof *n);
@@ -155,6 +178,7 @@ int main(void) {
     test_nested_block_visibility();
     test_atomic_failures();
     test_large_nested_transform_cancellation();
+    test_reversed_fma_large_coordinates();
     test_deep_chain();
     return 0;
 }
