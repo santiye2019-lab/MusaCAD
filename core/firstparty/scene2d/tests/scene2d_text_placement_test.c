@@ -77,6 +77,18 @@ int main(void) {
     /* A compiler may fuse the subtraction above under FP contraction.
      * Assert the preserved residual itself, not a non-fused expression. */
     assert(a[4]>0.125 && a[4]<0.25);
+    /* With a rotated, anisotropically scaled TEXT, one anchor term
+     * overflows before the opposite term cancels it. Both final
+     * translations remain finite and must not be discarded. */
+    p=(MusaScene2dTextPlacement){0,1.5e308,
+        2.0*sqrt(2.0),0.5,0,acos(-1.0)/4.0,1e308,1e308};
+    assert(musa_scene2d_text_affine(&p,a));
+    assert(isfinite(a[4]) && fabs(a[4]/1e308-1.0)<1e-14);
+    assert(isfinite(a[5]) && fabs(a[5]/1.5e308+1.0)<1e-14);
+    memcpy(saved,a,sizeof(saved));
+    p.insertion_y=-1.5e308; /* Genuine y overflow still rejects. */
+    assert(!musa_scene2d_text_affine(&p,a));
+    assert(memcmp(saved,a,sizeof(saved))==0);
     for (int i=0;i<20000;++i) {
         const double k=(double)(i%101-50)/20.0;
         p=(MusaScene2dTextPlacement){k*3,k-4,2.0,0.1+(i%7)/4.0,
