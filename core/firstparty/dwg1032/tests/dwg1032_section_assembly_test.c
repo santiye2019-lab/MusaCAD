@@ -144,7 +144,8 @@ static void file_backed_large_reverse_physical_order(void) {
     enum { COUNT=16384 };
     uint8_t *src=malloc(COUNT), *dst=malloc(COUNT);
     MusaDwg1032FilePage *pages=malloc(COUNT*sizeof(*pages));
-    assert(src && dst && pages);
+    size_t *order=malloc(COUNT*sizeof(*order));
+    assert(src && dst && pages && order);
     for (size_t i=0;i<COUNT;++i) {
         src[i]=(uint8_t)((i*31u)^(i>>4));
         pages[i]=(MusaDwg1032FilePage){(uint64_t)i,
@@ -155,11 +156,18 @@ static void file_backed_large_reverse_physical_order(void) {
         src,COUNT,pages,COUNT,dst,COUNT));
     for (size_t i=0;i<COUNT;++i) assert(dst[i]==src[COUNT-1u-i]);
     memset(dst,0xCC,COUNT);
+    assert(musa_dwg1032_section_assemble_checked_file_pages(
+        src,COUNT,pages,COUNT,dst,COUNT,order,COUNT));
+    for (size_t i=0;i<COUNT;++i) assert(dst[i]==src[COUNT-1u-i]);
+    memset(dst,0xCC,COUNT);
     pages[COUNT-1u].file_offset=COUNT; /* late invalid page, no partial writes */
     assert(!musa_dwg1032_section_assemble_file_pages(
         src,COUNT,pages,COUNT,dst,COUNT));
     for (size_t i=0;i<COUNT;++i) assert(dst[i]==0xCC);
-    free(pages);free(dst);free(src);
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        src,COUNT,pages,COUNT,dst,COUNT,order,COUNT));
+    for (size_t i=0;i<COUNT;++i) assert(dst[i]==0xCC);
+    free(order);free(pages);free(dst);free(src);
 }
 static void physical_directory_validation(void) {
     MusaDwg1032FilePage pages[]={{0,6,2},{2,0,2},{4,3,2}};
