@@ -101,6 +101,36 @@ static void test_atomic_failures(void) {
     assert(memcmp(out,saved,sizeof out)==0);
 #undef REJECT
 }
+/* A finite nested transform can contain an intermediate product larger
+ * than DBL_MAX; only the final, fused affine coefficient must be finite. */
+static void test_large_nested_transform_cancellation(void) {
+    const MusaScene2dLayer layer[]={{0,0xff112233u,1}};
+    MusaScene2dNode nodes[]={
+        {1,0,0,0,MUSA_SCENE2D_INSERT,1,MUSA_SCENE2D_BYLAYER,
+         {1e308,0,0,1,-1e308,0}},
+        {2,1,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,
+         {1,0,0,1,2,0}}
+    };
+    MusaScene2dResolved out[2];
+    size_t written=99;
+    assert(musa_scene2d_resolve(nodes,2,layer,1,out,2,&written));
+    assert(written==2 && out[1].world[0]==1e308 &&
+           out[1].world[4]==1e308 && out[1].visible==1);
+    MusaScene2dResolved saved[2];
+    memcpy(saved,out,sizeof(out));
+    nodes[1].affine[4]=4; /* Genuine final overflow: fail atomically. */
+    written=99;
+    assert(!musa_scene2d_resolve(nodes,2,layer,1,out,2,&written));
+    assert(written==99 && memcmp(saved,out,sizeof(out))==0);
+    /* Also exercise a fused matrix coefficient (2e308 - 1e308). */
+    nodes[0].affine[2]=-1e308;
+    nodes[0].affine[4]=0;
+    nodes[1].affine[0]=2;
+    nodes[1].affine[1]=1;
+    nodes[1].affine[4]=0;
+    assert(musa_scene2d_resolve(nodes,2,layer,1,out,2,&written));
+    assert(out[1].world[0]==1e308 && out[1].world[4]==0);
+}
 static void test_deep_chain(void) {
     const size_t count=20000;
     MusaScene2dNode *n=calloc(count,sizeof *n);
@@ -124,6 +154,7 @@ int main(void) {
     test_hierarchy();
     test_nested_block_visibility();
     test_atomic_failures();
+    test_large_nested_transform_cancellation();
     test_deep_chain();
     return 0;
 }
