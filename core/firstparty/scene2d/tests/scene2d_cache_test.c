@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_scene2d_cache.h"
+#include "musa_scene2d_index.h"
 #include "musa_scene2d_viewport.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
 #include <assert.h>
 #include <math.h>
+#include <float.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -119,6 +121,58 @@ static void test_atomic_failures(void) {
              (MusaScene2dBox){0,0,1,1},NULL,0,&written));
     assert(written == 0);
 }
+/* A finite drawing point at the largest representable coordinate must
+ * remain indexable, rather than becoming an infinite cached AABB. */
+static void test_extreme_coordinate_consistency(void) {
+    const MusaScene2dNode n[] = {
+        {1,0,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,I},
+        {2,0,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,I}
+    };
+    const MusaScene2dResolved r[] = {
+        {1,0,0xff000000u,1,I},
+        {2,0,0xff000000u,1,I}
+    };
+    const MusaScene2dBox local[] = {
+        {DBL_MAX,DBL_MAX,DBL_MAX,DBL_MAX},
+        {-DBL_MAX,-DBL_MAX,-DBL_MAX,-DBL_MAX}
+    };
+    MusaScene2dPreparedBounds prepared[2];
+    size_t written=77;
+    assert(musa_scene2d_prepare_bounds(n,r,local,2,prepared,2,&written));
+    assert(written==2);
+    assert(isfinite(prepared[0].box.min_x) &&
+           isfinite(prepared[0].box.max_x) &&
+           isfinite(prepared[1].box.min_y) &&
+           isfinite(prepared[1].box.max_y));
+    assert(prepared[0].box.max_x==DBL_MAX &&
+           prepared[1].box.min_x==-DBL_MAX);
+    MusaScene2dIndexNode tree[4];
+    size_t leaves=0;
+    assert(musa_scene2d_index_build(prepared,2,tree,4,&leaves));
+    assert(leaves==2);
+    const MusaScene2dBox views[] = {
+        {DBL_MAX,DBL_MAX,DBL_MAX,DBL_MAX},
+        {-DBL_MAX,-DBL_MAX,-DBL_MAX,-DBL_MAX}
+    };
+    for (size_t k=0;k<2;++k) {
+        size_t direct[2]={99,99}, cached[2]={98,98}, indexed[2]={97,97};
+        size_t nd=77,nc=77,ni=77;
+        assert(musa_scene2d_collect_visible(n,r,local,2,views[k],direct,2,&nd));
+        assert(musa_scene2d_collect_prepared(prepared,2,views[k],cached,2,&nc));
+        assert(musa_scene2d_index_query(tree,2,leaves,views[k],indexed,2,&ni));
+        assert(nd==1 && nc==1 && ni==1);
+        assert(direct[0]==k && cached[0]==k && indexed[0]==k);
+    }
+    /* Invalid externally supplied bounds fail consistently and atomically. */
+    prepared[0].box.max_x=INFINITY;
+    size_t hits[2]={99,99};
+    written=77;
+    assert(!musa_scene2d_collect_prepared(prepared,2,views[0],hits,2,&written));
+    assert(written==77 && hits[0]==99);
+    leaves=55;
+    assert(!musa_scene2d_index_build(prepared,2,tree,4,&leaves));
+    assert(leaves==55);
+}
 static void test_large_scene(void) {
     const size_t count = 20000;
     MusaScene2dNode *n = calloc(count,sizeof *n);
@@ -148,6 +202,7 @@ static void test_large_scene(void) {
 int main(void) {
     test_cache_equivalence();
     test_atomic_failures();
+    test_extreme_coordinate_consistency();
     test_large_scene();
     return 0;
 }
