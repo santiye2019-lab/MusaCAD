@@ -3,6 +3,7 @@
  */
 #ifndef MUSA_SCENE2D_INSERT_H
 #define MUSA_SCENE2D_INSERT_H
+#include <stddef.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,6 +26,14 @@ typedef struct MusaScene2dInsertPlacement {
  */
 int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
                                double out[6]);
+/* Convert an array of independent, already-decoded INSERT placements.
+ * capacity counts six-double transforms. Validates the complete input
+ * before publishing any result, so failure leaves all out entries intact.
+ * No allocation, O(count) time, source/output must be disjoint.
+ * Empty input succeeds with NULL buffers. Not a DWG entity decoder. */
+int musa_scene2d_insert_affine_batch(
+    const MusaScene2dInsertPlacement *placements, size_t count,
+    double (*out)[6], size_t capacity);
 #ifdef __cplusplus
 }
 #endif
