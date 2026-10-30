@@ -28,6 +28,18 @@ int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
  * Rejects dimension/count overflow and output/input aliasing. */
 int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
                              double *out, size_t capacity, size_t *written);
+
+/* Produce a bounded page of row-major INSERT-array transforms without
+ * allocating or visiting preceding instances. start is a zero-based instance
+ * index; indices >= columns*rows return an empty page. capacity is in
+ * transforms, not doubles. out may be NULL only for an empty page.
+ * A zero-capacity query returns the total count without writing transforms.
+ * All requested instances are validated before any output is modified.
+ * On failure, out, *written and *total remain unchanged; buffers must be
+ * disjoint. This accepts already decoded planar fields, not DWG bytes. */
+int musa_scene2d_array_fill_page(const MusaScene2dInsertArray *array,
+                                  size_t start, double *out, size_t capacity,
+                                  size_t *written, size_t *total);
 #ifdef __cplusplus
 }
 #endif
