@@ -65,7 +65,9 @@ int main(void) {
     assert(musa_scene2d_text_affine(&p,a));
     assert(a[4]==fma(-a[0],p.anchor_x,p.insertion_x));
     assert(a[5]==0.0);
-    assert(fabs(a[4]-(p.insertion_x-a[0]*p.anchor_x))>0.01);
+    /* A compiler may fuse the subtraction above under FP contraction.
+     * Assert the preserved residual itself, not a non-fused expression. */
+    assert(a[4]>0.125 && a[4]<0.25);
     for (int i=0;i<20000;++i) {
         const double k=(double)(i%101-50)/20.0;
         p=(MusaScene2dTextPlacement){k*3,k-4,2.0,0.1+(i%7)/4.0,
