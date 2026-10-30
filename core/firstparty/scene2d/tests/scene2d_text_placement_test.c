@@ -99,6 +99,15 @@ int main(void) {
     p.height=1e308;
     assert(!musa_scene2d_text_affine(&p,a));
     assert(memcmp(saved,a,sizeof(saved))==0);
+    /* Large finite anchor offsets may produce an unrepresentable
+     * translation; no partial affine matrix may escape on failure. */
+    p=(MusaScene2dTextPlacement){1e308,0,2,1,0,0,-1e308,0};
+    assert(!musa_scene2d_text_affine(&p,a));
+    assert(memcmp(saved,a,sizeof(saved))==0);
+    /* Nonfinite anchor data must be rejected before trigonometry. */
+    p.anchor_x=INFINITY;
+    assert(!musa_scene2d_text_affine(&p,a));
+    assert(memcmp(saved,a,sizeof(saved))==0);
     for (int i=0;i<20000;++i) {
         const double k=(double)(i%101-50)/20.0;
         p=(MusaScene2dTextPlacement){k*3,k-4,2.0,0.1+(i%7)/4.0,
