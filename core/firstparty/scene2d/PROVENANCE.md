@@ -146,3 +146,10 @@
 - **Safety tests:** Null query output with and without viewport hits, output-count rollback, infinity in minimum/maximum bounds, index-storage rollback, and hidden malformed bounds.
 - **Origin:** Independently reasoned from C pointer validity and IEEE-754 finite-coordinate requirements; no external CAD source, GPL/AGPL/LGPL implementation, or copied algorithm.
 - **Limit:** These are scene-level robustness fixes for predecoded geometry, not AC1032 decoding or evidence that real DWG drawings render. Confirm GitHub CI for the final commit before calling tests successful.
+
+## Finite world bounds at IEEE-754 coordinate limits (2026-10-30)
+
+- **Change:** Independently authored C11 scene-cache and direct-culling bounds now widen toward the largest finite double instead of infinity. At exactly +/-DBL_MAX the conservative bound remains finite, allowing a successfully prepared drawing to enter the spatial index. The linear prepared-bounds collector rejects externally supplied nonfinite visible boxes consistently with index construction.
+- **Regression:** Two synthetic point entities at +DBL_MAX and -DBL_MAX are checked through direct culling, cached queries and spatial indexing. A corrupt infinity bound is rejected without changing output counts or indices. This is a numerical edge-case fix, not a measured large-drawing performance gain.
+- **Provenance:** Standard C11/IEEE-754 arithmetic and independently authored tests only. No legacy CAD reader, LibreDWG, GPL/AGPL/LGPL code, or unknown-origin implementation was copied, adapted or linked. Existing 3D code, `MusaCAD2/`, `main` and production JNI were not modified.
+- **Boundary:** AC1032 compressed pages, actual entity decoding, original colors/layers, block semantics and Android rendering remain unverified against real DWG fixtures. CI must be checked on the final commit; synthetic geometry tests are not proof of real DWG import.
