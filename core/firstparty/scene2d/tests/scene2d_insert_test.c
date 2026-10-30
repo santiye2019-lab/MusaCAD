@@ -100,6 +100,24 @@ static void mirrored_rotated_insert(void) {
     apply(a,2,4,&x,&y);
     assert(near(x,7) && near(y,20));
 }
+/* Reject a late invalid placement without publishing a partial page. */
+static void page_overflow_rollback(void) {
+    MusaScene2dInsertPlacement p[3]={
+        {1,2,0,0,1,1,0},
+        {3,4,0,0,1,1,0},
+        {1e308,0,-1e308,0,2,1,0}
+    };
+    double out[3][6]={{-9},{-9},{-9}},saved[3][6];
+    memcpy(saved,out,sizeof(out));
+    size_t written=17,total=19;
+    assert(!musa_scene2d_insert_affine_page(
+        p,3,0,out,3,&written,&total));
+    assert(written==17 && total==19);
+    assert(memcmp(saved,out,sizeof(out))==0);
+    assert(musa_scene2d_insert_affine_page(
+        p,3,0,out,2,&written,&total));
+    assert(written==2 && total==3);
+}
 static void rollback(void) {
     MusaScene2dInsertPlacement p={1,2,3,4,5,6,0};
     double out[6]={11,12,13,14,15,16},saved[6];
@@ -214,4 +232,4 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();mirrored_rotated_insert();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
+int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
