@@ -29,18 +29,30 @@ static int overlap(const void *a, size_t na, const void *b, size_t nb) {
     const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
     return x <= y ? y - x < na : x - y < nb;
 }
+/* FMA prevents overflow in its multiplied operand, but the OTHER
+ * product may still overflow before FMA can cancel it. Try both operand
+ * orders when the first evaluation is nonfinite. Ordinary drawing
+ * coordinates take only the fast path. */
+static double sum_products(double a, double b, double c, double d) {
+    const double result = fma(a, b, c * d);
+    return isfinite(result) ? result : fma(c, d, a * b);
+}
+static double sum_products_offset(double a, double b, double c, double d,
+                                  double offset) {
+    const double result = fma(a, b, fma(c, d, offset));
+    return isfinite(result) ? result : fma(c, d, fma(a, b, offset));
+}
 static int compose(const double parent[6], const double child[6], double dst[6]) {
-    /* A multiply may overflow before a finite translation or shear term
-     * cancels it. FMA evaluates the product and sum with one rounding,
-     * retaining valid world transforms at large drawing coordinates. */
-    dst[0] = fma(parent[0],child[0],parent[2]*child[1]);
-    dst[1] = fma(parent[1],child[0],parent[3]*child[1]);
-    dst[2] = fma(parent[0],child[2],parent[2]*child[3]);
-    dst[3] = fma(parent[1],child[2],parent[3]*child[3]);
-    dst[4] = fma(parent[0],child[4],
-                 fma(parent[2],child[5],parent[4]));
-    dst[5] = fma(parent[1],child[4],
-                 fma(parent[3],child[5],parent[5]));
+    /* Evaluate both orders before rejecting a finite cancellation.
+     * This is still bounded double arithmetic, not arbitrary precision. */
+    dst[0] = sum_products(parent[0],child[0],parent[2],child[1]);
+    dst[1] = sum_products(parent[1],child[0],parent[3],child[1]);
+    dst[2] = sum_products(parent[0],child[2],parent[2],child[3]);
+    dst[3] = sum_products(parent[1],child[2],parent[3],child[3]);
+    dst[4] = sum_products_offset(parent[0],child[4],
+                                 parent[2],child[5],parent[4]);
+    dst[5] = sum_products_offset(parent[1],child[4],
+                                 parent[3],child[5],parent[5]);
     for (size_t j = 0; j < 6; ++j) if (!isfinite(dst[j])) return 0;
     return 1;
 }
