@@ -22,12 +22,16 @@ int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
     const double dx=(double)column*array->column_spacing;
     const double dy=(double)row*array->row_spacing;
     if (!isfinite(dx) || !isfinite(dy)) return 0;
-    const double x=candidate[0]*dx + candidate[2]*dy;
-    const double y=candidate[1]*dx + candidate[3]*dy;
-    if (!isfinite(x) || !isfinite(y)) return 0;
-    candidate[4]+=x;
-    candidate[5]+=y;
-    if (!isfinite(candidate[4]) || !isfinite(candidate[5])) return 0;
+    /* Keep the existing translation inside the fused sum: intermediate
+     * scaled offsets may overflow even when the final placement is finite.
+     * This also avoids two extra rounding steps on large CAD coordinates. */
+    const double tx=fma(candidate[0],dx,
+                        fma(candidate[2],dy,candidate[4]));
+    const double ty=fma(candidate[1],dx,
+                        fma(candidate[3],dy,candidate[5]));
+    if (!isfinite(tx) || !isfinite(ty)) return 0;
+    candidate[4]=tx;
+    candidate[5]=ty;
     memcpy(out,candidate,sizeof(candidate));
     return 1;
 }
