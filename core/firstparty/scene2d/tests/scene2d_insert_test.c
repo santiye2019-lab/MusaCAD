@@ -109,4 +109,58 @@ static void bulk_placements(void) {
     assert(!musa_scene2d_insert_affine_batch(placements,1,NULL,1));
     free(saved);free(out);free(placements);
 }
-int main(void) {basic();hierarchy();rollback();many();bulk_placements();return 0;}
+static void paged_placements(void) {
+    enum { N=20000, CAP=16 };
+    MusaScene2dInsertPlacement *placements=malloc(N*sizeof(*placements));
+    assert(placements);
+    for (size_t i=0;i<N;++i)
+        placements[i]=(MusaScene2dInsertPlacement){
+            (double)i, (double)i*2.0, 0,0,1,1,0};
+    double out[CAP][6],saved[CAP][6];
+    for (size_t i=0;i<CAP;++i)
+        for (size_t j=0;j<6u;++j) out[i][j]=-777.0;
+    size_t written=123u,total=456u;
+    assert(musa_scene2d_insert_affine_page(
+        placements,N,N-5u,out,CAP,&written,&total));
+    assert(written==5u && total==N);
+    for (size_t i=0;i<5u;++i) {
+        double x,y;
+        apply(out[i],0,0,&x,&y);
+        assert(near(x,(double)(N-5u+i)));
+        assert(near(y,2.0*(double)(N-5u+i)));
+    }
+    for (size_t i=5u;i<CAP;++i)
+        for (size_t j=0;j<6u;++j) assert(out[i][j]==-777.0);
+    memcpy(saved,out,sizeof(out));
+    placements[N-1u].scale_x=INFINITY;
+    written=123u;total=456u;
+    assert(!musa_scene2d_insert_affine_page(
+        placements,N,N-7u,out,CAP,&written,&total));
+    assert(written==123u && total==456u &&
+           memcmp(saved,out,sizeof(out))==0);
+    /* Only the requested page is parsed: unrelated later errors do not
+     * make a visible early page unavailable. */
+    assert(musa_scene2d_insert_affine_page(
+        placements,N,0u,out,3u,&written,&total));
+    assert(written==3u && total==N);
+    memcpy(saved,out,sizeof(out));
+    assert(!musa_scene2d_insert_affine_page(
+        placements,N,0u,(double (*)[6])(void *)placements,
+        3u,&written,&total));
+    assert(!musa_scene2d_insert_affine_page(
+        placements,N,0u,out,CAP,(size_t *)(void *)out,&total));
+    assert(!musa_scene2d_insert_affine_page(
+        placements,N,0u,out,CAP,&written,&written));
+    assert(memcmp(saved,out,sizeof(out))==0);
+    assert(musa_scene2d_insert_affine_page(
+        placements,N,SIZE_MAX,NULL,0u,&written,&total));
+    assert(written==0u && total==N);
+    assert(musa_scene2d_insert_affine_page(
+        placements,N,0u,NULL,0u,&written,&total));
+    assert(written==0u && total==N);
+    assert(musa_scene2d_insert_affine_page(
+        NULL,0u,0u,NULL,0u,&written,&total));
+    assert(written==0u && total==0u);
+    free(placements);
+}
+int main(void) {basic();hierarchy();rollback();many();bulk_placements();paged_placements();return 0;}
