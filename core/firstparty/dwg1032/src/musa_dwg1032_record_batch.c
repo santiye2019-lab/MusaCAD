@@ -75,3 +75,57 @@ int musa_dwg1032_record_batch_extract(
     }
     return 1;
 }
+
+/* A fast page reader for an immutable, previously span-validated index.
+ * Per-page preflight preserves output even when a later frame is malformed.
+ * Global span validation remains the caller's explicit prerequisite. */
+int musa_dwg1032_record_batch_extract_page(
+    const MusaDwg1032ObjectIndex *index,
+    const MusaDwg1032Cursor *section,
+    size_t start, size_t max_payload_bytes,
+    MusaDwg1032ObjectLocation *payloads, size_t capacity,
+    size_t *written, size_t *total) {
+    if (!index || !section || !written || !total ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        section->byte_count>SIZE_MAX/8u ||
+        index->section_bytes!=(uint64_t)section->byte_count ||
+        section->bit_position!=0u ||
+        (index->count && !index->entries) ||
+        (section->byte_count && !section->bytes))
+        return 0;
+    const size_t remaining=start<index->count ? index->count-start : 0u;
+    const size_t page_count=remaining<capacity ? remaining : capacity;
+    if (page_count>SIZE_MAX/sizeof(*payloads) ||
+        (page_count && (!payloads || !max_payload_bytes)))
+        return 0;
+    const size_t entries_bytes=index->count*sizeof(*index->entries);
+    const size_t output_bytes=page_count*sizeof(*payloads);
+    const void *inputs[]={index,section,index->entries,section->bytes};
+    const size_t sizes[]={sizeof(*index),sizeof(*section),
+                          entries_bytes,section->byte_count};
+    for (size_t i=0;i<4u;++i) {
+        if (overlaps(payloads,output_bytes,inputs[i],sizes[i]) ||
+            overlaps(written,sizeof(*written),inputs[i],sizes[i]) ||
+            overlaps(total,sizeof(*total),inputs[i],sizes[i]))
+            return 0;
+    }
+    if (overlaps(payloads,output_bytes,written,sizeof(*written)) ||
+        overlaps(payloads,output_bytes,total,sizeof(*total)) ||
+        overlaps(written,sizeof(*written),total,sizeof(*total)))
+        return 0;
+    for (size_t i=0;i<page_count;++i) {
+        MusaDwg1032ObjectLocation candidate;
+        if (!extract_one(index,section,start+i,max_payload_bytes,&candidate))
+            return 0;
+    }
+    for (size_t i=0;i<page_count;++i) {
+        MusaDwg1032ObjectLocation candidate;
+        /* The caller must keep the validated inputs immutable. */
+        if (!extract_one(index,section,start+i,max_payload_bytes,&candidate))
+            return 0;
+        payloads[i]=candidate;
+    }
+    *written=page_count;
+    *total=index->count;
+    return 1;
+}
