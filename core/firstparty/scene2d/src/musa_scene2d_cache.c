@@ -36,8 +36,12 @@ static int prepare_one(const MusaScene2dNode *n,
     for (unsigned k = 0; k < 4; ++k) {
         const double x = (k & 1u) ? local.max_x : local.min_x;
         const double y = (k & 2u) ? local.max_y : local.min_y;
-        const double wx = r->world[0]*x + r->world[2]*y + r->world[4];
-        const double wy = r->world[1]*x + r->world[3]*y + r->world[5];
+        /* Avoid losing small world-space offsets when a large local
+         * coordinate cancels the translation (large CAD site plans). */
+        const double wx = fma(r->world[0],x,
+                              fma(r->world[2],y,r->world[4]));
+        const double wy = fma(r->world[1],x,
+                              fma(r->world[3],y,r->world[5]));
         if (!isfinite(wx) || !isfinite(wy)) return 0;
         if (wx < minx) minx = wx;
         if (wx > maxx) maxx = wx;
