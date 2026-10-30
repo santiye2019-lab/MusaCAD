@@ -8,31 +8,59 @@ static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
     return x<=y ? y-x<an : x-y<bn;
 }
+int musa_dwg1032_object_map_iterator_init(
+    MusaDwg1032MapIterator *iterator, const uint8_t *bytes,
+    size_t byte_count, uint64_t section_bytes) {
+    if (!iterator ||
+        overlaps(iterator,sizeof(*iterator),bytes,byte_count)) return 0;
+    MusaDwg1032MapIterator trial;
+    if (!musa_dwg1032_cursor_init(&trial.cursor,bytes,byte_count)) return 0;
+    trial.handle=0;
+    trial.offset=0;
+    trial.section_bytes=section_bytes;
+    *iterator=trial;
+    return 1;
+}
+int musa_dwg1032_object_map_iterator_next(
+    MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *entry) {
+    if (!iterator || !entry ||
+        overlaps(iterator,sizeof(*iterator),entry,sizeof(*entry)) ||
+        overlaps(iterator->cursor.bytes,iterator->cursor.byte_count,
+                 entry,sizeof(*entry))) return 0;
+    MusaDwg1032MapIterator trial=*iterator;
+    uint64_t step=0;
+    int64_t delta=0;
+    if (!musa_dwg1032_modular_unsigned(&trial.cursor,&step) || !step ||
+        step>UINT64_MAX-trial.handle ||
+        !musa_dwg1032_modular_signed(&trial.cursor,&delta)) return 0;
+    trial.handle+=step;
+    if (delta<0) {
+        const uint64_t back=(uint64_t)(-delta);
+        if (back>trial.offset) return 0;
+        trial.offset-=back;
+    } else {
+        const uint64_t forward=(uint64_t)delta;
+        if (forward>UINT64_MAX-trial.offset) return 0;
+        trial.offset+=forward;
+    }
+    if (trial.offset>=trial.section_bytes) return 0;
+    const MusaDwg1032MapEntry candidate={trial.handle,trial.offset};
+    *entry=candidate;
+    *iterator=trial;
+    return 1;
+}
 static int parse(const uint8_t *bytes, size_t byte_count, size_t count,
                  uint64_t section_bytes, MusaDwg1032MapEntry *out) {
-    MusaDwg1032Cursor cursor;
-    if (!musa_dwg1032_cursor_init(&cursor,bytes,byte_count)) return 0;
-    uint64_t handle=0, offset=0;
+    MusaDwg1032MapIterator iterator;
+    if (!musa_dwg1032_object_map_iterator_init(
+            &iterator,bytes,byte_count,section_bytes)) return 0;
     for (size_t i=0;i<count;++i) {
-        uint64_t step=0;
-        int64_t delta=0;
-        if (!musa_dwg1032_modular_unsigned(&cursor,&step) || !step ||
-            step>UINT64_MAX-handle ||
-            !musa_dwg1032_modular_signed(&cursor,&delta)) return 0;
-        handle+=step;
-        if (delta<0) {
-            const uint64_t back=(uint64_t)(-delta);
-            if (back>offset) return 0;
-            offset-=back;
-        } else {
-            const uint64_t forward=(uint64_t)delta;
-            if (forward>UINT64_MAX-offset) return 0;
-            offset+=forward;
-        }
-        if (offset>=section_bytes) return 0;
-        if (out) out[i]=(MusaDwg1032MapEntry){handle,offset};
+        MusaDwg1032MapEntry entry;
+        if (!musa_dwg1032_object_map_iterator_next(&iterator,&entry))
+            return 0;
+        if (out) out[i]=entry;
     }
-    return cursor.bit_position/8u==byte_count;
+    return iterator.cursor.bit_position/8u==byte_count;
 }
 int musa_dwg1032_object_map_decode(const uint8_t *bytes, size_t byte_count,
                                    size_t count, uint64_t section_bytes,
