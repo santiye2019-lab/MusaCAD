@@ -35,5 +35,20 @@ int main(void) {
     a.rows=2; a.column_spacing=1e308;
     assert(!musa_scene2d_array_affine(&a,2,0,m));
     assert(memcmp(m,saved,sizeof saved)==0);
+
+    /* The unfused product 2 * 1e308 overflows, but the final placement
+     * 2 * 1e308 - 1e308 is representable. Preserve the real coordinate. */
+    MusaScene2dInsertArray huge={{-1e308,0,0,0,2,1,0},2,1,1e308,0};
+    assert(musa_scene2d_array_affine(&huge,1,0,m));
+    assert(isfinite(m[4]) && fabs(m[4]/1e308-1.0)<1e-14);
+    assert(m[5]==0.0);
+    double bulk[12];
+    size_t written=99, total=99;
+    assert(musa_scene2d_array_fill(&huge,bulk,2,&written));
+    assert(written==2 && bulk[4]==-1e308 && bulk[10]==m[4]);
+    double page[6]={0};
+    assert(musa_scene2d_array_fill_page(&huge,1,page,1,
+                                         &written,&total));
+    assert(written==1 && total==2 && memcmp(page,m,sizeof(m))==0);
     return 0;
 }
