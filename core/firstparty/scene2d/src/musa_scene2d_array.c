@@ -25,10 +25,17 @@ int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
     /* Keep the existing translation inside the fused sum: intermediate
      * scaled offsets may overflow even when the final placement is finite.
      * This also avoids two extra rounding steps on large CAD coordinates. */
-    const double tx=fma(candidate[0],dx,
-                        fma(candidate[2],dy,candidate[4]));
-    const double ty=fma(candidate[1],dx,
-                        fma(candidate[3],dy,candidate[5]));
+    double tx=fma(candidate[0],dx,
+                  fma(candidate[2],dy,candidate[4]));
+    double ty=fma(candidate[1],dx,
+                  fma(candidate[3],dy,candidate[5]));
+    /* Either inner product may overflow before an opposite-signed outer
+     * term cancels it. Retry with the other term evaluated first; preserve
+     * the established finite fast path and reject genuine overflow. */
+    if (!isfinite(tx))
+        tx=fma(candidate[2],dy,fma(candidate[0],dx,candidate[4]));
+    if (!isfinite(ty))
+        ty=fma(candidate[3],dy,fma(candidate[1],dx,candidate[5]));
     if (!isfinite(tx) || !isfinite(ty)) return 0;
     candidate[4]=tx;
     candidate[5]=ty;
