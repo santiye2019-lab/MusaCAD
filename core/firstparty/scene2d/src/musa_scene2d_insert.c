@@ -31,10 +31,19 @@ int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
     /* Fused products avoid a spurious infinity when a large scaled base
      * cancels a large insertion coordinate to a finite translation. This
      * also rounds each multiply-add only once on very large drawings. */
-    const double tx = fma(-a, placement->base_x,
-                          fma(-cc, placement->base_y, placement->insertion_x));
-    const double ty = fma(-b, placement->base_x,
-                          fma(-d, placement->base_y, placement->insertion_y));
+    double tx = fma(-a, placement->base_x,
+                    fma(-cc, placement->base_y, placement->insertion_x));
+    double ty = fma(-b, placement->base_x,
+                    fma(-d, placement->base_y, placement->insertion_y));
+    /* The inner FMA can itself overflow before the outer, opposite-signed
+     * product cancels it. Retry with the other product evaluated last.
+     * The common finite path remains unchanged. */
+    if (!isfinite(tx))
+        tx = fma(-cc, placement->base_y,
+                 fma(-a, placement->base_x, placement->insertion_x));
+    if (!isfinite(ty))
+        ty = fma(-d, placement->base_y,
+                 fma(-b, placement->base_x, placement->insertion_y));
     const double candidate[6] = {a,b,cc,d,tx,ty};
     for (size_t i = 0; i < 6; ++i)
         if (!isfinite(candidate[i])) return 0;
