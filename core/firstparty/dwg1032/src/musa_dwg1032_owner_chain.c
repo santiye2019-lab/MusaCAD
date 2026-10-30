@@ -17,7 +17,8 @@ int musa_dwg1032_owner_chain_root(const MusaDwg1032ObjectIndex *index,
         index->count>SIZE_MAX/sizeof(*index->entries)) return 0;
     const size_t owner_bytes=index->count*sizeof(*owner_handles);
     const size_t entry_bytes=index->count*sizeof(*index->entries);
-    if (overlaps(owner_handles,owner_bytes,index->entries,entry_bytes) ||
+    if (overlaps(owner_handles,owner_bytes,index,sizeof(*index)) ||
+        overlaps(owner_handles,owner_bytes,index->entries,entry_bytes) ||
         overlaps(root_handle,sizeof(*root_handle),hops,sizeof(*hops)) ||
         overlaps(root_handle,sizeof(*root_handle),index,sizeof(*index)) ||
         overlaps(hops,sizeof(*hops),index,sizeof(*index)) ||
@@ -28,9 +29,16 @@ int musa_dwg1032_owner_chain_root(const MusaDwg1032ObjectIndex *index,
     size_t at=start_position;
     size_t depth=0;
     for (;;) {
+        /* A caller may accidentally reuse an index after mutating its
+         * backing storage. Reject malformed visited entries before
+         * publishing a root, without a full-index scan per query. */
+        const MusaDwg1032ObjectLocation entry=index->entries[at];
+        if (!entry.handle || !entry.length ||
+            entry.offset>index->section_bytes ||
+            entry.length>index->section_bytes-entry.offset) return 0;
         const uint64_t parent=owner_handles[at];
         if (!parent) {
-            *root_handle=index->entries[at].handle;
+            *root_handle=entry.handle;
             *hops=depth;
             return 1;
         }
