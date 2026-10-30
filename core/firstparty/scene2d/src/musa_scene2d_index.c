@@ -126,3 +126,65 @@ int musa_scene2d_index_query(const MusaScene2dIndexNode *storage,
     *written=hits;
     return 1;
 }
+
+/* Walk only occupied/intersecting branches, retaining source-index order.
+ * Stop as soon as the requested page has been emitted. */
+static void visit_page(const MusaScene2dIndexNode *tree, size_t node,
+                       size_t first, size_t span, size_t count,
+                       MusaScene2dBox view, size_t skip,
+                       size_t *indices, size_t capacity,
+                       size_t *seen, size_t *emitted) {
+    if (*emitted==capacity || !tree[node].occupied ||
+        !intersects(tree[node].box,view)) return;
+    if (span==1u) {
+        if (first<count) {
+            if (*seen>=skip) indices[(*emitted)++]=first;
+            ++*seen;
+        }
+        return;
+    }
+    const size_t half=span/2u;
+    visit_page(tree,node*2u,first,half,count,view,skip,
+               indices,capacity,seen,emitted);
+    visit_page(tree,node*2u+1u,first+half,half,count,view,skip,
+               indices,capacity,seen,emitted);
+}
+int musa_scene2d_index_query_page(const MusaScene2dIndexNode *storage,
+                                  size_t count, size_t leaf_count,
+                                  MusaScene2dBox viewport, size_t skip,
+                                  size_t *indices, size_t capacity,
+                                  size_t *written, size_t *total_hits) {
+    if (!written || !total_hits || !finite_box(viewport) ||
+        capacity>SIZE_MAX/sizeof(*indices) ||
+        (capacity && !indices) ||
+        overlap(written,sizeof(*written),total_hits,sizeof(*total_hits)))
+        return 0;
+    const size_t obytes=capacity*sizeof(*indices);
+    if (overlap(indices,obytes,written,sizeof(*written)) ||
+        overlap(indices,obytes,total_hits,sizeof(*total_hits))) return 0;
+    if (!count) {
+        if (leaf_count) return 0;
+        *written=0;
+        *total_hits=0;
+        return 1;
+    }
+    if (!storage || !leaf_count || (leaf_count&(leaf_count-1u)) ||
+        count>leaf_count || leaf_count>SIZE_MAX/2u ||
+        2u*leaf_count>SIZE_MAX/sizeof(*storage)) return 0;
+    const size_t tbytes=2u*leaf_count*sizeof(*storage);
+    if (overlap(storage,tbytes,indices,obytes) ||
+        overlap(storage,tbytes,written,sizeof(*written)) ||
+        overlap(storage,tbytes,total_hits,sizeof(*total_hits))) return 0;
+    size_t total=0;
+    visit(storage,1u,0u,leaf_count,count,viewport,NULL,&total);
+    const size_t remaining=skip<total ? total-skip : 0u;
+    const size_t page_count=remaining<capacity ? remaining:capacity;
+    if (page_count) {
+        size_t seen=0,emitted=0;
+        visit_page(storage,1u,0u,leaf_count,count,viewport,skip,
+                   indices,page_count,&seen,&emitted);
+    }
+    *written=page_count;
+    *total_hits=total;
+    return 1;
+}
