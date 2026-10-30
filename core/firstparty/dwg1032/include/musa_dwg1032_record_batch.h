@@ -32,6 +32,23 @@ int musa_dwg1032_record_batch_extract(
     size_t max_payload_bytes,
     MusaDwg1032ObjectLocation *payloads, size_t capacity,
     size_t *order, size_t order_capacity);
+/* Extract only the requested page of ALREADY VALIDATED candidate spans.
+ * Before the first call, the caller MUST successfully validate the entire
+ * immutable index with musa_dwg1032_object_spans_prepare. This fast path
+ * deliberately does not repeat full-index sorting or overlap checks:
+ * modifying the index after validation invalidates this precondition.
+ * start >= count returns an empty page; capacity counts records. Only the
+ * requested page is parsed. No allocation, O(page_count) time and O(1)
+ * auxiliary memory. A failure leaves payloads, *written and *total intact.
+ * The section is a caller-verified, already decompressed object section.
+ * MS frames are only candidates, NOT verified AC1032 entities.
+ */
+int musa_dwg1032_record_batch_extract_page(
+    const MusaDwg1032ObjectIndex *validated_candidates,
+    const MusaDwg1032Cursor *section,
+    size_t start, size_t max_payload_bytes,
+    MusaDwg1032ObjectLocation *payloads, size_t capacity,
+    size_t *written, size_t *total);
 #ifdef __cplusplus
 }
 #endif
