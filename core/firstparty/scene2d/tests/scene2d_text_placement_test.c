@@ -57,6 +57,15 @@ int main(void) {
     assert(!musa_scene2d_text_affine(NULL,a));
     assert(!musa_scene2d_text_affine(&p,NULL));
     assert(memcmp(saved,a,sizeof(a))==0);
+    /* A very large anchor can cancel a large insertion coordinate.
+     * A rounded product would lose the fractional residual (0.25). */
+    p=(MusaScene2dTextPlacement){1e15+0.25,-1e15-0.25,
+                                  1.0,0.1,0.0,0.0,
+                                  1e16,-1e15-0.25};
+    assert(musa_scene2d_text_affine(&p,a));
+    assert(a[4]==fma(-a[0],p.anchor_x,p.insertion_x));
+    assert(a[5]==0.0);
+    assert(fabs(a[4]-(p.insertion_x-a[0]*p.anchor_x))>0.01);
     for (int i=0;i<20000;++i) {
         const double k=(double)(i%101-50)/20.0;
         p=(MusaScene2dTextPlacement){k*3,k-4,2.0,0.1+(i%7)/4.0,
