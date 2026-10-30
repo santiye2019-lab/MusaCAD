@@ -31,6 +31,18 @@ int musa_dwg1032_owner_graph_resolve(const MusaDwg1032ObjectIndex *index,
     for (size_t a=0;a<6;++a)
         for (size_t b=a+1;b<6;++b)
             if (overlaps(ptrs[a],sizes[a],ptrs[b],sizes[b])) return 0;
+    /* Index storage is caller-owned and may have changed since init.
+     * Validate it before touching scratch or publishing any roots: the
+     * binary-search owner lookup requires strictly increasing handles. */
+    uint64_t previous_handle=0;
+    for (size_t i=0;i<n;++i) {
+        const MusaDwg1032ObjectLocation e=index->entries[i];
+        if (!e.handle || e.handle<=previous_handle || !e.length ||
+            e.offset>index->section_bytes ||
+            e.length>index->section_bytes-e.offset)
+            return 0;
+        previous_handle=e.handle;
+    }
     memset(work,0,n*sizeof(*work));
     for (size_t i=0;i<n;++i) {
         if (work[i].state==2u) continue;
