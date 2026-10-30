@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_dwg1032_record_frame.h"
+#include "musa_dwg1032_object_map.h"
+#include "musa_dwg1032_object_spans.h"
 #ifdef NDEBUG
 #undef NDEBUG /* Assertions remain active in Release CI. */
 #endif
@@ -90,9 +92,37 @@ static void large_pafta_record_stream(void) {
     free(bytes);
 }
 
+/* Synthetic integration: map offset -> bounded candidate -> MS envelope.
+ * Candidate region may contain padding, so it is NOT an exact record. */
+static void candidate_map_pipeline(void) {
+    const uint8_t section_bytes[]={1,0,0xa1,1,0,0xb2,1,0,0xc3,0xfe};
+    const MusaDwg1032MapEntry map[]={{1,6},{2,0},{3,3}};
+    MusaDwg1032ObjectLocation locations[3];
+    size_t order[3];
+    assert(musa_dwg1032_object_map_candidate_spans(
+        map,3,sizeof(section_bytes),locations,3,order,3));
+    const MusaDwg1032ObjectIndex index={
+        locations,3,sizeof(section_bytes)};
+    const MusaDwg1032Cursor section={
+        section_bytes,sizeof(section_bytes),0};
+    const uint8_t expected[]={0xc3,0xa1,0xb2};
+    for (size_t i=0;i<3;++i) {
+        MusaDwg1032Cursor candidate;
+        MusaDwg1032Cursor record;
+        assert(musa_dwg1032_object_span_cursor(
+            &index,&section,i,&candidate));
+        assert(musa_dwg1032_record_take_ms_frame(
+            &candidate,1,&record));
+        assert(record.byte_count==1 && record.bytes[0]==expected[i]);
+        assert(candidate.bit_position==24u);
+        if (i==0) assert(candidate.byte_count==4u); /* padding */
+        else assert(candidate.byte_count==3u);
+    }
+}
 int main(void) {
     basic_and_rollback();
     two_word_prefix();
     large_pafta_record_stream();
+    candidate_map_pipeline();
     return 0;
 }
