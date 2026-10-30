@@ -30,6 +30,17 @@ int musa_scene2d_index_query(const MusaScene2dIndexNode *storage,
                              size_t count, size_t leaf_count,
                              MusaScene2dBox viewport, size_t *indices,
                              size_t capacity, size_t *written);
+/* Memory-bounded, ordered viewport pagination for very large scenes.
+ * Returns up to capacity hits after skipping the first skip hits; *total_hits
+ * reports all matching entities even when capacity is zero. Output and both
+ * counts remain unchanged on invalid arguments. No heap allocation.
+ * Each page performs a pruned tree walk; sequential page retrieval may
+ * revisit nodes. The tree must be an unmodified successful build result. */
+int musa_scene2d_index_query_page(const MusaScene2dIndexNode *storage,
+                                  size_t count, size_t leaf_count,
+                                  MusaScene2dBox viewport, size_t skip,
+                                  size_t *indices, size_t capacity,
+                                  size_t *written, size_t *total_hits);
 #ifdef __cplusplus
 }
 #endif
