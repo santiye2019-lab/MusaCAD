@@ -4,6 +4,7 @@
 #include "musa_dwg1032_record_batch.h"
 #include "musa_dwg1032_object_spans.h"
 #include "musa_dwg1032_record_frame.h"
+#include "musa_dwg1032_object_map.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -128,4 +129,63 @@ int musa_dwg1032_record_batch_extract_page(
     *written=page_count;
     *total=index->count;
     return 1;
+}
+
+/* Integrate already-verified, decompressed map and object section buffers.
+ * Scratch is caller-owned; the payload result is published only after every
+ * candidate frame has passed the bounded, transactional batch preflight.
+ * This does NOT discover or authenticate DWG pages or decode entities. */
+int musa_dwg1032_record_batch_from_verified_map(
+    const uint8_t *map_bytes, size_t map_byte_count, size_t object_count,
+    const MusaDwg1032Cursor *section, size_t max_payload_bytes,
+    MusaDwg1032MapEntry *map_entries, size_t map_capacity,
+    MusaDwg1032ObjectLocation *candidates, size_t candidate_capacity,
+    MusaDwg1032ObjectLocation *payloads, size_t payload_capacity,
+    size_t *order, size_t order_capacity) {
+    if (!section || object_count>map_capacity ||
+        object_count>candidate_capacity || object_count>payload_capacity ||
+        object_count>order_capacity ||
+        object_count>SIZE_MAX/sizeof(*map_entries) ||
+        object_count>SIZE_MAX/sizeof(*candidates) ||
+        object_count>SIZE_MAX/sizeof(*payloads) ||
+        object_count>SIZE_MAX/sizeof(*order) ||
+        section->byte_count>SIZE_MAX/8u ||
+        section->bit_position!=0u ||
+        (section->byte_count && !section->bytes) ||
+        (map_byte_count && !map_bytes) ||
+        (object_count && (!map_entries || !candidates || !payloads ||
+                          !order || !max_payload_bytes)))
+        return 0;
+    const void *scratch[]={map_entries,candidates,payloads,order};
+    const size_t lengths[]={
+        object_count*sizeof(*map_entries),
+        object_count*sizeof(*candidates),
+        object_count*sizeof(*payloads),
+        object_count*sizeof(*order)
+    };
+    const void *inputs[]={map_bytes,section,section->bytes};
+    const size_t input_lengths[]={
+        map_byte_count,sizeof(*section),section->byte_count
+    };
+    for (size_t i=0;i<4u;++i) {
+        for (size_t j=i+1u;j<4u;++j)
+            if (overlaps(scratch[i],lengths[i],scratch[j],lengths[j]))
+                return 0;
+        for (size_t j=0;j<3u;++j)
+            if (overlaps(scratch[i],lengths[i],inputs[j],input_lengths[j]))
+                return 0;
+    }
+    if (!musa_dwg1032_object_map_decode(
+            map_bytes,map_byte_count,object_count,
+            (uint64_t)section->byte_count,map_entries,map_capacity) ||
+        !musa_dwg1032_object_map_candidate_spans(
+            map_entries,object_count,(uint64_t)section->byte_count,
+            candidates,candidate_capacity,order,order_capacity))
+        return 0;
+    const MusaDwg1032ObjectIndex index={
+        candidates,object_count,(uint64_t)section->byte_count
+    };
+    return musa_dwg1032_record_batch_extract(
+        &index,section,max_payload_bytes,payloads,payload_capacity,
+        order,order_capacity);
 }
