@@ -52,11 +52,20 @@ int main(void) {
     assert(!musa_scene2d_text_affine(&p,a));
     p.rotation_rad=0; p.height=1e308; p.width_factor=1e308;
     assert(!musa_scene2d_text_affine(&p,a));
+    /* Finite inputs can still underflow to a singular width scale. */
+    p.height=1e-300; p.width_factor=1e-300;
+    assert(!musa_scene2d_text_affine(&p,a));
+    p.width_factor=-1e-300;
+    assert(!musa_scene2d_text_affine(&p,a));
     p.height=2; p.width_factor=1;
     assert(!musa_scene2d_text_affine(&p,(double *)(void *)&p));
     assert(!musa_scene2d_text_affine(NULL,a));
     assert(!musa_scene2d_text_affine(&p,NULL));
     assert(memcmp(saved,a,sizeof(a))==0);
+    /* Preserve valid tiny, but representable, nonzero glyph scales. */
+    p=(MusaScene2dTextPlacement){0,0,1e-200,1e-100,0,0,0,0};
+    assert(musa_scene2d_text_affine(&p,a));
+    assert(a[0]>0.0 && a[3]>0.0);
     /* A very large anchor can cancel a large insertion coordinate.
      * A rounded product would lose the fractional residual (0.25). */
     p=(MusaScene2dTextPlacement){1e15+0.25,-1e15-0.25,
