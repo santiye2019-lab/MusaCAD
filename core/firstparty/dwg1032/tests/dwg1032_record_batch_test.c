@@ -180,4 +180,97 @@ static void large_pafta(void) {
     free(snapshot);
     free(order);free(out);free(spans);free(bytes);
 }
-int main(void) {three_candidates();large_pafta();return 0;}
+
+/* Integrated, synthetic map-to-framed-record proof. Inputs represent
+ * independently verified/decompressed sections, not a real DWG fixture. */
+static void verified_map_pipeline(void) {
+    uint8_t map[]={1u,10u,2u,0x45u,3u,20u};
+    uint8_t bytes[30]={0};
+    const size_t starts[]={10u,5u,25u};
+    for (size_t i=0;i<3u;++i) {
+        bytes[starts[i]]=1u;
+        bytes[starts[i]+1u]=0u;
+        bytes[starts[i]+2u]=(uint8_t)(0x41u+i);
+    }
+    const MusaDwg1032Cursor section={bytes,sizeof(bytes),0u};
+    MusaDwg1032MapEntry entries[3];
+    MusaDwg1032ObjectLocation candidates[3];
+    MusaDwg1032ObjectLocation out[3]={{99u,99u,99u},
+                                       {99u,99u,99u},{99u,99u,99u}};
+    size_t order[3];
+    assert(musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        out,3u,order,3u));
+    const uint64_t handles[]={1u,3u,6u};
+    const uint64_t offsets[]={12u,7u,27u};
+    for (size_t i=0;i<3u;++i)
+        assert(out[i].handle==handles[i] &&
+               out[i].offset==offsets[i] && out[i].length==1u);
+    MusaDwg1032ObjectLocation saved[3];
+    memcpy(saved,out,sizeof(saved));
+    bytes[25]=0u; /* Last candidate malformed; no partial publication. */
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        out,3u,order,3u));
+    assert(memcmp(out,saved,sizeof(saved))==0);
+    bytes[25]=1u;
+    map[5]=0x40u; /* Noncanonical signed negative zero. */
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        out,3u,order,3u));
+    assert(memcmp(out,saved,sizeof(saved))==0);
+    map[5]=20u;
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        out,2u,order,3u));
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,
+        (MusaDwg1032MapEntry *)(void *)map,3u,candidates,3u,
+        out,3u,order,3u));
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        (MusaDwg1032ObjectLocation *)(void *)entries,3u,order,3u));
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        out,3u,(size_t *)(void *)bytes,3u));
+    assert(memcmp(out,saved,sizeof(saved))==0);
+    const MusaDwg1032Cursor empty={NULL,0u,0u};
+    assert(musa_dwg1032_record_batch_from_verified_map(
+        NULL,0u,0u,&empty,0u,NULL,0u,NULL,0u,NULL,0u,NULL,0u));
+}
+static void verified_map_large_pafta(void) {
+    enum { N=20000, STRIDE=4 };
+    uint8_t *map=(uint8_t *)malloc(2u*N);
+    uint8_t *bytes=(uint8_t *)malloc(STRIDE*N);
+    MusaDwg1032MapEntry *entries=
+        (MusaDwg1032MapEntry *)malloc(N*sizeof(*entries));
+    MusaDwg1032ObjectLocation *candidates=
+        (MusaDwg1032ObjectLocation *)malloc(N*sizeof(*candidates));
+    MusaDwg1032ObjectLocation *out=
+        (MusaDwg1032ObjectLocation *)malloc(N*sizeof(*out));
+    size_t *order=(size_t *)malloc(N*sizeof(*order));
+    assert(map && bytes && entries && candidates && out && order);
+    for (size_t i=0;i<N;++i) {
+        map[2u*i]=1u;
+        map[2u*i+1u]=(uint8_t)(i==0u ? 0u : STRIDE);
+        bytes[STRIDE*i]=1u;
+        bytes[STRIDE*i+1u]=0u;
+        bytes[STRIDE*i+2u]=(uint8_t)i;
+        bytes[STRIDE*i+3u]=0xeeu;
+    }
+    const MusaDwg1032Cursor section={bytes,STRIDE*N,0u};
+    assert(musa_dwg1032_record_batch_from_verified_map(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,out,N,order,N));
+    for (size_t i=0;i<N;++i)
+        assert(out[i].handle==i+1u && out[i].offset==STRIDE*i+2u &&
+               out[i].length==1u);
+    const MusaDwg1032ObjectLocation first=out[0], last=out[N-1u];
+    bytes[STRIDE*(N-1u)]=0u;
+    assert(!musa_dwg1032_record_batch_from_verified_map(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,out,N,order,N));
+    assert(memcmp(out,&first,sizeof(first))==0);
+    assert(memcmp(out+N-1u,&last,sizeof(last))==0);
+    free(order);free(out);free(candidates);free(entries);free(bytes);free(map);
+}
+
+int main(void) {three_candidates();large_pafta();verified_map_pipeline();verified_map_large_pafta();return 0;}
