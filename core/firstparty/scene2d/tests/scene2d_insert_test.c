@@ -87,6 +87,19 @@ static void extreme_rotated_base_cancellation(void) {
     assert(!musa_scene2d_insert_affine(&p,out));
     assert(memcmp(out,saved,sizeof(saved))==0);
 }
+/* A reflected block must keep the sign of each axis through rotation. */
+static void mirrored_rotated_insert(void) {
+    const double halfpi=acos(-1.0)/2.0;
+    MusaScene2dInsertPlacement p={10,20,2,3,-2,3,halfpi};
+    double a[6],x,y;
+    assert(musa_scene2d_insert_affine(&p,a));
+    apply(a,2,3,&x,&y);
+    assert(near(x,10) && near(y,20));
+    apply(a,3,3,&x,&y);
+    assert(near(x,10) && near(y,18));
+    apply(a,2,4,&x,&y);
+    assert(near(x,7) && near(y,20));
+}
 static void rollback(void) {
     MusaScene2dInsertPlacement p={1,2,3,4,5,6,0};
     double out[6]={11,12,13,14,15,16},saved[6];
@@ -201,4 +214,4 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
+int main(void) {basic();mirrored_rotated_insert();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
