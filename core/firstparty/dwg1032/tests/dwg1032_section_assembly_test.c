@@ -161,8 +161,55 @@ static void file_backed_large_reverse_physical_order(void) {
     for (size_t i=0;i<COUNT;++i) assert(dst[i]==0xCC);
     free(pages);free(dst);free(src);
 }
+static void physical_directory_validation(void) {
+    MusaDwg1032FilePage pages[]={{0,6,2},{2,0,2},{4,3,2}};
+    size_t order[3]={99,99,99};
+    assert(musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    assert(order[0]==1 && order[1]==2 && order[2]==0);
+    pages[2].file_offset=1; /* Partial physical overlap. */
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    pages[2].file_offset=0; /* Duplicate physical start. */
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    pages[2].file_offset=7; /* Out of file. */
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    pages[2].file_offset=3;
+    pages[2].byte_count=0;
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    pages[2].byte_count=2;
+    pages[0].file_offset=UINT64_MAX;
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    pages[0].file_offset=6;
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,order,2));
+    assert(!musa_dwg1032_file_pages_validate_physical(
+        pages,3,8,(size_t *)(void *)pages,3));
+    assert(!musa_dwg1032_file_pages_validate_physical(NULL,3,8,order,3));
+    assert(!musa_dwg1032_file_pages_validate_physical(pages,3,8,NULL,3));
+    assert(musa_dwg1032_file_pages_validate_physical(NULL,0,0,NULL,0));
+    /* A physically adjacent range is legal; physical gaps are legal too. */
+    pages[2].file_offset=2;
+    assert(musa_dwg1032_file_pages_validate_physical(pages,3,8,order,3));
+    pages[2].file_offset=3;
+}
+static void physical_directory_stress(void) {
+    enum { COUNT=16384 };
+    MusaDwg1032FilePage *pages=malloc(COUNT*sizeof(*pages));
+    size_t *order=malloc(COUNT*sizeof(*order));
+    assert(pages && order);
+    for (size_t i=0;i<COUNT;++i)
+        pages[i]=(MusaDwg1032FilePage){
+            (uint64_t)i,(uint64_t)(COUNT-1u-i),1u};
+    assert(musa_dwg1032_file_pages_validate_physical(
+        pages,COUNT,COUNT,order,COUNT));
+    for (size_t i=0;i<COUNT;++i) assert(order[i]==COUNT-1u-i);
+    pages[COUNT-1u].file_offset=pages[COUNT-2u].file_offset;
+    assert(!musa_dwg1032_file_pages_validate_physical(
+        pages,COUNT,COUNT,order,COUNT));
+    free(order);
+    free(pages);
+}
 int main(void) {
     basic();stress();partitions();
     file_backed_pages();file_backed_large_reverse_physical_order();
+    physical_directory_validation();physical_directory_stress();
     return 0;
 }
