@@ -27,10 +27,12 @@ int musa_scene2d_text_affine(const MusaScene2dTextPlacement *placement,
     const double skew=sy*tan(placement->oblique_rad);
     const double a=c*sx, b=s*sx;
     const double cc=c*skew-s*sy, d=s*skew+c*sy;
-    const double tx=placement->insertion_x-a*placement->anchor_x-
-                    cc*placement->anchor_y;
-    const double ty=placement->insertion_y-b*placement->anchor_x-
-                    d*placement->anchor_y;
+    /* Fused multiply-add keeps small alignment offsets in large drawings:
+     * rounding each anchor product first can erase a finite residual. */
+    const double tx=fma(-a,placement->anchor_x,
+                        fma(-cc,placement->anchor_y,placement->insertion_x));
+    const double ty=fma(-b,placement->anchor_x,
+                        fma(-d,placement->anchor_y,placement->insertion_y));
     const double result[]={a,b,cc,d,tx,ty};
     for (size_t i=0;i<6;++i) if (!isfinite(result[i])) return 0;
     for (size_t i=0;i<6;++i) out[i]=result[i];
