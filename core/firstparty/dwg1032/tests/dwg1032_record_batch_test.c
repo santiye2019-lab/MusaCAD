@@ -33,6 +33,50 @@ static void three_candidates(void) {
                out[i].length==1u);
         assert(bytes[(size_t)out[i].offset]==values[i]);
     }
+    /* Prepared index: page reads avoid re-sorting or allocating 3 outputs. */
+    MusaDwg1032ObjectLocation page[2]={{77,77,77},{88,88,88}};
+    size_t written=111u, total=222u;
+    assert(musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,page,2u,&written,&total));
+    assert(written==2u && total==3u);
+    assert(page[0].handle==2u && page[0].offset==2u &&
+           page[1].handle==3u && page[1].offset==6u);
+    MusaDwg1032ObjectLocation saved_page[2]={page[0],page[1]};
+    written=111u; total=222u;
+    bytes[4]=0u; /* Later record in requested page fails atomically. */
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,page,2u,&written,&total));
+    assert(memcmp(page,saved_page,sizeof(page))==0);
+    assert(written==111u && total==222u);
+    bytes[4]=1u;
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,0u,page,2u,&written,&total));
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,(MusaDwg1032ObjectLocation *)(void *)bytes,
+        2u,&written,&total));
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,spans,2u,&written,&total));
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,page,2u,
+        (size_t *)(void *)page,&total));
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,page,2u,&written,&written));
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,1u,1u,page,2u,
+        (size_t *)(void *)bytes,&total));
+    assert(memcmp(page,saved_page,sizeof(page))==0);
+    assert(written==111u && total==222u);
+    const MusaDwg1032Cursor bad_section={bytes,sizeof(bytes),1u};
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&bad_section,1u,1u,page,2u,&written,&total));
+    assert(memcmp(page,saved_page,sizeof(page))==0);
+    assert(written==111u && total==222u);
+    assert(musa_dwg1032_record_batch_extract_page(
+        &index,&section,3u,0u,NULL,0u,&written,&total));
+    assert(written==0u && total==3u);
+    assert(musa_dwg1032_record_batch_extract_page(
+        &index,&section,SIZE_MAX,0u,NULL,0u,&written,&total));
+    assert(written==0u && total==3u);
     const MusaDwg1032ObjectLocation saved[3]={out[0],out[1],out[2]};
     bytes[4]=0; /* Late malformed record; no earlier result published. */
     assert(!musa_dwg1032_record_batch_extract(
@@ -100,6 +144,16 @@ static void large_pafta(void) {
                out[i].offset==(N-1u-i)*STRIDE+2u &&
                out[i].length==1u);
     }
+    /* Compare 79 independently requested pages with the bulk extraction. */
+    for (size_t start=0;start<N;start+=257u) {
+        MusaDwg1032ObjectLocation page[257];
+        size_t written=SIZE_MAX, total=SIZE_MAX;
+        assert(musa_dwg1032_record_batch_extract_page(
+            &index,&section,start,1u,page,257u,&written,&total));
+        assert(total==N);
+        assert(written==(N-start<257u ? N-start : 257u));
+        assert(memcmp(page,out+start,written*sizeof(*page))==0);
+    }
     MusaDwg1032ObjectLocation *snapshot=
         (MusaDwg1032ObjectLocation *)malloc(N*sizeof(*snapshot));
     assert(snapshot);
@@ -113,6 +167,16 @@ static void large_pafta(void) {
     assert(!musa_dwg1032_record_batch_extract(
         &index,&section,1,out,N,order,N));
     assert(memcmp(snapshot,out,N*sizeof(*out))==0);
+    MusaDwg1032ObjectLocation page[20];
+    for (size_t i=0;i<20u;++i)
+        page[i]=(MusaDwg1032ObjectLocation){77u,88u,99u};
+    MusaDwg1032ObjectLocation saved_page[20];
+    memcpy(saved_page,page,sizeof(page));
+    size_t written=777u,total=888u;
+    assert(!musa_dwg1032_record_batch_extract_page(
+        &index,&section,(N/2u)-10u,1u,page,20u,&written,&total));
+    assert(memcmp(saved_page,page,sizeof(page))==0);
+    assert(written==777u && total==888u);
     free(snapshot);
     free(order);free(out);free(spans);free(bytes);
 }
