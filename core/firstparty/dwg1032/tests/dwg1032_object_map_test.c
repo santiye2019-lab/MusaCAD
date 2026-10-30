@@ -6,6 +6,71 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
+/* Incremental decoding needs no full-map output buffer. A failed late
+ * delta must preserve both the stream position and the last good entry. */
+static void iterator_streaming(void) {
+    const uint8_t bytes[]={1,10,2,0x45,3,20};
+    MusaDwg1032MapIterator iterator;
+    MusaDwg1032MapEntry entry={99,99};
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,bytes,sizeof(bytes),26));
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(entry.handle==1 && entry.offset==10);
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(entry.handle==3 && entry.offset==5);
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(entry.handle==6 && entry.offset==25);
+    assert(iterator.cursor.bit_position==sizeof(bytes)*8u);
+    MusaDwg1032MapIterator saved=iterator;
+    MusaDwg1032MapEntry last=entry;
+    assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
+    assert(memcmp(&last,&entry,sizeof(last))==0);
+    assert(!musa_dwg1032_object_map_iterator_next(
+        &iterator,(MusaDwg1032MapEntry *)(void *)&iterator));
+    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
+    const uint8_t truncated[]={1,10,2};
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,truncated,sizeof(truncated),26));
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    saved=iterator;last=entry;
+    assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
+    assert(memcmp(&last,&entry,sizeof(last))==0);
+    assert(!musa_dwg1032_object_map_iterator_init(
+        (MusaDwg1032MapIterator *)(void *)bytes,
+        bytes,sizeof(bytes),26));
+    assert(!musa_dwg1032_object_map_iterator_init(
+        &iterator,NULL,1,26));
+}
+static void iterator_large_map(void) {
+    enum { N=20000 };
+    static uint8_t bytes[N*2];
+    for (size_t i=0;i<N;++i) {
+        bytes[i*2]=1;
+        bytes[i*2+1]=1;
+    }
+    MusaDwg1032MapIterator iterator;
+    MusaDwg1032MapEntry entry={0,0};
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,bytes,sizeof(bytes),N+1u));
+    for (size_t i=0;i<N;++i) {
+        assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+        assert(entry.handle==i+1u && entry.offset==i+1u);
+    }
+    assert(iterator.cursor.bit_position==sizeof(bytes)*8u);
+    bytes[N*2-1u]=0x40; /* Invalid signed negative-zero at last entry. */
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,bytes,sizeof(bytes),N+1u));
+    for (size_t i=0;i<N-1u;++i)
+        assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    const MusaDwg1032MapIterator saved=iterator;
+    const MusaDwg1032MapEntry last=entry;
+    assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(memcmp(&saved,&iterator,sizeof(saved))==0);
+    assert(memcmp(&last,&entry,sizeof(last))==0);
+}
 static void small(void) {
     const uint8_t payload[]={1,10,2,0x45,3,20};
     MusaDwg1032MapEntry out[3]={{99,99},{99,99},{99,99}};
@@ -98,4 +163,4 @@ static void candidate_stress(void) {
         entries,N,N*3u,out,N,order,N));
     assert(out[N-1u].length==3u); /* No partial publication. */
 }
-int main(void) {small();stress();candidate_spans();candidate_stress();return 0;}
+int main(void) {iterator_streaming();iterator_large_map();small();stress();candidate_spans();candidate_stress();return 0;}
