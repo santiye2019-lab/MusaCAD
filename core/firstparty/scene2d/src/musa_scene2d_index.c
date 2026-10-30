@@ -101,7 +101,8 @@ int musa_scene2d_index_query(const MusaScene2dIndexNode *storage,
                              MusaScene2dBox viewport, size_t *indices,
                              size_t capacity, size_t *written) {
     if (!written || !finite_box(viewport) ||
-        capacity>SIZE_MAX/sizeof(*indices)) return 0;
+        capacity>SIZE_MAX/sizeof(*indices) ||
+        (capacity && !indices)) return 0;
     if (!count) {
         if (leaf_count) return 0;
         *written=0;
