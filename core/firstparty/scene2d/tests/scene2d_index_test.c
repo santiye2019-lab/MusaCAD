@@ -12,7 +12,7 @@
 static void atomic_and_edges(void) {
     MusaScene2dPreparedBounds p[5]={
         {{0,0,1,1},1}, {{10,10,20,20},1}, {{0,0,0,0},0},
-        {{20,20,30,30},1}, {{-INFINITY,0,-100,2},1}
+        {{20,20,30,30},1}, {{-1000,0,-100,2},1}
     };
     MusaScene2dIndexNode tree[16];
     size_t leaves=91, written=99;
@@ -25,6 +25,19 @@ static void atomic_and_edges(void) {
     assert(!musa_scene2d_index_build(p,5,tree,16,&leaves));
     assert(leaves==91 && memcmp(tree,saved,sizeof tree)==0);
     p[1].box.min_x=10;
+    p[4].box.min_x=-INFINITY;
+    assert(!musa_scene2d_index_build(p,5,tree,16,&leaves));
+    assert(leaves==91 && memcmp(tree,saved,sizeof tree)==0);
+    p[4].box.min_x=-1000;
+    p[4].box.max_y=INFINITY;
+    assert(!musa_scene2d_index_build(p,5,tree,16,&leaves));
+    assert(leaves==91 && memcmp(tree,saved,sizeof tree)==0);
+    p[4].box.max_y=2;
+    p[4].visible=0;
+    p[4].box.min_x=NAN; /* Hidden geometry is not indexed. */
+    assert(musa_scene2d_index_build(p,5,tree,16,&leaves));
+    p[4].visible=1;
+    p[4].box.min_x=-1000;
     assert(musa_scene2d_index_build(p,5,tree,16,&leaves));
     assert(leaves==8 && tree[1].occupied);
     size_t indices[5]={91,92,93,94,95};
