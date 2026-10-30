@@ -71,3 +71,63 @@ int musa_dwg1032_section_assemble_file_pages(
     }
     return 1;
 }
+
+/* Physical page validation is optional and independent of logical assembly.
+ * A max-heap sorts caller-owned indices without allocating or moving pages. */
+static int physical_before(const MusaDwg1032FilePage *pages,
+                           size_t a, size_t b) {
+    return pages[a].file_offset < pages[b].file_offset ||
+        (pages[a].file_offset == pages[b].file_offset && a < b);
+}
+
+static void physical_sift(const MusaDwg1032FilePage *pages, size_t *order,
+                          size_t root, size_t end) {
+    while (root < end / 2u) {
+        size_t child = root * 2u + 1u;
+        if (child >= end) break;
+        if (child + 1u < end &&
+            physical_before(pages, order[child], order[child + 1u]))
+            ++child;
+        if (!physical_before(pages, order[root], order[child])) break;
+        const size_t swap = order[root];
+        order[root] = order[child];
+        order[child] = swap;
+        root = child;
+    }
+}
+
+int musa_dwg1032_file_pages_validate_physical(
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    size_t file_size, size_t *order, size_t order_capacity) {
+    if (page_count > order_capacity ||
+        page_count > SIZE_MAX / sizeof(*pages) ||
+        page_count > SIZE_MAX / sizeof(*order) ||
+        (page_count && (!pages || !order)) ||
+        overlaps(pages, page_count * sizeof(*pages),
+                 order, page_count * sizeof(*order)))
+        return 0;
+    for (size_t i = 0; i < page_count; ++i) {
+        const MusaDwg1032FilePage *page = &pages[i];
+        if (!page->byte_count || page->file_offset > (uint64_t)file_size ||
+            (uint64_t)page->byte_count >
+                (uint64_t)file_size - page->file_offset)
+            return 0;
+    }
+    for (size_t i = 0; i < page_count; ++i) order[i] = i;
+    for (size_t i = page_count / 2u; i > 0u; --i)
+        physical_sift(pages, order, i - 1u, page_count);
+    for (size_t end = page_count; end > 1u; --end) {
+        const size_t swap = order[0];
+        order[0] = order[end - 1u];
+        order[end - 1u] = swap;
+        physical_sift(pages, order, 0u, end - 1u);
+    }
+    for (size_t i = 1; i < page_count; ++i) {
+        const MusaDwg1032FilePage *previous = &pages[order[i - 1u]];
+        const MusaDwg1032FilePage *next = &pages[order[i]];
+        if (next->file_offset - previous->file_offset <
+            (uint64_t)previous->byte_count)
+            return 0;
+    }
+    return 1;
+}
