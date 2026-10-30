@@ -29,7 +29,45 @@ static void rejects(uint8_t file[0x180], size_t n,
     assert(!musa_dwg1032_read_preamble(file,n,out));
     assert(memcmp(&before,out,sizeof(before))==0);
 }
+static void streaming_prefix(void) {
+    uint8_t file[0x180];
+    fixture(file);
+    MusaDwg1032Preamble expected={0}, actual={0};
+    assert(musa_dwg1032_read_preamble(file,sizeof(file),&expected));
+    assert(musa_dwg1032_read_preamble_prefix(file,0x100u,
+                                             sizeof(file),&actual));
+    assert(memcmp(&expected,&actual,sizeof(actual))==0);
+    /* A 256-byte read is sufficient even for a declared file >4 GiB. */
+    assert(musa_dwg1032_read_preamble_prefix(
+        file,0x100u,UINT64_C(0x100000100),&actual));
+    assert(memcmp(&expected,&actual,sizeof(actual))==0);
+    const MusaDwg1032Preamble before=actual;
+    assert(!musa_dwg1032_read_preamble_prefix(file,0x80u,
+                                               sizeof(file),&actual));
+    assert(!musa_dwg1032_read_preamble_prefix(file,0x101u,
+                                               sizeof(file),&actual));
+    assert(!musa_dwg1032_read_preamble_prefix(file,0x100u,
+                                               0xffu,&actual));
+    assert(!musa_dwg1032_read_preamble_prefix(file,0x100u,
+                                               0x120u,&actual));
+    assert(!musa_dwg1032_read_preamble_prefix(NULL,0x100u,
+                                               sizeof(file),&actual));
+    assert(!musa_dwg1032_read_preamble_prefix(file,0x100u,
+                                               sizeof(file),NULL));
+    assert(!musa_dwg1032_read_preamble_prefix(
+        file,0x100u,sizeof(file),
+        (MusaDwg1032Preamble *)(void *)(file+0x90u)));
+    assert(memcmp(&before,&actual,sizeof(actual))==0);
+    file[0x0eu]=0x02u; /* Preview now points beyond declared file size. */
+    assert(!musa_dwg1032_read_preamble_prefix(file,0x100u,
+                                               sizeof(file),&actual));
+    assert(memcmp(&before,&actual,sizeof(actual))==0);
+    assert(musa_dwg1032_read_preamble_prefix(
+        file,0x100u,UINT64_C(0x100000100),&actual));
+    assert(actual.preview_offset==0x220u);
+}
 int main(void) {
+    streaming_prefix();
     uint8_t file[0x180];
     fixture(file);
     MusaDwg1032Preamble out={0};
