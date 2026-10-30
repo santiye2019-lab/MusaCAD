@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 static int near(double a, double b) { return fabs(a-b) < 1e-10; }
 static void apply(const double a[6], double x, double y, double *ox, double *oy) {
     *ox = a[0]*x + a[2]*y + a[4];
@@ -77,4 +78,35 @@ static void many(void) {
         assert(fabs(y-p.insertion_y)<1e-11);
     }
 }
-int main(void) {basic();hierarchy();rollback();many();return 0;}
+static void bulk_placements(void) {
+    enum { N=20000 };
+    MusaScene2dInsertPlacement *placements=malloc(N*sizeof(*placements));
+    double (*out)[6]=malloc(N*sizeof(*out));
+    double (*saved)[6]=malloc(N*sizeof(*saved));
+    assert(placements && out && saved);
+    for (size_t i=0;i<N;++i) {
+        placements[i]=(MusaScene2dInsertPlacement){
+            (double)i, -(double)i, 1.0, 2.0, 1.0, -2.0, 0.0};
+        for (size_t j=0;j<6u;++j) out[i][j]=-12345.0;
+    }
+    assert(musa_scene2d_insert_affine_batch(placements,N,out,N));
+    for (size_t i=0;i<N;++i) {
+        double x=0,y=0;
+        apply(out[i],1.0,2.0,&x,&y);
+        assert(near(x,(double)i) && near(y,-(double)i));
+    }
+    memcpy(saved,out,N*sizeof(*out));
+    placements[N-1u].rotation_rad=NAN; /* Late failure: no partial output. */
+    assert(!musa_scene2d_insert_affine_batch(placements,N,out,N));
+    assert(memcmp(saved,out,N*sizeof(*out))==0);
+    placements[N-1u].rotation_rad=0.0;
+    assert(!musa_scene2d_insert_affine_batch(placements,N,out,N-1u));
+    assert(!musa_scene2d_insert_affine_batch(placements,N,
+               (double (*)[6])(void *)placements,N));
+    assert(memcmp(saved,out,N*sizeof(*out))==0);
+    assert(musa_scene2d_insert_affine_batch(NULL,0,NULL,0));
+    assert(!musa_scene2d_insert_affine_batch(NULL,1,out,1));
+    assert(!musa_scene2d_insert_affine_batch(placements,1,NULL,1));
+    free(saved);free(out);free(placements);
+}
+int main(void) {basic();hierarchy();rollback();many();bulk_placements();return 0;}
