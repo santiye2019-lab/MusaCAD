@@ -36,3 +36,25 @@ int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
     for (size_t i = 0; i < 6; ++i) out[i] = candidate[i];
     return 1;
 }
+
+/* Transactional conversion of unrelated, already-decoded INSERT placements.
+ * No allocation; a malformed late placement cannot partially publish a
+ * large drawing's transform list. Inputs remain immutable across passes. */
+int musa_scene2d_insert_affine_batch(
+    const MusaScene2dInsertPlacement *placements, size_t count,
+    double (*out)[6], size_t capacity) {
+    if (count>capacity ||
+        count>SIZE_MAX/sizeof(*placements) ||
+        count>SIZE_MAX/sizeof(*out) ||
+        (count && (!placements || !out)) ||
+        (count && overlap(placements,count*sizeof(*placements),
+                          out,count*sizeof(*out)))) return 0;
+    double candidate[6];
+    for (size_t i=0;i<count;++i)
+        if (!musa_scene2d_insert_affine(&placements[i],candidate)) return 0;
+    for (size_t i=0;i<count;++i) {
+        (void)musa_scene2d_insert_affine(&placements[i],candidate);
+        for (size_t j=0;j<6u;++j) out[i][j]=candidate[j];
+    }
+    return 1;
+}
