@@ -3,6 +3,7 @@
  */
 #include "musa_dwg1032_record_batch.h"
 #include "musa_dwg1032_object_map.h"
+#include "musa_dwg1032_section_assembly.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -273,4 +274,47 @@ static void verified_map_large_pafta(void) {
     free(order);free(out);free(candidates);free(entries);free(bytes);free(map);
 }
 
-int main(void) {three_candidates();large_pafta();verified_map_pipeline();verified_map_large_pafta();return 0;}
+
+/* Reverse physical page order is independent of logical record order.
+ * Still synthetic: page metadata and the map are caller-verified inputs. */
+static void verified_file_pages_to_records(void) {
+    const uint8_t map[]={1u,10u,2u,0x45u,3u,20u};
+    uint8_t logical[30]={0};
+    const size_t starts[]={10u,5u,25u};
+    for (size_t i=0;i<3u;++i) {
+        logical[starts[i]]=1u;
+        logical[starts[i]+1u]=0u;
+        logical[starts[i]+2u]=(uint8_t)(0x61u+i);
+    }
+    uint8_t physical[30], assembled[30];
+    memcpy(physical,logical+20u,10u);
+    memcpy(physical+10u,logical,10u);
+    memcpy(physical+20u,logical+10u,10u);
+    MusaDwg1032FilePage pages[]={
+        {0u,10u,10u},{10u,20u,10u},{20u,0u,10u}
+    };
+    size_t physical_order[3];
+    memset(assembled,0xa5,sizeof(assembled));
+    assert(musa_dwg1032_section_assemble_checked_file_pages(
+        physical,sizeof(physical),pages,3u,assembled,sizeof(assembled),
+        physical_order,3u));
+    assert(memcmp(assembled,logical,sizeof(logical))==0);
+    const MusaDwg1032Cursor section={assembled,sizeof(assembled),0u};
+    MusaDwg1032MapEntry entries[3];
+    MusaDwg1032ObjectLocation candidates[3],payloads[3];
+    size_t order[3];
+    assert(musa_dwg1032_record_batch_from_verified_map(
+        map,sizeof(map),3u,&section,1u,entries,3u,candidates,3u,
+        payloads,3u,order,3u));
+    assert(payloads[0].offset==12u && payloads[1].offset==7u &&
+           payloads[2].offset==27u);
+    memset(assembled,0xa5,sizeof(assembled));
+    pages[2].file_offset=25u; /* Last logical page is physically truncated. */
+    assert(!musa_dwg1032_section_assemble_checked_file_pages(
+        physical,sizeof(physical),pages,3u,assembled,sizeof(assembled),
+        physical_order,3u));
+    for (size_t i=0;i<sizeof(assembled);++i)
+        assert(assembled[i]==0xa5u);
+}
+
+int main(void) {three_candidates();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();return 0;}
