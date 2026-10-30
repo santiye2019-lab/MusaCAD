@@ -50,5 +50,27 @@ int main(void) {
     assert(musa_scene2d_array_fill_page(&huge,1,page,1,
                                          &written,&total));
     assert(written==1 && total==2 && memcmp(page,m,sizeof(m))==0);
+
+    /* The first inner FMA would produce -infinity (-2 * 1e308)
+     * although the full rotated column+row offset is representable.
+     * Exercise the single-instance and paged MINSERT paths. */
+    MusaScene2dInsertArray cancellation={
+        {0,-1.5e308,0,0,sqrt(2.0),2.0*sqrt(2.0),halfpi/2.0},
+        2,2,1e308,1e308};
+    assert(musa_scene2d_array_affine(&cancellation,1,1,m));
+    assert(isfinite(m[4]) && fabs(m[4]/1e308+1.0)<1e-14);
+    assert(isfinite(m[5]) && fabs(m[5]/1.5e308-1.0)<1e-14);
+    written=99; total=99;
+    assert(musa_scene2d_array_fill_page(&cancellation,3,page,1,
+                                         &written,&total));
+    assert(written==1 && total==4 && memcmp(page,m,sizeof(m))==0);
+    /* Another instance genuinely exceeds the finite range; a bulk
+     * failure must not publish even the preceding valid transforms. */
+    double unchanged[24];
+    for (size_t i=0;i<24u;++i) unchanged[i]=123.0;
+    written=99;
+    assert(!musa_scene2d_array_fill(&cancellation,unchanged,4,&written));
+    assert(written==99);
+    for (size_t i=0;i<24u;++i) assert(unchanged[i]==123.0);
     return 0;
 }
