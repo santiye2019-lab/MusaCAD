@@ -128,6 +128,48 @@ static void iterator_large_map(void) {
     assert(same_iterator(&saved,&iterator));
     assert(same_entry(&last,&entry));
 }
+static void iterator_paged_large(void) {
+    enum { N=20000, PAGE=257 };
+    static uint8_t bytes[N*2];
+    for (size_t i=0;i<N;++i) {
+        bytes[i*2]=1u;
+        bytes[i*2+1u]=1u;
+    }
+    MusaDwg1032MapIterator iterator;
+    MusaDwg1032MapEntry out[PAGE];
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,bytes,sizeof(bytes),N+1u));
+    for (size_t start=0;start<N;start+=PAGE) {
+        const size_t count=N-start<PAGE ? N-start : PAGE;
+        assert(musa_dwg1032_object_map_iterator_page(
+            &iterator,out,count,PAGE));
+        for (size_t j=0;j<count;++j) {
+            assert(out[j].handle==start+j+1u);
+            assert(out[j].offset==start+j+1u);
+        }
+    }
+    assert(iterator.cursor.bit_position==sizeof(bytes)*8u);
+    /* A corrupt last record cannot publish even the first entry of
+     * its page, despite 77 preceding pages being independently valid. */
+    bytes[N*2u-1u]=0x40u;
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,bytes,sizeof(bytes),N+1u));
+    for (size_t start=0;start+PAGE<N-PAGE;start+=PAGE)
+        assert(musa_dwg1032_object_map_iterator_page(
+            &iterator,out,PAGE,PAGE));
+    /* Seek by complete pages until the final short page. */
+    const size_t processed=(N/PAGE)*PAGE;
+    while (iterator.handle<processed)
+        assert(musa_dwg1032_object_map_iterator_page(
+            &iterator,out,PAGE,PAGE));
+    MusaDwg1032MapIterator saved=iterator;
+    MusaDwg1032MapEntry snapshot[PAGE];
+    memcpy(snapshot,out,sizeof(out));
+    assert(!musa_dwg1032_object_map_iterator_page(
+        &iterator,out,N-processed,PAGE));
+    assert(same_iterator(&saved,&iterator));
+    assert(memcmp(snapshot,out,sizeof(out))==0);
+}
 static void small(void) {
     const uint8_t payload[]={1,10,2,0x45,3,20};
     MusaDwg1032MapEntry out[3]={{99,99},{99,99},{99,99}};
