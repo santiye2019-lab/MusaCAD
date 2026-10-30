@@ -89,6 +89,16 @@ int main(void) {
     p.insertion_y=-1.5e308; /* Genuine y overflow still rejects. */
     assert(!musa_scene2d_text_affine(&p,a));
     assert(memcmp(saved,a,sizeof(saved))==0);
+    /* Mirrored text must retain a non-singular, signed x-axis. */
+    p=(MusaScene2dTextPlacement){5,-7,2,-3,0,0,0,0};
+    assert(musa_scene2d_text_affine(&p,a));
+    assert(a[0]==-6 && a[3]==2 && a[4]==5 && a[5]==-7);
+    memcpy(saved,a,sizeof(saved));
+    /* Extreme oblique angles can overflow the shear despite finite input. */
+    p.oblique_rad=1.5707963267948966;
+    p.height=1e308;
+    assert(!musa_scene2d_text_affine(&p,a));
+    assert(memcmp(saved,a,sizeof(saved))==0);
     for (int i=0;i<20000;++i) {
         const double k=(double)(i%101-50)/20.0;
         p=(MusaScene2dTextPlacement){k*3,k-4,2.0,0.1+(i%7)/4.0,
