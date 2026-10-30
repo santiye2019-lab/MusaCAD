@@ -100,12 +100,20 @@ static void large_pafta(void) {
                out[i].offset==(N-1u-i)*STRIDE+2u &&
                out[i].length==1u);
     }
-    const MusaDwg1032ObjectLocation last=out[N-1u];
+    MusaDwg1032ObjectLocation *snapshot=
+        (MusaDwg1032ObjectLocation *)malloc(N*sizeof(*snapshot));
+    assert(snapshot);
+    memcpy(snapshot,out,N*sizeof(*out));
     bytes[0]=0; /* Final handle has the first physical record. */
     assert(!musa_dwg1032_record_batch_extract(
         &index,&section,1,out,N,order,N));
-    assert(out[N-1u].handle==last.handle &&
-           out[N-1u].offset==last.offset);
+    assert(memcmp(snapshot,out,N*sizeof(*out))==0);
+    bytes[0]=1;
+    bytes[(N/2u)*STRIDE]=0; /* Middle-record corruption must also roll back. */
+    assert(!musa_dwg1032_record_batch_extract(
+        &index,&section,1,out,N,order,N));
+    assert(memcmp(snapshot,out,N*sizeof(*out))==0);
+    free(snapshot);
     free(order);free(out);free(spans);free(bytes);
 }
 int main(void) {three_candidates();large_pafta();return 0;}
