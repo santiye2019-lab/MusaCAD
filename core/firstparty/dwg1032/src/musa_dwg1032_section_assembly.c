@@ -141,6 +141,7 @@ int musa_dwg1032_section_assemble_checked_file_pages(
     size_t *order, size_t order_capacity) {
     if (page_count > order_capacity ||
         page_count > SIZE_MAX / sizeof(*order) ||
+        page_count > SIZE_MAX / sizeof(*pages) ||
         (page_count && !order))
         return 0;
     const size_t scratch_bytes = page_count * sizeof(*order);
