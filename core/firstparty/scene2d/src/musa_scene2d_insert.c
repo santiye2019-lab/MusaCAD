@@ -58,3 +58,40 @@ int musa_scene2d_insert_affine_batch(
     }
     return 1;
 }
+
+/* A bounded, resumable page of arbitrary INSERT placements. Unlike a
+ * rectangular MINSERT array, each entry has its own decoded placement. */
+int musa_scene2d_insert_affine_page(
+    const MusaScene2dInsertPlacement *placements, size_t count,
+    size_t start, double (*out)[6], size_t capacity,
+    size_t *written, size_t *total) {
+    if (!written || !total ||
+        count>SIZE_MAX/sizeof(*placements) ||
+        (count && !placements) ||
+        overlap(written,sizeof(*written),total,sizeof(*total)) ||
+        (count && (overlap(placements,count*sizeof(*placements),
+                           written,sizeof(*written)) ||
+                   overlap(placements,count*sizeof(*placements),
+                           total,sizeof(*total))))) return 0;
+    const size_t remaining=start<count ? count-start : 0u;
+    const size_t page_count=remaining<capacity ? remaining : capacity;
+    if (page_count>SIZE_MAX/sizeof(*out) ||
+        (page_count && !out)) return 0;
+    if (page_count &&
+        (overlap(placements,count*sizeof(*placements),
+                 out,page_count*sizeof(*out)) ||
+         overlap(out,page_count*sizeof(*out),written,sizeof(*written)) ||
+         overlap(out,page_count*sizeof(*out),total,sizeof(*total))))
+        return 0;
+    double candidate[6];
+    for (size_t i=0;i<page_count;++i)
+        if (!musa_scene2d_insert_affine(&placements[start+i],candidate))
+            return 0;
+    for (size_t i=0;i<page_count;++i) {
+        (void)musa_scene2d_insert_affine(&placements[start+i],candidate);
+        for (size_t j=0;j<6u;++j) out[i][j]=candidate[j];
+    }
+    *written=page_count;
+    *total=count;
+    return 1;
+}
