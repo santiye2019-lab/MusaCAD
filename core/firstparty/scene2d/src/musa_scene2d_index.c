@@ -11,11 +11,6 @@ static int overlap(const void *a, size_t an, const void *b, size_t bn) {
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
     return x<=y ? y-x<an : x-y<bn;
 }
-static int ordered(MusaScene2dBox b) {
-    return !isnan(b.min_x) && !isnan(b.min_y) &&
-           !isnan(b.max_x) && !isnan(b.max_y) &&
-           b.min_x<=b.max_x && b.min_y<=b.max_y;
-}
 static int finite_box(MusaScene2dBox b) {
     return isfinite(b.min_x) && isfinite(b.min_y) &&
            isfinite(b.max_x) && isfinite(b.max_y) &&
@@ -56,7 +51,7 @@ int musa_scene2d_index_build(const MusaScene2dPreparedBounds *prepared,
         overlap(leaf_count,sizeof(*leaf_count),storage,tbytes)) return 0;
     for (size_t i=0;i<count;++i)
         if (prepared[i].visible>1u ||
-            (prepared[i].visible && !ordered(prepared[i].box)))
+            (prepared[i].visible && !finite_box(prepared[i].box)))
             return 0;
     storage[0]=(MusaScene2dIndexNode){{0,0,0,0},0};
     for (size_t i=0;i<leaves;++i) {
