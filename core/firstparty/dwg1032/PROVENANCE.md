@@ -104,3 +104,11 @@
 - Synthetic tests cover in-bounds overlapping pages, duplicate physical spans, logical gaps, scratch aliasing, unchanged destination on failure, and 16,384 reverse-ordered physical pages. Tests must pass GitHub CI before reporting success.
 - The implementation is original MIT C11 using only bounded arithmetic and in-place sorting; no GPL/AGPL/LGPL, LibreDWG, legacy native CAD code, SDK, or uncertain-origin source was copied, adapted, or linked.
 - **Scope:** The caller must still provide verified physical page descriptors and raw or already decompressed data. This does not discover an AC1032 section directory, decompress pages, validate page CRCs, decode entities or enable Android production DWG import. Existing 3D code, `MusaCAD2/` and `main` remain untouched.
+
+## 2026-10-30 — bounded MS-prefixed record envelopes
+
+- Added `musa_dwg1032_record_frame.[ch]` as an independent MIT C11, allocation-free, transactional reader of an **MS-length-prefixed payload inside a caller-verified bounded byte region**. The MS integer encoding convention is already documented above from the published ODA DWG specification (section 2.7); the implementation is original and uses only this repository's independent cursor and modular-short primitives.
+- The decoder requires a nonzero payload length, a caller-defined maximum, complete bytes and disjoint output. It leaves the candidate cursor and output unchanged on malformed/truncated data, supports one- and two-word MS lengths, and does not silently consume trailing candidate-span bytes.
+- Synthetic CTest covers 20,000 sequential record frames, 32,768-byte two-word length, truncated/overlong inputs, unaligned state, output aliasing, rollback and zero length. These are **not real AC1032 fixture tests**.
+- A candidate object-map interval is only an upper bound. The caller must independently establish whether and where an AC1032 object record uses this prefix, verify record framing and any checksums, and separately decode the object type, handles, layer, owner, block, geometry and text. No real-file opening or production JNI path is enabled by this module.
+- No third-party source code, LibreDWG, GPL/AGPL/LGPL implementation, historical native core or uncertain-provenance CAD decoder was copied, adapted, imported or linked. `MusaCAD2/`, `main` and existing 3D sources are untouched.
