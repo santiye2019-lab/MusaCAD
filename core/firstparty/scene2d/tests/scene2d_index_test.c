@@ -28,6 +28,16 @@ static void atomic_and_edges(void) {
     assert(musa_scene2d_index_build(p,5,tree,16,&leaves));
     assert(leaves==8 && tree[1].occupied);
     size_t indices[5]={91,92,93,94,95};
+    written=99;
+    assert(!musa_scene2d_index_query(tree,5,leaves,
+           (MusaScene2dBox){0,0,100,100},NULL,5,&written));
+    assert(written==99);
+    assert(!musa_scene2d_index_query(tree,5,leaves,
+           (MusaScene2dBox){999,999,1000,1000},NULL,5,&written));
+    assert(written==99);
+    assert(musa_scene2d_index_query(tree,5,leaves,
+           (MusaScene2dBox){999,999,1000,1000},NULL,0,&written));
+    assert(written==0);
     assert(musa_scene2d_index_query(tree,5,leaves,
            (MusaScene2dBox){20,20,20,20},indices,5,&written));
     assert(written==2 && indices[0]==1 && indices[1]==3);
