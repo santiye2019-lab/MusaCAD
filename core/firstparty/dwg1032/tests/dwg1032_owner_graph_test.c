@@ -88,6 +88,32 @@ static void mutated_index_is_rejected(void) {
     assert(memcmp(depths,expected_depths,sizeof depths)==0);
 }
 
+/* Scratch capacity, not just the used prefix, must be disjoint from
+ * published outputs. An unused tail can still alias the caller's results. */
+static void oversized_workspace_alias(void) {
+    const MusaDwg1032ObjectLocation entries[]={
+        {10,0,1},{20,1,1},{30,2,1}
+    };
+    MusaDwg1032ObjectIndex index;
+    assert(musa_dwg1032_object_index_init(&index,entries,3,3));
+    const uint64_t owners[]={0,10,20};
+    MusaDwg1032OwnerWork work[8]={0};
+    uint64_t roots[]={77,78,79};
+    size_t depths[]={87,88,89};
+    assert(!musa_dwg1032_owner_graph_resolve(
+        &index,owners,work,8,(uint64_t *)(void *)&work[4],depths));
+    assert(!musa_dwg1032_owner_graph_resolve(
+        &index,owners,work,8,roots,(size_t *)(void *)&work[5]));
+    assert(!musa_dwg1032_owner_graph_resolve(
+        &index,owners,work,SIZE_MAX,roots,depths));
+    assert(roots[0]==77 && roots[1]==78 && roots[2]==79);
+    assert(depths[0]==87 && depths[1]==88 && depths[2]==89);
+    assert(musa_dwg1032_owner_graph_resolve(
+        &index,owners,work,8,roots,depths));
+    assert(roots[0]==10 && roots[1]==10 && roots[2]==10);
+    assert(depths[0]==0 && depths[1]==1 && depths[2]==2);
+}
+
 static void large_chain(void) {
     enum {N=20000};
     static MusaDwg1032ObjectLocation entries[N];
@@ -106,4 +132,4 @@ static void large_chain(void) {
     assert(!musa_dwg1032_owner_graph_resolve(&index,owners,work,N,roots,depths));
     assert(roots[N-1]==1 && depths[N-1]==N-1);
 }
-int main(void) {branching_and_rollback();mutated_index_is_rejected();large_chain();return 0;}
+int main(void) {branching_and_rollback();mutated_index_is_rejected();oversized_workspace_alias();large_chain();return 0;}
