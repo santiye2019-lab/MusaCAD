@@ -17,7 +17,9 @@ typedef struct MusaDwg1032OwnerWork {
 /* Resolve the root and hop count of EVERY indexed, predecoded owner chain.
  * owner_handles[i] == 0 marks a root. index must have been validated by
  * object_index_init and must remain immutable. All buffers must be disjoint.
- * work_count must be >= index->count. No recursion or heap allocation.
+ * work_count must be >= index->count, and the ENTIRE advertised work
+ * capacity must be disjoint from the input and output buffers, including
+ * any unused tail. No recursion or heap allocation.
  * O(n log n) for n objects, with O(n) caller-provided workspace.
  * Rejects dangling owners and cycles. On failure roots and depths remain
  * unchanged; work is scratch and may be modified. No DWG bytes are parsed. */
