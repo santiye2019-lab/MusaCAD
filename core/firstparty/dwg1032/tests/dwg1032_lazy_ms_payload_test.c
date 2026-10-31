@@ -61,6 +61,22 @@ static void small_reordered_pages(void) {
     assert(!musa_dwg1032_object_ms_payload_read_window(
         file,sizeof(file),pages,3,&index,10,0,4,file,1,&length));
     assert(length==77 && out[0]==0xa5);
+    /* Even with a cached single lookup, output may not corrupt metadata. */
+    const MusaDwg1032ObjectIndex saved_index=index;
+    MusaDwg1032FilePage saved_pages[3];
+    memcpy(saved_pages,pages,sizeof(pages));
+    assert(!musa_dwg1032_object_ms_payload_read_window(
+        file,sizeof(file),pages,3,&index,10,0,4,
+        (uint8_t *)(void *)&index,1,&length));
+    assert(!musa_dwg1032_object_ms_payload_read_window(
+        file,sizeof(file),pages,3,&index,10,0,4,
+        (uint8_t *)(void *)pages,1,&length));
+    assert(!musa_dwg1032_object_ms_payload_read_window(
+        file,sizeof(file),pages,3,&index,10,0,4,
+        out,1,(uint64_t *)(void *)&index));
+    assert(memcmp(&saved_index,&index,sizeof(index))==0);
+    assert(memcmp(saved_pages,pages,sizeof(pages))==0);
+    assert(length==77 && out[0]==0xa5);
     file[8]=7; /* Claimed record exceeds its candidate span. */
     assert(!musa_dwg1032_object_ms_payload_read_window(
         file,sizeof(file),pages,3,&index,10,0,8,out,1,&length));
