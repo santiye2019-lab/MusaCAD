@@ -55,6 +55,19 @@ int main(void) {
     assert(!musa_scene2d_array_fill_scratch(
         &array,fast,count,(double *)(void *)&array,count,&fast_written));
     assert(fast_written==13u && memcmp(fast,out,bytes)==0);
+    /* Reflected and rotated blocks must agree across the entire batch. */
+    const MusaScene2dInsertArray baseline=array;
+    array.placement.rotation_rad=acos(-1.0)/3.0;
+    array.placement.scale_x=-2.0;
+    array.placement.scale_y=3.0;
+    array.column_spacing=-1.25;
+    array.row_spacing=0.75;
+    assert(musa_scene2d_array_fill(&array,out,count,&written));
+    assert(musa_scene2d_array_fill_scratch(
+        &array,fast,count,scratch,count,&fast_written));
+    assert(memcmp(fast,out,bytes)==0);
+    array=baseline;
+    assert(musa_scene2d_array_fill(&array,out,count,&written));
     free(fast);
     free(scratch);
     const double first=out[4],last=out[6u*(count-1u)+5u];
