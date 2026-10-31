@@ -96,6 +96,24 @@ int musa_dwg1032_record_batch_from_verified_map(
     MusaDwg1032ObjectLocation *candidates, size_t candidate_capacity,
     MusaDwg1032ObjectLocation *payloads, size_t payload_capacity,
     size_t *order, size_t order_capacity);
+/* Scratch-backed integration of the same caller-verified map and object
+ * section. Each candidate MS frame is decoded once, then all payload spans
+ * are published together. Adds one caller-owned ObjectLocation array; this
+ * trades O(object_count) memory for fewer frame reads on large drawings.
+ * map_entries, candidates, payload_scratch and order may change on failure;
+ * payloads never changes on failure. All writable buffers must be disjoint
+ * from each other, the map bytes, the section descriptor and section bytes.
+ * The MS envelope remains hypothetical for real AC1032 object records:
+ * no compressed page, checksum, entity schema or JNI import is handled. */
+int musa_dwg1032_record_batch_from_verified_map_scratch(
+    const uint8_t *map_bytes, size_t map_byte_count, size_t object_count,
+    const MusaDwg1032Cursor *section, size_t max_payload_bytes,
+    MusaDwg1032MapEntry *map_entries, size_t map_capacity,
+    MusaDwg1032ObjectLocation *candidates, size_t candidate_capacity,
+    MusaDwg1032ObjectLocation *payloads, size_t payload_capacity,
+    MusaDwg1032ObjectLocation *payload_scratch,
+    size_t payload_scratch_capacity,
+    size_t *order, size_t order_capacity);
 #ifdef __cplusplus
 }
 #endif
