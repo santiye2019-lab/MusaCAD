@@ -10,15 +10,13 @@ static int array_overlap(const void *a, size_t an, const void *b, size_t bn) {
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
     return x<=y ? y-x<an : x-y<bn;
 }
-int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
-                               size_t column, size_t row, double out[6]) {
-    if (!array || !out || !array->columns || !array->rows ||
-        column>=array->columns || row>=array->rows ||
-        !isfinite(array->column_spacing) || !isfinite(array->row_spacing) ||
-        array_overlap(array,sizeof(*array),out,6u*sizeof(double)))
-        return 0;
+/* Reuse the INSERT base transform for large MINSERT batches. Only the
+ * per-cell offsets differ; no trigonometry is needed per instance. */
+static int instance_from_base(const MusaScene2dInsertArray *array,
+                              const double base[6], size_t column,
+                              size_t row, double out[6]) {
     double candidate[6];
-    if (!musa_scene2d_insert_affine(&array->placement,candidate)) return 0;
+    memcpy(candidate,base,sizeof(candidate));
     const double dx=(double)column*array->column_spacing;
     const double dy=(double)row*array->row_spacing;
     if (!isfinite(dx) || !isfinite(dy)) return 0;
@@ -43,6 +41,17 @@ int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
     return 1;
 }
 
+int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
+                               size_t column, size_t row, double out[6]) {
+    if (!array || !out || !array->columns || !array->rows ||
+        column>=array->columns || row>=array->rows ||
+        !isfinite(array->column_spacing) || !isfinite(array->row_spacing) ||
+        array_overlap(array,sizeof(*array),out,6u*sizeof(double)))
+        return 0;
+    double base[6];
+    if (!musa_scene2d_insert_affine(&array->placement,base)) return 0;
+    return instance_from_base(array,base,column,row,out);
+}
 int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
                              double *out, size_t capacity, size_t *written) {
     if (!array || !out || !written || !array->columns || !array->rows ||
@@ -54,15 +63,16 @@ int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
         array_overlap(array,sizeof(*array),written,sizeof(*written)))
         return 0;
     /* The first pass validates every result without touching the output. */
-    double affine[6];
+    double base[6],affine[6];
+    if (!musa_scene2d_array_affine(array,0u,0u,base)) return 0;
     for (size_t row=0;row<array->rows;++row)
         for (size_t col=0;col<array->columns;++col)
-            if (!musa_scene2d_array_affine(array,col,row,affine)) return 0;
+            if (!instance_from_base(array,base,col,row,affine)) return 0;
     /* Caller keeps the input immutable throughout both passes. */
     for (size_t row=0;row<array->rows;++row)
         for (size_t col=0;col<array->columns;++col) {
             const size_t i=row*array->columns+col;
-            if (!musa_scene2d_array_affine(array,col,row,affine)) return 0;
+            if (!instance_from_base(array,base,col,row,affine)) return 0;
             memcpy(out+6u*i,affine,sizeof(affine));
         }
     *written=count;
@@ -89,17 +99,17 @@ int musa_scene2d_array_fill_page(const MusaScene2dInsertArray *array,
     if (array_overlap(array,sizeof(*array),out,output_bytes) ||
         array_overlap(written,sizeof(*written),out,output_bytes) ||
         array_overlap(total,sizeof(*total),out,output_bytes)) return 0;
-    double affine[6];
+    double base[6],affine[6];
     /* Validate even an empty page's base placement and spacings. */
-    if (!musa_scene2d_array_affine(array,0u,0u,affine)) return 0;
+    if (!musa_scene2d_array_affine(array,0u,0u,base)) return 0;
     for (size_t i=0;i<page_count;++i) {
         const size_t at=start+i; /* <= count-1; checked by remaining. */
-        if (!musa_scene2d_array_affine(array,at%array->columns,
+        if (!instance_from_base(array,base,at%array->columns,
                                         at/array->columns,affine)) return 0;
     }
     for (size_t i=0;i<page_count;++i) {
         const size_t at=start+i;
-        (void)musa_scene2d_array_affine(array,at%array->columns,
+        (void)instance_from_base(array,base,at%array->columns,
                                          at/array->columns,affine);
         memcpy(out+6u*i,affine,sizeof(affine));
     }
