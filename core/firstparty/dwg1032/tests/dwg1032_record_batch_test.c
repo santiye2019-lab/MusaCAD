@@ -113,6 +113,10 @@ static void three_candidates(void) {
     assert(!musa_dwg1032_record_batch_extract(
         &index,&section,1,out,3,(size_t *)(void *)spans,3));
     assert(memcmp(saved,out,sizeof(out))==0);
+    const MusaDwg1032ObjectIndex missing_entries={NULL,3,sizeof(bytes)};
+    assert(!musa_dwg1032_record_batch_extract(
+        &missing_entries,&section,1,out,3,order,3));
+    assert(memcmp(saved,out,sizeof(out))==0);
     MusaDwg1032ObjectLocation bad[3]={spans[0],spans[1],spans[2]};
     bad[2].offset=spans[1].offset; /* Intersecting physical candidates. */
     const MusaDwg1032ObjectIndex invalid={bad,3,sizeof(bytes)};
