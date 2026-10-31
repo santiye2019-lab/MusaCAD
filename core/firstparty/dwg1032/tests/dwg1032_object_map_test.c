@@ -357,4 +357,42 @@ static void decode_locations_large(void) {
         bytes,sizeof(bytes),N,N+1u,out,N,scratch,N,order,N));
     assert(out[N-1u].handle==N && out[N-1u].length==1u);
 }
-int main(void) {iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
+/* Exercise the full signed 64-bit range in a map walk. In particular,
+ * -INT64_MIN must never be evaluated as a signed expression. */
+static void iterator_extreme_negative_delta(void) {
+    const uint8_t stream[]={
+        1u, /* handle 1, positive INT64_MAX */
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x00,
+        1u,1u, /* handle 2, offset 2^63 */
+        1u, /* handle 3, signed delta INT64_MIN */
+        0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x41
+    };
+    MusaDwg1032MapIterator iterator;
+    MusaDwg1032MapEntry entry={99u,99u};
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,stream,sizeof(stream),UINT64_MAX));
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(entry.handle==1u && entry.offset==(uint64_t)INT64_MAX);
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(entry.handle==2u && entry.offset==(UINT64_C(1)<<63u));
+    assert(musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(entry.handle==3u && entry.offset==0u);
+    assert(musa_dwg1032_object_map_iterator_finished(&iterator,3u));
+    MusaDwg1032MapEntry out[3]={{0}};
+    assert(musa_dwg1032_object_map_decode(
+        stream,sizeof(stream),3u,UINT64_MAX,out,3u));
+    assert(out[0].offset==(uint64_t)INT64_MAX &&
+           out[1].offset==(UINT64_C(1)<<63u) && out[2].offset==0u);
+
+    const uint8_t min_only[]={
+        1u,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x41
+    };
+    assert(musa_dwg1032_object_map_iterator_init(
+        &iterator,min_only,sizeof(min_only),UINT64_MAX));
+    iterator.offset=(UINT64_C(1)<<63u)-1u;
+    const MusaDwg1032MapIterator saved=iterator;
+    const MusaDwg1032MapEntry last=entry;
+    assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
+    assert(same_iterator(&saved,&iterator) && same_entry(&last,&entry));
+}
+int main(void) {iterator_extreme_negative_delta();iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
