@@ -71,6 +71,29 @@ int musa_dwg1032_section_assemble_checked_file_pages(
     uint8_t *destination, size_t destination_size,
     size_t *order, size_t order_capacity);
 
+
+/* One-time validation for random-access reads of a caller-supplied RAW,
+ * already decompressed section directory. Pages must be in consecutive
+ * logical order and exactly cover section_bytes; physical ranges must be
+ * disjoint and inside the file. order is caller-owned sorting scratch.
+ * No DWG page discovery, decompression, CRC or authenticity is implied. */
+int musa_dwg1032_file_pages_validate_window_directory(
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    size_t file_size, uint64_t section_bytes,
+    size_t *order, size_t order_capacity);
+
+/* Read a bounded logical window without allocating or assembling the entire
+ * section. REQUIRES a previously validated, immutable directory from the
+ * function above. O(log(page_count) + touched_pages + window_bytes).
+ * Source file, page metadata and destination must not overlap. All touched
+ * pages are checked before writing, so failure preserves destination.
+ * Does not decode DWG pages, records or entities. */
+int musa_dwg1032_section_read_window(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    uint64_t section_bytes, uint64_t logical_offset,
+    uint8_t *destination, size_t destination_size);
+
 #ifdef __cplusplus
 }
 #endif
