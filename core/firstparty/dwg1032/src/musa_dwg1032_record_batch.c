@@ -77,6 +77,58 @@ int musa_dwg1032_record_batch_extract(
     return 1;
 }
 
+/* Parse each already-located record exactly once into disjoint caller
+ * scratch, then publish the complete array only after the last succeeds.
+ * Unlike the two-pass API, this trades O(count) scratch for fewer reads. */
+int musa_dwg1032_record_batch_extract_scratch(
+    const MusaDwg1032ObjectIndex *index,
+    const MusaDwg1032Cursor *section,
+    size_t max_payload_bytes,
+    MusaDwg1032ObjectLocation *payloads, size_t capacity,
+    MusaDwg1032ObjectLocation *scratch, size_t scratch_capacity,
+    size_t *order, size_t order_capacity) {
+    if (!index || !section || index->count>capacity ||
+        index->count>scratch_capacity || index->count>order_capacity ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        index->count>SIZE_MAX/sizeof(*payloads) ||
+        index->count>SIZE_MAX/sizeof(*order) ||
+        section->byte_count>SIZE_MAX/8u ||
+        index->section_bytes!=(uint64_t)section->byte_count ||
+        section->bit_position!=0u ||
+        (section->byte_count && !section->bytes) ||
+        (index->count && (!index->entries || !payloads || !scratch ||
+                          !order || !max_payload_bytes)))
+        return 0;
+    const size_t count=index->count;
+    const size_t result_bytes=count*sizeof(*payloads);
+    const size_t order_bytes=count*sizeof(*order);
+    const size_t entries_bytes=count*sizeof(*index->entries);
+    const void *sources[]={index,section,index->entries,section->bytes};
+    const size_t source_bytes[]={sizeof(*index),sizeof(*section),
+                                 entries_bytes,section->byte_count};
+    const void *destinations[]={payloads,scratch,order};
+    const size_t destination_bytes[]={result_bytes,result_bytes,order_bytes};
+    for (size_t i=0;i<3u;++i) {
+        for (size_t j=i+1u;j<3u;++j)
+            if (overlaps(destinations[i],destination_bytes[i],
+                         destinations[j],destination_bytes[j])) return 0;
+        for (size_t j=0;j<4u;++j)
+            if (overlaps(destinations[i],destination_bytes[i],
+                         sources[j],source_bytes[j])) return 0;
+    }
+    if (!musa_dwg1032_object_spans_prepare(index,order,order_capacity))
+        return 0;
+    for (size_t i=0;i<count;++i)
+        if (!extract_one(index,section,i,max_payload_bytes,&scratch[i]))
+            return 0;
+    if (count) {
+        /* The scratch and output arrays have already been checked disjoint.
+         * The caller keeps both source buffers immutable throughout. */
+        for (size_t i=0;i<count;++i) payloads[i]=scratch[i];
+    }
+    return 1;
+}
+
 /* A fast page reader for an immutable, previously span-validated index.
  * Per-page preflight preserves output even when a later frame is malformed.
  * Global span validation remains the caller's explicit prerequisite. */
