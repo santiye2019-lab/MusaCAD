@@ -94,6 +94,14 @@ static void iterator_completion(void) {
     assert(musa_dwg1032_object_map_iterator_init(&it,NULL,0u,0u));
     assert(musa_dwg1032_object_map_iterator_finished(&it,0u));
     assert(!musa_dwg1032_object_map_iterator_finished(&it,1u));
+    it=saved;
+    it.cursor.byte_count=SIZE_MAX;
+    assert(!musa_dwg1032_object_map_iterator_page(&it,NULL,0u,0u));
+    assert(it.cursor.byte_count==SIZE_MAX);
+    it=saved;
+    it.cursor.bytes=NULL;
+    assert(!musa_dwg1032_object_map_iterator_page(&it,NULL,0u,0u));
+    assert(it.cursor.bytes==NULL);
 }
 static void iterator_paged_atomic(void) {
     uint8_t bytes[]={1,10,2,0x45,3,20};
