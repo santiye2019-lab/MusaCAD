@@ -118,6 +118,25 @@ static void page_overflow_rollback(void) {
         p,3,0,out,2,&written,&total));
     assert(written==2 && total==3);
 }
+/* Distinguish intentional zero scale from an underflowed axis. */
+static void tiny_insert_axes(void) {
+    MusaScene2dInsertPlacement p={0,0,0,0,1e-300,1e-300,0};
+    double a[6],saved[6];
+    assert(musa_scene2d_insert_affine(&p,a));
+    assert(a[0]==1e-300 && a[3]==1e-300);
+    memcpy(saved,a,sizeof(a));
+    p.scale_x=1e-320;
+    p.rotation_rad=acos(-1.0)/4.0;
+    assert(musa_scene2d_insert_affine(&p,a));
+    assert(a[0]!=0.0 || a[1]!=0.0);
+    p.scale_x=0.0;
+    assert(musa_scene2d_insert_affine(&p,a));
+    assert(a[0]==0.0 && a[1]==0.0);
+    memcpy(saved,a,sizeof(a));
+    p.scale_x=NAN;
+    assert(!musa_scene2d_insert_affine(&p,a));
+    assert(memcmp(saved,a,sizeof(a))==0);
+}
 static void rollback(void) {
     MusaScene2dInsertPlacement p={1,2,3,4,5,6,0};
     double out[6]={11,12,13,14,15,16},saved[6];
@@ -232,4 +251,4 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
+int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();tiny_insert_axes();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
