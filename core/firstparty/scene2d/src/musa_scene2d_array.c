@@ -79,6 +79,40 @@ int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
     return 1;
 }
 
+/* One checked evaluation per instance, followed by an atomic publication
+ * from caller-owned scratch. No allocation, recursion, or CAD dependencies. */
+int musa_scene2d_array_fill_scratch(
+    const MusaScene2dInsertArray *array,
+    double *out, size_t capacity, double *scratch,
+    size_t scratch_capacity, size_t *written) {
+    if (!array || !out || !scratch || !written ||
+        !array->columns || !array->rows ||
+        array->columns>SIZE_MAX/array->rows) return 0;
+    const size_t count=array->columns*array->rows;
+    if (count>SIZE_MAX/(6u*sizeof(double)) ||
+        count>capacity || count>scratch_capacity) return 0;
+    const size_t bytes=count*6u*sizeof(double);
+    if (array_overlap(array,sizeof(*array),out,bytes) ||
+        array_overlap(array,sizeof(*array),scratch,bytes) ||
+        array_overlap(array,sizeof(*array),written,sizeof(*written)) ||
+        array_overlap(out,bytes,scratch,bytes) ||
+        array_overlap(out,bytes,written,sizeof(*written)) ||
+        array_overlap(scratch,bytes,written,sizeof(*written)))
+        return 0;
+    double base[6],affine[6];
+    if (!musa_scene2d_array_affine(array,0u,0u,base)) return 0;
+    for (size_t row=0;row<array->rows;++row) {
+        for (size_t col=0;col<array->columns;++col) {
+            if (!instance_from_base(array,base,col,row,affine)) return 0;
+            const size_t i=row*array->columns+col;
+            memcpy(scratch+6u*i,affine,sizeof(affine));
+        }
+    }
+    memcpy(out,scratch,bytes);
+    *written=count;
+    return 1;
+}
+
 /* Page only the requested row-major instances: O(page_size), independent
  * of the number of preceding instances in a very large block array. */
 int musa_scene2d_array_fill_page(const MusaScene2dInsertArray *array,
