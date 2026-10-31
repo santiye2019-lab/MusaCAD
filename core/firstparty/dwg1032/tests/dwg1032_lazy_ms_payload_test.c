@@ -29,6 +29,25 @@ static void small_reordered_pages(void) {
     assert(musa_dwg1032_object_ms_payload_read_window(
         file,sizeof(file),pages,3,&index,10,1,4,out,3,&length));
     assert(length==4 && out[0]==2 && out[1]==3 && out[2]==4);
+    uint8_t ordinal_out[3]={0};
+    uint64_t ordinal_length=0;
+    assert(musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,0,1,4,
+        ordinal_out,sizeof(ordinal_out),&ordinal_length));
+    assert(ordinal_length==length && ordinal_out[0]==2 &&
+           ordinal_out[1]==3 && ordinal_out[2]==4);
+    ordinal_out[0]=0xa5;ordinal_length=99;
+    assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,2,0,4,
+        ordinal_out,1,&ordinal_length));
+    assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,0,0,4,
+        (uint8_t *)(void *)pages,1,&ordinal_length));
+    assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,0,0,4,
+        file,1,&ordinal_length));
+    assert(ordinal_length==99 && ordinal_out[0]==0xa5);
+
     for (size_t i=3;i<sizeof(out);++i) assert(out[i]==0xa5);
     memset(out,0xa5,sizeof(out));
     assert(musa_dwg1032_object_ms_payload_read_window(
@@ -135,6 +154,9 @@ static void extended_prefix_across_pages(void) {
     assert(!musa_dwg1032_object_ms_payload_read_window(
         file,BYTES,pages,2,&index,33,0,PAYLOAD,out,2,&length));
     assert(length==99 && out[0]==0xa5 && out[1]==0xa5);
+    assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,BYTES,pages,2,&index,0,0,PAYLOAD,out,2,&length));
+    assert(length==99 && out[0]==0xa5 && out[1]==0xa5);
     free(file);
 }
 
@@ -170,6 +192,14 @@ static void large_reverse_physical(void) {
             0,2,out,2,&length));
         assert(length==2 && out[0]==(uint8_t)at &&
                out[1]==(uint8_t)(at>>8u));
+        uint8_t ordinal_out[2]={0xa5,0xa5};
+        uint64_t ordinal_length=99;
+        assert(musa_dwg1032_object_ms_payload_read_window_at_position(
+            file,N*STRIDE,pages,N,&index,at,0,2,
+            ordinal_out,2,&ordinal_length));
+        assert(ordinal_length==length &&
+               memcmp(out,ordinal_out,sizeof(out))==0);
+
     }
     free(order);free(entries);free(pages);free(file);
 }
