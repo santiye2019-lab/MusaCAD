@@ -79,6 +79,37 @@ int musa_scene2d_insert_affine_batch(
     return 1;
 }
 
+/* Scratch-backed bulk INSERT placement for large drawings. Compute each
+ * affine exactly once, keeping the caller's output untouched until every
+ * input has been validated. Scratch is disposable on failure. */
+int musa_scene2d_insert_affine_batch_scratch(
+    const MusaScene2dInsertPlacement *placements, size_t count,
+    double (*out)[6], size_t capacity,
+    double (*scratch)[6], size_t scratch_capacity) {
+    if (count>capacity || count>scratch_capacity ||
+        count>SIZE_MAX/sizeof(*placements) ||
+        count>SIZE_MAX/sizeof(*out) ||
+        count>SIZE_MAX/sizeof(*scratch) ||
+        (count && (!placements || !out || !scratch)))
+        return 0;
+    if (count) {
+        const size_t source_bytes=count*sizeof(*placements);
+        const size_t output_bytes=count*sizeof(*out);
+        const size_t scratch_bytes=count*sizeof(*scratch);
+        if (overlap(placements,source_bytes,out,output_bytes) ||
+            overlap(placements,source_bytes,scratch,scratch_bytes) ||
+            overlap(out,output_bytes,scratch,scratch_bytes))
+            return 0;
+    }
+    for (size_t i=0;i<count;++i)
+        if (!musa_scene2d_insert_affine(&placements[i],scratch[i]))
+            return 0;
+    for (size_t i=0;i<count;++i)
+        for (size_t j=0;j<6u;++j)
+            out[i][j]=scratch[i][j];
+    return 1;
+}
+
 /* A bounded, resumable page of arbitrary INSERT placements. Unlike a
  * rectangular MINSERT array, each entry has its own decoded placement. */
 int musa_scene2d_insert_affine_page(
