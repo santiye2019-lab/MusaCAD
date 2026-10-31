@@ -157,3 +157,78 @@ int musa_dwg1032_section_assemble_checked_file_pages(
         file_bytes, file_size, pages, page_count,
         destination, destination_size);
 }
+
+/* The directory is checked once; repeated viewport windows do not sort or
+ * assemble the entire section. Only caller-verified RAW page bytes are used. */
+int musa_dwg1032_file_pages_validate_window_directory(
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    size_t file_size, uint64_t section_bytes,
+    size_t *order, size_t order_capacity) {
+    if (file_size>PTRDIFF_MAX || section_bytes>(uint64_t)PTRDIFF_MAX ||
+        page_count>SIZE_MAX/sizeof(*pages) ||
+        (page_count && !pages)) return 0;
+    uint64_t filled=0;
+    for (size_t i=0;i<page_count;++i) {
+        const MusaDwg1032FilePage p=pages[i];
+        if (!p.byte_count || p.logical_offset!=filled ||
+            p.byte_count>section_bytes-filled) return 0;
+        filled+=(uint64_t)p.byte_count;
+    }
+    if (filled!=section_bytes) return 0;
+    return musa_dwg1032_file_pages_validate_physical(
+        pages,page_count,file_size,order,order_capacity);
+}
+
+int musa_dwg1032_section_read_window(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    uint64_t section_bytes, uint64_t logical_offset,
+    uint8_t *destination, size_t destination_size) {
+    if (file_size>PTRDIFF_MAX || section_bytes>(uint64_t)PTRDIFF_MAX ||
+        page_count>SIZE_MAX/sizeof(*pages) ||
+        (file_size && !file_bytes) || (page_count && !pages) ||
+        (destination_size && !destination) ||
+        logical_offset>section_bytes ||
+        (uint64_t)destination_size>section_bytes-logical_offset ||
+        overlaps(file_bytes,file_size,destination,destination_size) ||
+        overlaps(pages,page_count*sizeof(*pages),
+                 destination,destination_size))
+        return 0;
+    if (!page_count) return !section_bytes && !destination_size;
+    if (!destination_size) return 1;
+    /* Binary search: first page whose logical start is greater than offset. */
+    size_t lo=0,hi=page_count;
+    while (lo<hi) {
+        const size_t mid=lo+(hi-lo)/2u;
+        if (pages[mid].logical_offset<=logical_offset) lo=mid+1u;
+        else hi=mid;
+    }
+    if (!lo) return 0;
+    const size_t first=lo-1u;
+    /* Validate all touched pages before the first destination write.
+     * The caller guarantees directory and file immutability between passes. */
+    for (unsigned pass=0;pass<2u;++pass) {
+        uint64_t pos=logical_offset;
+        size_t remaining=destination_size, written=0;
+        for (size_t i=first;remaining;) {
+            if (i>=page_count) return 0;
+            const MusaDwg1032FilePage p=pages[i];
+            if (!p.byte_count || p.logical_offset>pos ||
+                pos-p.logical_offset>=(uint64_t)p.byte_count ||
+                p.file_offset>(uint64_t)file_size ||
+                (uint64_t)p.byte_count>(uint64_t)file_size-p.file_offset)
+                return 0;
+            const size_t within=(size_t)(pos-p.logical_offset);
+            const size_t available=p.byte_count-within;
+            const size_t take=remaining<available?remaining:available;
+            if (pass)
+                memcpy(destination+written,
+                       file_bytes+(size_t)p.file_offset+within,take);
+            written+=take;
+            remaining-=take;
+            pos+=(uint64_t)take;
+            ++i;
+        }
+    }
+    return 1;
+}
