@@ -21,12 +21,13 @@ int musa_dwg1032_owner_graph_resolve(const MusaDwg1032ObjectIndex *index,
         index->count>SIZE_MAX/sizeof(*index->entries) ||
         index->count>SIZE_MAX/sizeof(*owner_handles) ||
         index->count>SIZE_MAX/sizeof(*work) ||
+        work_count>SIZE_MAX/sizeof(*work) ||
         index->count>SIZE_MAX/sizeof(*roots) ||
         index->count>SIZE_MAX/sizeof(*depths)) return 0;
     const size_t n=index->count;
     const void *ptrs[]={index,index->entries,owner_handles,work,roots,depths};
     const size_t sizes[]={sizeof(*index),n*sizeof(*index->entries),
-        n*sizeof(*owner_handles),n*sizeof(*work),n*sizeof(*roots),
+        n*sizeof(*owner_handles),work_count*sizeof(*work),n*sizeof(*roots),
         n*sizeof(*depths)};
     for (size_t a=0;a<6;++a)
         for (size_t b=a+1;b<6;++b)
