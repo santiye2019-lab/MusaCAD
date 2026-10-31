@@ -267,4 +267,49 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();tiny_insert_axes();tiny_insert_batch_page();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
+/* 20k independent INSERT transforms: one-pass scratch output must match
+ * the established two-pass result, including rotations and mirroring.
+ * A late malformed placement cannot publish even the first result. */
+static void scratch_bulk_placements(void) {
+    enum { N=20000 };
+    MusaScene2dInsertPlacement *placements=malloc(N*sizeof(*placements));
+    double (*reference)[6]=malloc(N*sizeof(*reference));
+    double (*out)[6]=malloc(N*sizeof(*out));
+    double (*scratch)[6]=malloc(N*sizeof(*scratch));
+    assert(placements && reference && out && scratch);
+    for (size_t i=0;i<N;++i) {
+        placements[i]=(MusaScene2dInsertPlacement){
+            (double)i*0.125, -(double)i*0.25,
+            (double)(i%17u), (double)(i%23u),
+            (i%2u)?-2.0:1.5, (i%3u)?3.0:-0.5,
+            (double)(i%113u)*0.015};
+    }
+    assert(musa_scene2d_insert_affine_batch(
+        placements,N,reference,N));
+    memset(out,0xa5,N*sizeof(*out));
+    assert(musa_scene2d_insert_affine_batch_scratch(
+        placements,N,out,N,scratch,N));
+    assert(memcmp(reference,out,N*sizeof(*out))==0);
+    placements[N-1u].rotation_rad=NAN;
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,N,out,N,scratch,N));
+    assert(memcmp(reference,out,N*sizeof(*out))==0);
+    placements[N-1u].rotation_rad=0.0;
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,N,out,N-1u,scratch,N));
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,N,out,N,scratch,N-1u));
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,N,out,N,out,N));
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,N,out,N,(double (*)[6])(void *)placements,N));
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,N,(double (*)[6])(void *)placements,N,scratch,N));
+    assert(memcmp(reference,out,N*sizeof(*out))==0);
+    assert(musa_scene2d_insert_affine_batch_scratch(
+        NULL,0u,NULL,0u,NULL,0u));
+    assert(!musa_scene2d_insert_affine_batch_scratch(
+        placements,1u,out,1u,NULL,1u));
+    free(scratch);free(out);free(reference);free(placements);
+}
+int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();tiny_insert_axes();tiny_insert_batch_page();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();scratch_bulk_placements();paged_placements();return 0;}
