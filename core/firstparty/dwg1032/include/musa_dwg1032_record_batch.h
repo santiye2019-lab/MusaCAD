@@ -50,6 +50,18 @@ int musa_dwg1032_record_batch_extract_page(
     size_t start, size_t max_payload_bytes,
     MusaDwg1032ObjectLocation *payloads, size_t capacity,
     size_t *written, size_t *total);
+/* O(log n) handle lookup and bounded extraction of ONE already located
+ * candidate. Before calling, validate the entire immutable index with
+ * musa_dwg1032_object_spans_prepare(); this function deliberately does not
+ * re-sort the full map on each viewport lookup. The section must be the
+ * caller-verified, decompressed object section, with bit_position zero.
+ * On any failure *payload is unchanged. No allocation or byte copying.
+ * This checks an assumed MS envelope only; it does not authenticate an
+ * AC1032 object, decode its entity, or enable JNI import. */
+int musa_dwg1032_record_batch_extract_handle(
+    const MusaDwg1032ObjectIndex *validated_candidates,
+    const MusaDwg1032Cursor *section, uint64_t handle,
+    size_t max_payload_bytes, MusaDwg1032ObjectLocation *payload);
 /* Combine a caller-VERIFIED, already decompressed object-map payload with
  * a caller-VERIFIED, already decompressed object section. Decodes exactly
  * object_count map pairs, derives non-overlapping candidate spans, and
