@@ -58,6 +58,9 @@ int musa_dwg1032_modular_signed(MusaDwg1032Cursor *cursor, int64_t *value) {
             ? (UINT64_C(1)<<63u) : (uint64_t)INT64_MAX;
         if (payload>(limit>>shift)) return 0;
         magnitude|=payload<<shift;
+        /* Earlier groups may already contain low bits, so checking
+         * only the terminal group's width is insufficient for -2^63. */
+        if (magnitude>limit) return 0;
         if (!more) {
             if ((negative && !magnitude) ||
                 (i && !payload && !(previous&0x40u))) return 0;
