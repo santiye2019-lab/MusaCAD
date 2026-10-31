@@ -59,6 +59,18 @@ int musa_dwg1032_object_map_iterator_page(
 int musa_dwg1032_object_map_decode(const uint8_t *bytes, size_t byte_count,
                                    size_t count, uint64_t section_bytes,
                                    MusaDwg1032MapEntry *out, size_t capacity);
+/* Decode a complete verified/decompressed map and derive bounded candidate
+ * object spans in one transactional call. The caller owns both scratch
+ * arrays; no allocation occurs. The output is unchanged if delta decoding
+ * or physical-offset validation fails. Scratch contents are unspecified
+ * after failure. Input must be immutable and disjoint from all writable
+ * buffers, which must also be mutually disjoint. These are candidate
+ * ranges, NOT authenticated object lengths or decoded DWG records. */
+int musa_dwg1032_object_map_decode_locations(
+    const uint8_t *bytes, size_t byte_count, size_t count,
+    uint64_t section_bytes, MusaDwg1032ObjectLocation *out,
+    size_t capacity, MusaDwg1032MapEntry *scratch,
+    size_t scratch_capacity, size_t *order, size_t order_capacity);
 /* Given caller-verified map entries in strictly increasing handle order,
  * compute a bounded CANDIDATE region for each object: from its map offset
  * to the next higher offset (or section end). The region may contain padding,
