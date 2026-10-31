@@ -53,6 +53,31 @@ static void signed_cases(void) {
         assert(v==42 && c.bit_position==0);
     }
 }
+/* The 10-byte signed MC terminal group can encode exactly -2^63.
+ * Positive 2^63 and negative magnitudes beyond 2^63 must be rejected. */
+static void signed_64bit_boundaries(void) {
+    const uint8_t negative_min[]={
+        0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x41
+    };
+    const uint8_t positive_overflow[]={
+        0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x01
+    };
+    const uint8_t negative_overflow[]={
+        0x81,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x41
+    };
+    MusaDwg1032Cursor c;
+    int64_t value=123;
+    assert(musa_dwg1032_cursor_init(&c,negative_min,sizeof(negative_min)));
+    assert(musa_dwg1032_modular_signed(&c,&value));
+    assert(value==INT64_MIN && c.bit_position==80u);
+    const uint8_t *bad[]={positive_overflow,negative_overflow};
+    for (size_t i=0;i<2u;++i) {
+        assert(musa_dwg1032_cursor_init(&c,bad[i],10u));
+        value=123;
+        assert(!musa_dwg1032_modular_signed(&c,&value));
+        assert(value==123 && c.bit_position==0u);
+    }
+}
 static void short_cases(void) {
     const uint8_t bytes[]={0,0,0xff,0x7f,0x00,0x80,0x01,0,
                            0xff,0xff,0xff,0x7f};
@@ -74,7 +99,7 @@ static void short_cases(void) {
     }
 }
 int main(void) {
-    unsigned_cases();signed_cases();short_cases();
+    unsigned_cases();signed_cases();signed_64bit_boundaries();short_cases();
     const uint8_t data[]={0x01,0x00,0x00,0x00};
     MusaDwg1032Cursor c;
     uint64_t u=7;
