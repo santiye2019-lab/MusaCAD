@@ -55,6 +55,26 @@ int musa_dwg1032_layer_color_apply_insert(
     const MusaDwg1032ResolvedColor *definition_colors, size_t count,
     const MusaDwg1032ResolvedColor *insert_color,
     MusaDwg1032ResolvedColor *resolved);
+/* Apply an INSERT's verified layer context to children from a block definition.
+ * A ByLayer child on the definition's layer 0 inherits the actual INSERT
+ * instance layer color, not the layer-0 color stored in the definition.
+ * ByBlock children inherit the INSERT entity color. Explicit colors retain
+ * their definition color; nonzero-layer ByLayer colors are unchanged.
+ * source_colors and source_layer_handles are original, already decoded data;
+ * definition_colors must agree with explicit/ByBlock source provenance.
+ * insert_layer_color must be an explicitly resolved color for this specific
+ * INSERT instance (including any enclosing layer-0 context). This function
+ * does not decode DWG records, locate layer 0, or resolve nested INSERTs.
+ * Every input and output range must be disjoint. On any failure the entire
+ * output is unchanged. O(count), no allocation. */
+int musa_dwg1032_layer_color_apply_insert_context(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles, size_t count,
+    uint64_t layer_zero_handle,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    MusaDwg1032ResolvedColor *resolved);
 #ifdef __cplusplus
 }
 #endif
