@@ -215,7 +215,70 @@ static void reject_stale_rgb_across_color_stages(void) {
     assert(memcmp(&rendered,&saved,sizeof(rendered))==0);
 }
 
+/* Layer 0 is inherited from each INSERT instance, never from the shared
+ * block definition. This is synthetic post-decode evidence only. */
+static void per_insert_layer_zero_context(void) {
+    const uint64_t zero_layer=100;
+    uint64_t child_layers[6]={100,200,100,100,100,100};
+    MusaDwg1032CadColor raw[6]={
+        {256,0,0},{256,0,0},{0,0,0},{4,0,0},
+        {256,1,0xabcdef},{256,0,0}
+    };
+    MusaDwg1032ResolvedColor definition[6]={
+        {{7,0,0},0},{{3,0,0},0},{{0,0,0},1},
+        {{4,0,0},0},{{256,1,0xabcdef},0},{{7,0,0},0}
+    };
+    const MusaDwg1032ResolvedColor red={{1,0,0},0};
+    const MusaDwg1032ResolvedColor blue={{5,0,0},0};
+    const MusaDwg1032ResolvedColor green={{3,0,0},0};
+    const MusaDwg1032ResolvedColor rgb={{256,1,0x112233},0};
+    const MusaDwg1032ResolvedColor nested={{0,0,0},1};
+    MusaDwg1032ResolvedColor a[6],b[6],saved[6];
+    assert(musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&blue,a));
+    assert(musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&green,&rgb,b));
+    assert(a[0].color.aci==5 && b[0].color.truecolor_rgb==0x112233);
+    assert(a[1].color.aci==3 && b[1].color.aci==3);
+    assert(a[2].color.aci==1 && b[2].color.aci==3);
+    assert(a[3].color.aci==4 && b[3].color.aci==4);
+    assert(a[4].color.truecolor_rgb==0xabcdef &&
+           b[4].color.truecolor_rgb==0xabcdef);
+    assert(a[5].color.aci==5 && b[5].color.truecolor_rgb==0x112233);
+    assert(musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&nested,&blue,a));
+    assert(a[2].byblock && a[0].color.aci==5);
+    memcpy(saved,b,sizeof(saved));
+    raw[5].truecolor_rgb=0x123456; /* Late malformed input. */
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&blue,b));
+    assert(memcmp(saved,b,sizeof(b))==0);
+    raw[5].truecolor_rgb=0;
+    child_layers[5]=0;
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&blue,b));
+    assert(memcmp(saved,b,sizeof(b))==0);
+    child_layers[5]=100;
+    definition[3].color.aci=9; /* Explicit source/definition mismatch. */
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&blue,b));
+    definition[3].color.aci=4;
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&nested,b));
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,0,&red,&blue,b));
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&blue,definition));
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,6,zero_layer,&red,&blue,
+        (MusaDwg1032ResolvedColor *)(void *)raw));
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,child_layers,SIZE_MAX,zero_layer,&red,&blue,b));
+    assert(memcmp(saved,b,sizeof(b))==0);
+}
+
 int main(void) {
+    per_insert_layer_zero_context();
     reject_stale_rgb_across_color_stages();
     inheritance_and_fail_closed();
     large_layer_table_and_rollback();
