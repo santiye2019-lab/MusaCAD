@@ -131,6 +131,36 @@ int musa_dwg1032_record_batch_extract_page(
     return 1;
 }
 
+/* Random-access viewport lookup in an immutable, span-validated map.
+ * The handle index remains in logical order; no full-map re-sort is needed.
+ * The caller owns the lifetime and validation of the decoded section. */
+int musa_dwg1032_record_batch_extract_handle(
+    const MusaDwg1032ObjectIndex *index,
+    const MusaDwg1032Cursor *section, uint64_t handle,
+    size_t max_payload_bytes, MusaDwg1032ObjectLocation *payload) {
+    if (!index || !section || !payload || !handle || !max_payload_bytes ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        section->byte_count>SIZE_MAX/8u ||
+        index->section_bytes!=(uint64_t)section->byte_count ||
+        section->bit_position!=0u ||
+        (index->count && !index->entries) ||
+        (section->byte_count && !section->bytes) ||
+        overlaps(payload,sizeof(*payload),index,sizeof(*index)) ||
+        overlaps(payload,sizeof(*payload),section,sizeof(*section)) ||
+        overlaps(payload,sizeof(*payload),index->entries,
+                 index->count*sizeof(*index->entries)) ||
+        overlaps(payload,sizeof(*payload),section->bytes,section->byte_count))
+        return 0;
+    size_t position=0;
+    if (!musa_dwg1032_object_index_find(index,handle,&position))
+        return 0;
+    MusaDwg1032ObjectLocation result;
+    if (!extract_one(index,section,position,max_payload_bytes,&result))
+        return 0;
+    *payload=result;
+    return 1;
+}
+
 /* Integrate already-verified, decompressed map and object section buffers.
  * Scratch is caller-owned; the payload result is published only after every
  * candidate frame has passed the bounded, transactional batch preflight.
