@@ -40,6 +40,21 @@ int musa_dwg1032_layer_color_select(
     const MusaDwg1032CadColor *entity_colors,
     const MusaDwg1032LayerColor *layers, size_t layer_count,
     MusaDwg1032ResolvedColor *resolved);
+/* Apply a caller-verified INSERT instance color to colors already resolved
+ * from a block definition. Explicit definition colors remain unchanged;
+ * ByBlock entries inherit the instance color. A ByBlock instance color
+ * remains unresolved for an enclosing INSERT (nested block context).
+ * The caller MUST resolve each INSERT instance independently: never cache
+ * these results against the shared block definition handle alone.
+ * This post-decode operation does not handle layer-0 inheritance, visibility,
+ * transparency, entity parsing, or DWG record decoding.
+ * Only explicit ACI/truecolor or canonical unresolved ByBlock colors are
+ * accepted. Output must not overlap either input. On failure the complete
+ * output array is unchanged. O(count), no allocation. */
+int musa_dwg1032_layer_color_apply_insert(
+    const MusaDwg1032ResolvedColor *definition_colors, size_t count,
+    const MusaDwg1032ResolvedColor *insert_color,
+    MusaDwg1032ResolvedColor *resolved);
 #ifdef __cplusplus
 }
 #endif
