@@ -25,6 +25,8 @@ int musa_dwg1032_object_map_iterator_init(
 int musa_dwg1032_object_map_iterator_next(
     MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *entry) {
     if (!iterator || !entry ||
+        iterator->cursor.byte_count>PTRDIFF_MAX/8u ||
+        (iterator->cursor.byte_count && !iterator->cursor.bytes) ||
         overlaps(iterator,sizeof(*iterator),entry,sizeof(*entry)) ||
         overlaps(iterator->cursor.bytes,iterator->cursor.byte_count,
                  entry,sizeof(*entry))) return 0;
