@@ -182,3 +182,29 @@ int musa_dwg1032_object_map_candidate_spans(
     }
     return 1;
 }
+
+/* Complete delta-map to candidate-span bridge; no partial publication. */
+int musa_dwg1032_object_map_decode_locations(
+    const uint8_t *bytes, size_t byte_count, size_t count,
+    uint64_t section_bytes, MusaDwg1032ObjectLocation *out,
+    size_t capacity, MusaDwg1032MapEntry *scratch,
+    size_t scratch_capacity, size_t *order, size_t order_capacity) {
+    if (count>capacity || count>scratch_capacity ||
+        count>order_capacity ||
+        count>SIZE_MAX/sizeof(*out) ||
+        count>SIZE_MAX/sizeof(*scratch) ||
+        count>SIZE_MAX/sizeof(*order) ||
+        (count && (!out || !scratch || !order)) ||
+        overlaps(bytes,byte_count,out,count*sizeof(*out)) ||
+        overlaps(bytes,byte_count,scratch,count*sizeof(*scratch)) ||
+        overlaps(bytes,byte_count,order,count*sizeof(*order)) ||
+        overlaps(out,count*sizeof(*out),scratch,count*sizeof(*scratch)) ||
+        overlaps(out,count*sizeof(*out),order,count*sizeof(*order)) ||
+        overlaps(scratch,count*sizeof(*scratch),order,count*sizeof(*order)))
+        return 0;
+    if (!musa_dwg1032_object_map_decode(
+            bytes,byte_count,count,section_bytes,scratch,scratch_capacity))
+        return 0;
+    return musa_dwg1032_object_map_candidate_spans(
+        scratch,count,section_bytes,out,capacity,order,order_capacity);
+}
