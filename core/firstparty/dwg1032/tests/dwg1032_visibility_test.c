@@ -224,7 +224,64 @@ static void insert_instance_layer_zero(void) {
         NULL,NULL,NULL,0u,100u,1u,NULL));
 }
 
+
+/* Large synthetic definition: instance visibility is O(n), and a malformed
+ * last record cannot leak a partially resolved scene to the renderer. */
+static void insert_instance_large_atomic(void) {
+    enum { N=20000 };
+    static uint64_t layers[N];
+    static uint8_t owner[N],layer_on[N],out[N],saved[N];
+    for (size_t i=0;i<N;++i) {
+        layers[i]=i%3u==0u ? 100u : 200u;
+        owner[i]=(uint8_t)(i%7u!=0u);
+        layer_on[i]=(uint8_t)(i%5u!=0u);
+        out[i]=9u;
+    }
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owner,layer_on,N,100u,1u,out));
+    for (size_t i=0;i<N;++i) {
+        const uint8_t expected=(uint8_t)(
+            owner[i] && (layers[i]==100u || layer_on[i]));
+        assert(out[i]==expected);
+    }
+    memcpy(saved,out,sizeof(out));
+    layer_on[N-1u]=2u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owner,layer_on,N,100u,1u,out));
+    assert(memcmp(saved,out,sizeof(out))==0);
+    layer_on[N-1u]=1u;
+    layers[N-1u]=0u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owner,layer_on,N,100u,1u,out));
+    assert(memcmp(saved,out,sizeof(out))==0);
+}
+
+/* A nested INSERT receives its actual enclosing instance visibility;
+ * a hidden outer instance cannot reveal a layer-zero inner child. */
+static void nested_insert_instance_visibility(void) {
+    const uint64_t outer_layers[]={100u,200u};
+    const uint8_t outer_owner[]={1u,1u};
+    const uint8_t outer_layer_on[]={0u,1u};
+    const uint64_t inner_layers[]={100u,300u};
+    const uint8_t inner_owner[]={1u,1u};
+    const uint8_t inner_layer_on[]={0u,1u};
+    uint8_t outer[2]={9u,9u},inner[2]={9u,9u};
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        outer_layers,outer_owner,outer_layer_on,2u,100u,1u,outer));
+    assert(outer[0]==1u && outer[1]==1u);
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        inner_layers,inner_owner,inner_layer_on,2u,100u,outer[0],inner));
+    assert(inner[0]==1u && inner[1]==1u);
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        outer_layers,outer_owner,outer_layer_on,2u,100u,0u,outer));
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        inner_layers,inner_owner,inner_layer_on,2u,100u,outer[0],inner));
+    assert(inner[0]==0u && inner[1]==0u);
+}
+
 int main(void) {
+    insert_instance_large_atomic();
+    nested_insert_instance_visibility();
     insert_instance_layer_zero();
     forest_and_fail_closed();
     large_inherited_visibility();
