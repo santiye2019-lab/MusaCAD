@@ -112,8 +112,67 @@ static void large_layer_table_and_rollback(void) {
         assert(out[i].byblock==0 &&
                out[i].color.aci==(uint16_t)(i%L%255u+1u));
 }
+static void per_insert_byblock_provenance(void) {
+    MusaDwg1032ResolvedColor definition[4]={
+        {{7,0,0},0},{{0,0,0},1},{{0,0,0},1},
+        {{256,1,0xabcdef},0}
+    };
+    const MusaDwg1032ResolvedColor red={{1,0,0},0};
+    const MusaDwg1032ResolvedColor blue={{5,0,0},0};
+    const MusaDwg1032ResolvedColor nested={{0,0,0},1};
+    MusaDwg1032ResolvedColor a[4],b[4],c[4],saved[4];
+    assert(musa_dwg1032_layer_color_apply_insert(definition,4,&red,a));
+    assert(musa_dwg1032_layer_color_apply_insert(definition,4,&blue,b));
+    assert(a[0].color.aci==7 && b[0].color.aci==7);
+    assert(a[1].color.aci==1 && b[1].color.aci==5);
+    assert(a[2].color.aci==1 && b[2].color.aci==5);
+    assert(a[3].color.has_truecolor && a[3].color.truecolor_rgb==0xabcdef);
+    assert(b[3].color.has_truecolor && b[3].color.truecolor_rgb==0xabcdef);
+    assert(musa_dwg1032_layer_color_apply_insert(definition,4,&nested,c));
+    assert(c[1].byblock && c[2].byblock);
+    assert(musa_dwg1032_layer_color_apply_insert(c,4,&blue,a));
+    assert(a[1].color.aci==5 && a[2].color.aci==5);
+    memcpy(saved,b,sizeof(saved));
+    definition[3].byblock=2;
+    assert(!musa_dwg1032_layer_color_apply_insert(definition,4,&red,b));
+    assert(memcmp(saved,b,sizeof(saved))==0);
+    definition[3].byblock=0;
+    definition[3].color.truecolor_rgb=0x1000000;
+    assert(!musa_dwg1032_layer_color_apply_insert(definition,4,&red,b));
+    assert(memcmp(saved,b,sizeof(saved))==0);
+    definition[3].color.truecolor_rgb=0xabcdef;
+    assert(!musa_dwg1032_layer_color_apply_insert(definition,4,&red,definition));
+    assert(!musa_dwg1032_layer_color_apply_insert(definition,4,&b[0],b));
+    assert(!musa_dwg1032_layer_color_apply_insert(definition,SIZE_MAX,&red,b));
+    assert(memcmp(saved,b,sizeof(saved))==0);
+}
+
+static void large_per_insert_atomicity(void) {
+    enum { N=20000 };
+    static MusaDwg1032ResolvedColor definition[N],out[N];
+    const MusaDwg1032ResolvedColor insert={{256,1,0x123456},0};
+    for (size_t i=0;i<N;++i) {
+        definition[i]=i%2u
+            ? (MusaDwg1032ResolvedColor){{0,0,0},1}
+            : (MusaDwg1032ResolvedColor){{7,0,0},0};
+    }
+    assert(musa_dwg1032_layer_color_apply_insert(definition,N,&insert,out));
+    for (size_t i=0;i<N;++i) {
+        assert(!out[i].byblock);
+        if (i%2u) assert(out[i].color.has_truecolor &&
+                         out[i].color.truecolor_rgb==0x123456);
+        else assert(out[i].color.aci==7 && !out[i].color.has_truecolor);
+    }
+    definition[N-1].color.aci=256; /* Invalid unresolved ByBlock. */
+    assert(!musa_dwg1032_layer_color_apply_insert(definition,N,&insert,out));
+    for (size_t i=0;i<N;++i)
+        if (i%2u) assert(out[i].color.truecolor_rgb==0x123456);
+        else assert(out[i].color.aci==7);
+}
 int main(void) {
     inheritance_and_fail_closed();
     large_layer_table_and_rollback();
+    per_insert_byblock_provenance();
+    large_per_insert_atomicity();
     return 0;
 }
