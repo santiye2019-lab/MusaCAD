@@ -205,6 +205,26 @@ int musa_dwg1032_section_read_window(
     }
     if (!lo) return 0;
     const size_t first=lo-1u;
+    /* Most visible objects occupy one physical page. Validate that page
+     * once and copy directly, avoiding the two full traversal passes used
+     * for multi-page windows. The directory must still be prevalidated. */
+    const MusaDwg1032FilePage first_page=pages[first];
+    if (!first_page.byte_count ||
+        first_page.logical_offset>logical_offset ||
+        logical_offset-first_page.logical_offset>=
+            (uint64_t)first_page.byte_count ||
+        first_page.file_offset>(uint64_t)file_size ||
+        (uint64_t)first_page.byte_count>
+            (uint64_t)file_size-first_page.file_offset)
+        return 0;
+    const size_t first_within=
+        (size_t)(logical_offset-first_page.logical_offset);
+    if (destination_size<=first_page.byte_count-first_within) {
+        memcpy(destination,
+               file_bytes+(size_t)first_page.file_offset+first_within,
+               destination_size);
+        return 1;
+    }
     /* Validate all touched pages before the first destination write.
      * The caller guarantees directory and file immutability between passes. */
     for (unsigned pass=0;pass<2u;++pass) {
