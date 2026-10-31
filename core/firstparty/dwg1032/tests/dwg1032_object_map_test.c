@@ -89,6 +89,9 @@ static void iterator_completion(void) {
     assert(!musa_dwg1032_object_map_iterator_next(&it,&entry));
     assert(it.cursor.bytes==NULL);
     it=saved;
+    it.cursor.bit_position=it.cursor.byte_count*8u+1u;
+    assert(!musa_dwg1032_object_map_iterator_finished(&it,3u));
+    it=saved;
     it.cursor.bit_position=0u;
     assert(!musa_dwg1032_object_map_iterator_finished(&it,3u));
     assert(musa_dwg1032_object_map_iterator_init(&it,NULL,0u,0u));
