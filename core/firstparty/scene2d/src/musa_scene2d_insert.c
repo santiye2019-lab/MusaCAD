@@ -28,6 +28,10 @@ int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
     const double b = s * placement->scale_x;
     const double cc = -s * placement->scale_y;
     const double d = c * placement->scale_y;
+    /* A finite nonzero scale may underflow during rotation. Preserve
+     * singular transforms only when the caller explicitly supplied zero. */
+    if ((placement->scale_x != 0.0 && a == 0.0 && b == 0.0) ||
+        (placement->scale_y != 0.0 && cc == 0.0 && d == 0.0)) return 0;
     /* Fused products avoid a spurious infinity when a large scaled base
      * cancels a large insertion coordinate to a finite translation. This
      * also rounds each multiply-add only once on very large drawings. */
