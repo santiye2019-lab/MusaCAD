@@ -183,7 +183,7 @@ static void reject_stale_rgb_across_color_stages(void) {
     assert(musa_dwg1032_layer_color_select(
         &index,&layer_ref,&entity,&layer,1,&out));
     assert(out.color.aci==7 && !out.byblock);
-    saved=out;
+    memcpy(&saved,&out,sizeof(saved));
     entity.truecolor_rgb=0x112233;
     assert(!musa_dwg1032_layer_color_select(
         &index,&layer_ref,&entity,&layer,1,&out));
@@ -204,7 +204,7 @@ static void reject_stale_rgb_across_color_stages(void) {
     assert(musa_dwg1032_layer_color_apply_insert(
         &out,1,&insert,&rendered));
     assert(!rendered.byblock && rendered.color.aci==2);
-    saved=rendered;
+    memcpy(&saved,&rendered,sizeof(saved));
     MusaDwg1032ResolvedColor stale_insert={{2,0,0x112233},0};
     assert(!musa_dwg1032_layer_color_apply_insert(
         &out,1,&stale_insert,&rendered));
