@@ -70,6 +70,8 @@ int musa_dwg1032_object_map_iterator_page(
     MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *out,
     size_t count, size_t capacity) {
     if (!iterator || count>capacity ||
+        iterator->cursor.byte_count>PTRDIFF_MAX/8u ||
+        (iterator->cursor.byte_count && !iterator->cursor.bytes) ||
         count>SIZE_MAX/sizeof(*out) ||
         (count && !out) ||
         overlaps(iterator,sizeof(*iterator),out,count*sizeof(*out)) ||
