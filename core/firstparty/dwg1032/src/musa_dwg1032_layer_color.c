@@ -121,3 +121,63 @@ int musa_dwg1032_layer_color_apply_insert(
             ? *insert_color : definition_colors[i];
     return 1;
 }
+
+/* Caller-provenanced layer-zero inheritance, scoped to a single INSERT.
+ * The original source color is required because ByLayer provenance is lost
+ * after resolving the definition's color against its own layer table. */
+int musa_dwg1032_layer_color_apply_insert_context(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles, size_t count,
+    uint64_t layer_zero_handle,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    MusaDwg1032ResolvedColor *resolved) {
+    if (!definition_colors || !source_colors || !source_layer_handles ||
+        !insert_color || !insert_layer_color || !resolved || !count ||
+        !layer_zero_handle ||
+        count>SIZE_MAX/sizeof(*definition_colors) ||
+        count>SIZE_MAX/sizeof(*source_colors) ||
+        count>SIZE_MAX/sizeof(*source_layer_handles) ||
+        count>SIZE_MAX/sizeof(*resolved)) return 0;
+    const size_t bytes=count*sizeof(*definition_colors);
+    const size_t color_bytes=count*sizeof(*source_colors);
+    const size_t layer_bytes=count*sizeof(*source_layer_handles);
+    if (overlaps(resolved,bytes,definition_colors,bytes) ||
+        overlaps(resolved,bytes,source_colors,color_bytes) ||
+        overlaps(resolved,bytes,source_layer_handles,layer_bytes) ||
+        overlaps(resolved,bytes,insert_color,sizeof(*insert_color)) ||
+        overlaps(resolved,bytes,insert_layer_color,sizeof(*insert_layer_color)) ||
+        !valid_resolved(insert_color) ||
+        !valid_resolved(insert_layer_color) ||
+        insert_layer_color->byblock) return 0;
+
+    /* Validate every source and its already-resolved definition first.
+     * No partially rendered color array is ever published on failure. */
+    for (size_t i=0;i<count;++i) {
+        const MusaDwg1032CadColor *raw=&source_colors[i];
+        const MusaDwg1032ResolvedColor *def=&definition_colors[i];
+        if (!source_layer_handles[i] || !valid_color(raw) ||
+            !valid_resolved(def)) return 0;
+        if (!raw->has_truecolor && raw->aci==0u) {
+            if (!def->byblock) return 0;
+        } else if (!raw->has_truecolor && raw->aci==256u) {
+            if (def->byblock) return 0;
+        } else {
+            if (def->byblock || def->color.aci!=raw->aci ||
+                def->color.has_truecolor!=raw->has_truecolor ||
+                def->color.truecolor_rgb!=raw->truecolor_rgb) return 0;
+        }
+    }
+    for (size_t i=0;i<count;++i) {
+        const MusaDwg1032CadColor raw=source_colors[i];
+        if (!raw.has_truecolor && raw.aci==0u)
+            resolved[i]=*insert_color;
+        else if (!raw.has_truecolor && raw.aci==256u &&
+                 source_layer_handles[i]==layer_zero_handle)
+            resolved[i]=*insert_layer_color;
+        else
+            resolved[i]=definition_colors[i];
+    }
+    return 1;
+}
