@@ -43,6 +43,7 @@ int musa_dwg1032_record_batch_extract(
         index->count>order_capacity ||
         index->count>SIZE_MAX/sizeof(MusaDwg1032ObjectLocation) ||
         index->count>SIZE_MAX/sizeof(size_t) ||
+        (index->count && !index->entries) ||
         section->byte_count>SIZE_MAX/8u ||
         index->section_bytes!=(uint64_t)section->byte_count ||
         section->bit_position!=0u ||
