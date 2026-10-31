@@ -65,7 +65,7 @@ int musa_dwg1032_layer_color_apply_insert(
  * insert_layer_color must be an explicitly resolved color for this specific
  * INSERT instance (including any enclosing layer-0 context). This function
  * does not decode DWG records, locate layer 0, or resolve nested INSERTs.
- * Every input and output range must be disjoint. On any failure the entire
+ * The output must not overlap any input. On any failure the entire
  * output is unchanged. O(count), no allocation. */
 int musa_dwg1032_layer_color_apply_insert_context(
     const MusaDwg1032ResolvedColor *definition_colors,
