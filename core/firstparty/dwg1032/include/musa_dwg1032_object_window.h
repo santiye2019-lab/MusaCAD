@@ -30,6 +30,25 @@ int musa_dwg1032_object_candidate_read_window(
     uint64_t handle, uint64_t candidate_offset,
     uint8_t *destination, size_t byte_count, uint64_t *candidate_length);
 
+/* Extract a bounded window from an MS-length-prefixed candidate record,
+ * without allocating or assembling the entire verified RAW section.
+ * Reads only the 2- or 4-byte prefix and the requested payload bytes,
+ * including across physical page boundaries. The immutable directory and
+ * index MUST already pass the validations required by candidate_read_window.
+ * max_payload_bytes is a hard limit, independent of the candidate length.
+ * The caller must keep all source data immutable during the operation.
+ * On failure neither destination nor *payload_length is modified.
+ * A zero-byte read at the payload end is permitted. O(log n + touched
+ * pages + byte_count), constant auxiliary memory. The MS envelope is an
+ * assumed candidate format, NOT proof of AC1032 object semantics; this
+ * function does not discover, decompress or authenticate DWG pages. */
+int musa_dwg1032_object_ms_payload_read_window(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    uint64_t handle, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length);
+
 #ifdef __cplusplus
 }
 #endif
