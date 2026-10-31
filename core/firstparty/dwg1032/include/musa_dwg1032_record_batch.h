@@ -33,6 +33,23 @@ int musa_dwg1032_record_batch_extract(
     size_t max_payload_bytes,
     MusaDwg1032ObjectLocation *payloads, size_t capacity,
     size_t *order, size_t order_capacity);
+/* Optional one-pass batch extraction for large verified object sections.
+ * Uses caller-owned scratch to hold exactly one decoded MS payload span per
+ * candidate, then publishes the complete result with one memcpy. Unlike
+ * the allocation-free two-pass API, each record envelope is parsed once.
+ * Input index, section, order, scratch and output must be mutually disjoint
+ * wherever a writable buffer is involved. The index and section are
+ * immutable; scratch and order may change on failure, while payloads does
+ * not. Capacities count object records. This only validates assumed MS
+ * envelopes inside previously verified/decompressed bytes: it does NOT
+ * authenticate real AC1032 objects, sections or compression. */
+int musa_dwg1032_record_batch_extract_scratch(
+    const MusaDwg1032ObjectIndex *candidates,
+    const MusaDwg1032Cursor *section,
+    size_t max_payload_bytes,
+    MusaDwg1032ObjectLocation *payloads, size_t capacity,
+    MusaDwg1032ObjectLocation *scratch, size_t scratch_capacity,
+    size_t *order, size_t order_capacity);
 /* Extract only the requested page of ALREADY VALIDATED candidate spans.
  * Before the first call, the caller MUST successfully validate the entire
  * immutable index with musa_dwg1032_object_spans_prepare. This fast path
