@@ -68,6 +68,25 @@ int musa_dwg1032_owner_graph_layer_visibility(
     const MusaDwg1032LayerState *layers, size_t layer_count,
     MusaDwg1032OwnerWork *work, size_t work_count,
     uint8_t *local_work, uint8_t *effective_visible);
+
+/* Resolve visibility for DIRECT children of one concrete INSERT instance.
+ * definition_owner_visible contains owner/local visibility only, obtained
+ * without applying layer states. definition_layer_visible contains each
+ * child's decoded layer on/thawed state; the definition's layer-0 state is
+ * intentionally ignored, because layer-0 children inherit the actual
+ * INSERT instance's visibility. insert_visible must already include the
+ * INSERT's own layer, ancestors, and any enclosing instance context.
+ * Call separately for every INSERT instance; do not cache by definition.
+ * Nested INSERTs must be processed in their own instance context.
+ * Inputs are post-decoded, caller-verified data, not DWG bytes.
+ * Strict Boolean flags; all buffers disjoint. No heap, O(count).
+ * On any error the complete output remains unchanged. */
+int musa_dwg1032_owner_graph_apply_insert_context(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    const uint8_t *definition_layer_visible,
+    size_t count, uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *effective_visible);
 #ifdef __cplusplus
 }
 #endif

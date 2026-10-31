@@ -195,7 +195,37 @@ static void large_layer_owner_chain(void) {
         assert(visible[i]==(uint8_t)(i<N/2));
 }
 
+
+/* Two INSERT instances of the same definition must not share layer-0
+ * visibility; layer 0 in the definition can be off while the instance is on. */
+static void insert_instance_layer_zero(void) {
+    const uint64_t layers[]={100u,200u,300u,100u,200u};
+    const uint8_t owners[]={1u,1u,1u,0u,1u};
+    const uint8_t layer_on[]={0u,1u,0u,1u,1u};
+    uint8_t a[5]={9u,9u,9u,9u,9u};
+    uint8_t b[5]={9u,9u,9u,9u,9u};
+    const uint8_t expected[]={1u,1u,0u,0u,1u};
+    const uint8_t hidden[]={0u,0u,0u,0u,0u};
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owners,layer_on,5u,100u,1u,a));
+    assert(memcmp(a,expected,sizeof(a))==0);
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owners,layer_on,5u,100u,0u,b));
+    assert(memcmp(b,hidden,sizeof(b))==0);
+    assert(memcmp(a,expected,sizeof(a))==0);
+    assert(!musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owners,layer_on,5u,100u,2u,b));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owners,layer_on,5u,0u,1u,b));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owners,layer_on,5u,100u,1u,(uint8_t *)(void *)layers));
+    assert(memcmp(b,hidden,sizeof(b))==0);
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        NULL,NULL,NULL,0u,100u,1u,NULL));
+}
+
 int main(void) {
+    insert_instance_layer_zero();
     forest_and_fail_closed();
     large_inherited_visibility();
     layer_and_owner_visibility();

@@ -209,3 +209,34 @@ int musa_dwg1032_owner_graph_layer_visibility(
     return musa_dwg1032_owner_graph_visibility(
         index,owner_handles,local_work,work,work_count,effective_visible);
 }
+
+/* Per-instance layer-zero inheritance, without changing block definitions.
+ * The caller supplies owner-only flags to avoid incorrectly retaining a
+ * definition-time layer-0 suppression after insertion on another layer. */
+int musa_dwg1032_owner_graph_apply_insert_context(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    const uint8_t *definition_layer_visible,
+    size_t count, uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *effective_visible) {
+    if (!layer_zero_handle || insert_visible>1u ||
+        count>SIZE_MAX/sizeof(*source_layer_handles) ||
+        (count && (!source_layer_handles || !definition_owner_visible ||
+                   !definition_layer_visible || !effective_visible)))
+        return 0;
+    if (overlaps(effective_visible,count,source_layer_handles,
+                 count*sizeof(*source_layer_handles)) ||
+        overlaps(effective_visible,count,definition_owner_visible,count) ||
+        overlaps(effective_visible,count,definition_layer_visible,count))
+        return 0;
+    /* Validate the entire instance before publishing a single flag. */
+    for (size_t i=0;i<count;++i)
+        if (!source_layer_handles[i] || definition_owner_visible[i]>1u ||
+            definition_layer_visible[i]>1u) return 0;
+    for (size_t i=0;i<count;++i)
+        effective_visible[i]=(uint8_t)(
+            insert_visible && definition_owner_visible[i] &&
+            (source_layer_handles[i]==layer_zero_handle ||
+             definition_layer_visible[i]));
+    return 1;
+}
