@@ -34,6 +34,18 @@ int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
 int musa_scene2d_insert_affine_batch(
     const MusaScene2dInsertPlacement *placements, size_t count,
     double (*out)[6], size_t capacity);
+/* Convert independent INSERT placements once each into caller-owned scratch,
+ * then publish the complete result after all placements validate.
+ * This avoids repeating trigonometry in the transactional two-pass batch
+ * API at the cost of count * 6 doubles of additional caller storage.
+ * capacity and scratch_capacity count transforms (not doubles).
+ * Source, output and scratch must be pairwise disjoint. On failure out
+ * remains unchanged; scratch contents are unspecified. No allocation.
+ * An empty batch accepts NULL arrays. Not a DWG entity decoder. */
+int musa_scene2d_insert_affine_batch_scratch(
+    const MusaScene2dInsertPlacement *placements, size_t count,
+    double (*out)[6], size_t capacity,
+    double (*scratch)[6], size_t scratch_capacity);
 /* Read only the requested page of arbitrary decoded INSERT placements.
  * start >= count returns an empty page; capacity is in transforms.
  * An empty page permits NULL out. The input array must remain immutable.
