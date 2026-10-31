@@ -106,6 +106,12 @@ static void three_candidates(void) {
         &index,&section,1,out,3,(size_t *)(void *)bytes,3));
     assert(!musa_dwg1032_record_batch_extract(
         &index,&section,1,out,3,(size_t *)(void *)out,3));
+    /* Sorting scratch must never overwrite immutable index descriptors
+     * or indexed object locations, even when output is disjoint. */
+    assert(!musa_dwg1032_record_batch_extract(
+        &index,&section,1,out,3,(size_t *)(void *)&index,3));
+    assert(!musa_dwg1032_record_batch_extract(
+        &index,&section,1,out,3,(size_t *)(void *)spans,3));
     assert(memcmp(saved,out,sizeof(out))==0);
     MusaDwg1032ObjectLocation bad[3]={spans[0],spans[1],spans[2]};
     bad[2].offset=spans[1].offset; /* Intersecting physical candidates. */
