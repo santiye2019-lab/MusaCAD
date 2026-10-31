@@ -49,6 +49,29 @@ int musa_dwg1032_object_ms_payload_read_window(
     uint64_t handle, uint64_t payload_offset, size_t max_payload_bytes,
     uint8_t *destination, size_t byte_count, uint64_t *payload_length);
 
+
+/* Fast path for a caller iterating an already validated, immutable handle
+ * index in its stored order. position is an index entry ordinal, NOT a DWG
+ * object byte offset. Skips the O(log object_count) handle search while
+ * retaining the same page, candidate, alias and rollback checks.
+ * Invalid positions fail without changing either output. */
+int musa_dwg1032_object_candidate_read_window_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    size_t position, uint64_t candidate_offset,
+    uint8_t *destination, size_t byte_count, uint64_t *candidate_length);
+
+/* Same ordinal fast path for a caller-verified MS-prefixed candidate.
+ * The prefix is still decoded and bounded on every call. The index and
+ * directory must remain immutable; no DWG authenticity is inferred. */
+int musa_dwg1032_object_ms_payload_read_window_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    size_t position, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length);
+
 #ifdef __cplusplus
 }
 #endif
