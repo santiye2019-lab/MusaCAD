@@ -439,4 +439,64 @@ static void scratch_batch_large_pafta(void) {
         &empty,&zero,0u,NULL,0u,NULL,0u,NULL,0u));
     free(order);free(reference);free(scratch);free(out);free(entries);free(bytes);
 }
-int main(void) {three_candidates();handle_lookup();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();scratch_batch_large_pafta();return 0;}
+/* Full map-to-payload integration, not merely an isolated frame parser.
+ * 20k synthetic records verify the scratch fast path against the original
+ * two-pass pipeline and check atomic rollback on a late malformed record. */
+static void scratch_verified_map_large_pafta(void) {
+    enum { N=20000, STRIDE=4 };
+    uint8_t *map=malloc(2u*N), *bytes=malloc(STRIDE*N);
+    MusaDwg1032MapEntry *entries=malloc(N*sizeof(*entries));
+    MusaDwg1032ObjectLocation *candidates=malloc(N*sizeof(*candidates));
+    MusaDwg1032ObjectLocation *out=malloc(N*sizeof(*out));
+    MusaDwg1032ObjectLocation *reference=malloc(N*sizeof(*reference));
+    MusaDwg1032ObjectLocation *scratch=malloc(N*sizeof(*scratch));
+    size_t *order=malloc(N*sizeof(*order));
+    assert(map && bytes && entries && candidates && out &&
+           reference && scratch && order);
+    for (size_t i=0;i<N;++i) {
+        map[2u*i]=1u;
+        map[2u*i+1u]=(uint8_t)(i ? STRIDE : 0u);
+        bytes[STRIDE*i]=1u;
+        bytes[STRIDE*i+1u]=0u;
+        bytes[STRIDE*i+2u]=(uint8_t)(i&0xffu);
+        bytes[STRIDE*i+3u]=0xeeu;
+    }
+    const MusaDwg1032Cursor section={bytes,STRIDE*N,0u};
+    assert(musa_dwg1032_record_batch_from_verified_map(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        reference,N,order,N));
+    assert(musa_dwg1032_record_batch_from_verified_map_scratch(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        out,N,scratch,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    for (size_t i=0;i<N;++i)
+        assert(out[i].handle==i+1u &&
+               out[i].offset==STRIDE*i+2u && out[i].length==1u);
+    /* The last record must fail without publishing any earlier results. */
+    bytes[STRIDE*(N-1u)]=0u;
+    assert(!musa_dwg1032_record_batch_from_verified_map_scratch(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        out,N,scratch,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    bytes[STRIDE*(N-1u)]=1u;
+    assert(!musa_dwg1032_record_batch_from_verified_map_scratch(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        out,N,scratch,N-1u,order,N));
+    assert(!musa_dwg1032_record_batch_from_verified_map_scratch(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        out,N,out,N,order,N));
+    assert(!musa_dwg1032_record_batch_from_verified_map_scratch(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        out,N,candidates,N,order,N));
+    assert(!musa_dwg1032_record_batch_from_verified_map_scratch(
+        map,2u*N,N,&section,1u,entries,N,candidates,N,
+        out,N,(MusaDwg1032ObjectLocation *)(void *)bytes,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    const MusaDwg1032Cursor empty={NULL,0u,0u};
+    assert(musa_dwg1032_record_batch_from_verified_map_scratch(
+        NULL,0u,0u,&empty,0u,NULL,0u,NULL,0u,
+        NULL,0u,NULL,0u,NULL,0u));
+    free(order);free(scratch);free(reference);free(out);
+    free(candidates);free(entries);free(bytes);free(map);
+}
+int main(void) {three_candidates();handle_lookup();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();scratch_batch_large_pafta();scratch_verified_map_large_pafta();return 0;}
