@@ -137,6 +137,22 @@ static void tiny_insert_axes(void) {
     assert(!musa_scene2d_insert_affine(&p,a));
     assert(memcmp(saved,a,sizeof(a))==0);
 }
+/* The same subnormal placement must be consistent in batch and
+ * paged conversion, including an intentional zero-width block axis. */
+static void tiny_insert_batch_page(void) {
+    MusaScene2dInsertPlacement p[2]={
+        {1,2,0,0,1e-300,1e-300,0},
+        {3,4,0,0,0,1e-300,0}
+    };
+    double bulk[2][6],page[2][6];
+    size_t written=99,total=99;
+    assert(musa_scene2d_insert_affine_batch(p,2,bulk,2));
+    assert(musa_scene2d_insert_affine_page(
+        p,2,0,page,2,&written,&total));
+    assert(written==2 && total==2);
+    assert(memcmp(bulk,page,sizeof(bulk))==0);
+    assert(bulk[0][0]==1e-300 && bulk[1][0]==0.0);
+}
 static void rollback(void) {
     MusaScene2dInsertPlacement p={1,2,3,4,5,6,0};
     double out[6]={11,12,13,14,15,16},saved[6];
@@ -251,4 +267,4 @@ static void paged_placements(void) {
     assert(written==0u && total==0u);
     free(placements);
 }
-int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();tiny_insert_axes();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
+int main(void) {basic();mirrored_rotated_insert();page_overflow_rollback();tiny_insert_axes();tiny_insert_batch_page();hierarchy();extreme_finite_translations();extreme_rotated_base_cancellation();rollback();many();bulk_placements();paged_placements();return 0;}
