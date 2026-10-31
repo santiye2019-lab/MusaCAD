@@ -277,7 +277,41 @@ static void per_insert_layer_zero_context(void) {
     assert(memcmp(saved,b,sizeof(b))==0);
 }
 
+/* Large synthetic block definition: O(n) context selection, no allocation,
+ * and no partial writes when the final child's provenance is corrupt. */
+static void large_layer_zero_instance_atomicity(void) {
+    enum { N=20000 };
+    static MusaDwg1032ResolvedColor definition[N],out[N];
+    static MusaDwg1032CadColor raw[N];
+    static uint64_t layers[N];
+    const MusaDwg1032ResolvedColor insert={{1,0,0},0};
+    const MusaDwg1032ResolvedColor insert_layer={{5,0,0},0};
+    for (size_t i=0;i<N;++i) {
+        layers[i]=i%2u ? 200u : 100u;
+        raw[i]=(MusaDwg1032CadColor){256,0,0};
+        definition[i]=i%2u
+            ? (MusaDwg1032ResolvedColor){{7,0,0},0}
+            : (MusaDwg1032ResolvedColor){{3,0,0},0};
+    }
+    raw[N-2]=(MusaDwg1032CadColor){0,0,0};
+    definition[N-2]=(MusaDwg1032ResolvedColor){{0,0,0},1};
+    assert(musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,layers,N,100,&insert,&insert_layer,out));
+    for (size_t i=0;i<N;++i) {
+        const uint16_t expected=i==N-2 ? 1u : (i%2u ? 7u : 5u);
+        assert(!out[i].byblock && out[i].color.aci==expected);
+    }
+    layers[N-1]=0; /* Last-record corruption must not publish a prefix. */
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        definition,raw,layers,N,100,&insert,&insert_layer,out));
+    for (size_t i=0;i<N;++i) {
+        const uint16_t expected=i==N-2 ? 1u : (i%2u ? 7u : 5u);
+        assert(!out[i].byblock && out[i].color.aci==expected);
+    }
+}
+
 int main(void) {
+    large_layer_zero_instance_atomicity();
     per_insert_layer_zero_context();
     reject_stale_rgb_across_color_stages();
     inheritance_and_fail_closed();
