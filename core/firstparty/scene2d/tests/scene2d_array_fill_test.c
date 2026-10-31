@@ -25,6 +25,38 @@ int main(void) {
             assert(out[i]==1 && out[i+1]==0 &&
                    out[i+2]==0 && out[i+3]==1);
         }
+    /* Compare all 20,000 transforms with the allocation-free reference. */
+    const size_t bytes=count*6u*sizeof(*out);
+    double *scratch=malloc(bytes);
+    double *fast=malloc(bytes);
+    assert(scratch && fast);
+    memset(fast,0xA5,bytes);
+    size_t fast_written=11u;
+    assert(musa_scene2d_array_fill_scratch(
+        &array,fast,count,scratch,count,&fast_written));
+    assert(fast_written==count && memcmp(fast,out,bytes)==0);
+    /* A late invalid cell may alter scratch but must not publish out. */
+    array.column_spacing=1e308;
+    fast_written=13u;
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count,scratch,count,&fast_written));
+    assert(fast_written==13u && memcmp(fast,out,bytes)==0);
+    array.column_spacing=2;
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count-1u,scratch,count,&fast_written));
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count,scratch,count-1u,&fast_written));
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count,fast,count,&fast_written));
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count,scratch,count,(size_t *)(void *)fast));
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count,scratch,count,(size_t *)(void *)scratch));
+    assert(!musa_scene2d_array_fill_scratch(
+        &array,fast,count,(double *)(void *)&array,count,&fast_written));
+    assert(fast_written==13u && memcmp(fast,out,bytes)==0);
+    free(fast);
+    free(scratch);
     const double first=out[4],last=out[6u*(count-1u)+5u];
     written=123;
     assert(!musa_scene2d_array_fill(&array,out,count-1u,&written));
