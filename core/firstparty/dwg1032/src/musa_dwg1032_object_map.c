@@ -37,7 +37,9 @@ int musa_dwg1032_object_map_iterator_next(
         !musa_dwg1032_modular_signed(&trial.cursor,&delta)) return 0;
     trial.handle+=step;
     if (delta<0) {
-        const uint64_t back=(uint64_t)(-delta);
+        /* Unsigned subtraction is defined even for INT64_MIN; negating
+         * that signed value would overflow and corrupt the map walk. */
+        const uint64_t back=UINT64_C(0)-(uint64_t)delta;
         if (back>trial.offset) return 0;
         trial.offset-=back;
     } else {
