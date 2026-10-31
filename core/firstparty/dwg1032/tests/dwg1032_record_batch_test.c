@@ -381,4 +381,62 @@ static void verified_file_pages_to_records(void) {
         assert(assembled[i]==0xa5u);
 }
 
-int main(void) {three_candidates();handle_lookup();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();return 0;}
+/* 20,000 physically reversed, synthetic MS-framed records. The
+ * scratch fast path must match the two-pass reference byte-for-byte. */
+static void scratch_batch_large_pafta(void) {
+    enum { N=20000, STRIDE=4 };
+    uint8_t *bytes=malloc(N*STRIDE);
+    MusaDwg1032ObjectLocation *entries=malloc(N*sizeof(*entries));
+    MusaDwg1032ObjectLocation *out=malloc(N*sizeof(*out));
+    MusaDwg1032ObjectLocation *scratch=malloc(N*sizeof(*scratch));
+    MusaDwg1032ObjectLocation *reference=malloc(N*sizeof(*reference));
+    size_t *order=malloc(N*sizeof(*order));
+    assert(bytes && entries && out && scratch && reference && order);
+    for (size_t i=0;i<N;++i) {
+        const size_t off=(N-1u-i)*STRIDE;
+        bytes[off]=1u; bytes[off+1u]=0u;
+        bytes[off+2u]=(uint8_t)i; bytes[off+3u]=0x55u;
+        entries[i]=(MusaDwg1032ObjectLocation){i+1u,off,STRIDE};
+    }
+    const MusaDwg1032ObjectIndex index={entries,N,N*STRIDE};
+    const MusaDwg1032Cursor section={bytes,N*STRIDE,0u};
+    assert(musa_dwg1032_record_batch_extract(
+        &index,&section,1u,reference,N,order,N));
+    assert(musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,scratch,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    bytes[0]=0u; /* Last handle is physically first: late failure. */
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,scratch,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    bytes[0]=1u;
+    bytes[(N/2u)*STRIDE]=0u; /* Middle failure also rolls back. */
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,scratch,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    bytes[(N/2u)*STRIDE]=1u;
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N-1u,scratch,N,order,N));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,scratch,N-1u,order,N));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,scratch,N,order,N-1u));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,out,N,order,N));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,entries,N,order,N));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,out,N,scratch,N,(size_t *)(void *)bytes,N));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,1u,(MusaDwg1032ObjectLocation *)(void *)bytes,
+        N,scratch,N,order,N));
+    assert(!musa_dwg1032_record_batch_extract_scratch(
+        &index,&section,0u,out,N,scratch,N,order,N));
+    assert(memcmp(out,reference,N*sizeof(*out))==0);
+    const MusaDwg1032ObjectIndex empty={NULL,0u,0u};
+    const MusaDwg1032Cursor zero={NULL,0u,0u};
+    assert(musa_dwg1032_record_batch_extract_scratch(
+        &empty,&zero,0u,NULL,0u,NULL,0u,NULL,0u));
+    free(order);free(reference);free(scratch);free(out);free(entries);free(bytes);
+}
+int main(void) {three_candidates();handle_lookup();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();scratch_batch_large_pafta();return 0;}
