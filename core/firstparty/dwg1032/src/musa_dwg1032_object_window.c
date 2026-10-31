@@ -2,6 +2,8 @@
  * Independent C11 lazy object-window bridge over verified raw page ranges.
  */
 #include "musa_dwg1032_object_window.h"
+#include "musa_dwg1032_modular.h"
+#include "musa_dwg1032_cursor.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -57,5 +59,69 @@ int musa_dwg1032_object_candidate_read_window(
             entry.offset+candidate_offset,destination,byte_count))
         return 0;
     *candidate_length=entry.length;
+    return 1;
+}
+
+/* A viewport can request a few bytes from an already located candidate
+ * without mapping or assembling the full logical section. The short prefix
+ * is parsed by the existing independent, canonical MS scalar reader. */
+int musa_dwg1032_object_ms_payload_read_window(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *index,
+    uint64_t handle, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length) {
+    if (!index || !payload_length || !max_payload_bytes ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        page_count>SIZE_MAX/sizeof(*pages) ||
+        (index->count && !index->entries) ||
+        (page_count && !pages) ||
+        (byte_count && !destination))
+        return 0;
+    const size_t entries_bytes=index->count*sizeof(*index->entries);
+    const size_t pages_bytes=page_count*sizeof(*pages);
+    if (overlaps(payload_length,sizeof(*payload_length),
+                 destination,byte_count) ||
+        overlaps(payload_length,sizeof(*payload_length),
+                 index,sizeof(*index)) ||
+        overlaps(payload_length,sizeof(*payload_length),
+                 index->entries,entries_bytes) ||
+        overlaps(payload_length,sizeof(*payload_length),
+                 pages,pages_bytes) ||
+        overlaps(payload_length,sizeof(*payload_length),
+                 file_bytes,file_size))
+        return 0;
+
+    uint8_t prefix[4]={0};
+    uint64_t candidate_length=0;
+    if (!musa_dwg1032_object_candidate_read_window(
+            file_bytes,file_size,pages,page_count,index,handle,
+            0u,prefix,2u,&candidate_length))
+        return 0;
+    const size_t prefix_size=(prefix[1]&0x80u)?4u:2u;
+    if (prefix_size==4u &&
+        !musa_dwg1032_object_candidate_read_window(
+            file_bytes,file_size,pages,page_count,index,handle,
+            2u,prefix+2u,2u,&candidate_length))
+        return 0;
+
+    MusaDwg1032Cursor cursor;
+    uint32_t length=0;
+    if (!musa_dwg1032_cursor_init(&cursor,prefix,prefix_size) ||
+        !musa_dwg1032_modular_short(&cursor,&length) ||
+        !length || (size_t)length>max_payload_bytes ||
+        (uint64_t)prefix_size>candidate_length ||
+        (uint64_t)length>candidate_length-(uint64_t)prefix_size ||
+        payload_offset>(uint64_t)length ||
+        (uint64_t)byte_count>(uint64_t)length-payload_offset)
+        return 0;
+
+    uint64_t ignored_length=0;
+    if (!musa_dwg1032_object_candidate_read_window(
+            file_bytes,file_size,pages,page_count,index,handle,
+            (uint64_t)prefix_size+payload_offset,
+            destination,byte_count,&ignored_length))
+        return 0;
+    *payload_length=(uint64_t)length;
     return 1;
 }
