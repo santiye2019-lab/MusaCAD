@@ -43,5 +43,19 @@ int main(void){
     assert(!musa_dwg_ac1032_object_type_bytes(buf,sizeof(buf),7u,4u,
          (MusaDwgAc1032ObjectType*)(void*)(buf+16u)));
     assert(!memcmp(&ot,&saved,sizeof(saved)));
+    /* A valid envelope may still carry an incomplete OT bit field.
+     * In particular, 16-bit mode needs three payload bytes, while
+     * the envelope CRC must cover the exact declared payload size. */
+    prepare(buf,0x8du,0x04u,0x80u);
+    buf[4]=2u; /* payload shortened to two bytes */
+    uint16_t crc=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,buf+4u,5u,&crc));
+    buf[9]=(uint8_t)crc;buf[10]=(uint8_t)(crc>>8u);
+    assert(!musa_dwg_ac1032_object_type_bytes(buf,sizeof(buf),7u,4u,&ot));
+    assert(!memcmp(&ot,&saved,sizeof(saved)));
+    /* The reserved OT selector must fail even with a valid CRC. */
+    prepare(buf,0xc0u,0u,0u);
+    assert(!musa_dwg_ac1032_object_type_bytes(buf,sizeof(buf),7u,4u,&ot));
+    assert(!memcmp(&ot,&saved,sizeof(saved)));
     return 0;
 }

@@ -41,6 +41,23 @@ int main(void){
     assert(!musa_dwg_ac1032_record_envelope_bytes(data,sizeof(data),42u,4u,
       (MusaDwgAc1032RecordEnvelope*)(void*)(data+16u)));
     assert(!memcmp(&out,&saved,sizeof(out)));
+    /* Non-canonical two-byte MC must be rejected even if its CRC is
+     * valid: accepting multiple encodings would weaken record identity. */
+    uint8_t noncanonical[64]={0};
+    noncanonical[4]=3u;noncanonical[5]=0u;
+    noncanonical[6]=0x88u;noncanonical[7]=0u; /* 8 bits, redundant final group */
+    noncanonical[8]=0x51u;noncanonical[9]=0xa1u;noncanonical[10]=0x33u;
+    put_crc(noncanonical+4u,7u);
+    assert(!musa_dwg_ac1032_record_envelope_bytes(
+        noncanonical,sizeof(noncanonical),42u,4u,&out));
+    assert(!memcmp(&out,&saved,sizeof(out)));
+    /* A zero-length handle stream is invalid regardless of CRC. */
+    noncanonical[6]=0u;noncanonical[7]=0x51u;
+    noncanonical[8]=0xa1u;noncanonical[9]=0x33u;
+    put_crc(noncanonical+4u,6u);
+    assert(!musa_dwg_ac1032_record_envelope_bytes(
+        noncanonical,sizeof(noncanonical),42u,4u,&out));
+    assert(!memcmp(&out,&saved,sizeof(out)));
     /* Canonical two-word MS (32769 bytes) proves 15+15 bits, not
      * two generic little-endian uint16 fields. */
     const size_t biglen=32769u;
