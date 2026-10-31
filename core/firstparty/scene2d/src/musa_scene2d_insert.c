@@ -32,6 +32,8 @@ int musa_scene2d_insert_affine(const MusaScene2dInsertPlacement *placement,
      * singular transforms only when the caller explicitly supplied zero. */
     if ((placement->scale_x != 0.0 && a == 0.0 && b == 0.0) ||
         (placement->scale_y != 0.0 && cc == 0.0 && d == 0.0)) return 0;
+    /* Subnormal scale times a unit vector can round to an all-zero axis
+     * only if the intended nonzero axis was lost; reject such data. */
     /* Fused products avoid a spurious infinity when a large scaled base
      * cancels a large insertion coordinate to a finite translation. This
      * also rounds each multiply-add only once on very large drawings. */
