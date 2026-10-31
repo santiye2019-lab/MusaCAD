@@ -13,7 +13,8 @@ static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
 
 static int valid_color(const MusaDwg1032CadColor *c) {
     return c->aci<=256u && c->has_truecolor<=1u &&
-           (!c->has_truecolor || c->truecolor_rgb<=0xffffffu);
+           (c->has_truecolor ? c->truecolor_rgb<=0xffffffu
+                             : c->truecolor_rgb==0u);
 }
 
 static size_t find_layer(const MusaDwg1032LayerColor *layers,
