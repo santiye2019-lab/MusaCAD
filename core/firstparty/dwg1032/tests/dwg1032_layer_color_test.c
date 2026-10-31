@@ -169,7 +169,54 @@ static void large_per_insert_atomicity(void) {
         if (i%2u) assert(out[i].color.truecolor_rgb==0x123456);
         else assert(out[i].color.aci==7);
 }
+/* A stale RGB field must not silently become an explicit ACI result.
+ * It would otherwise pass selection but fail later INSERT validation. */
+static void reject_stale_rgb_across_color_stages(void) {
+    MusaDwg1032ObjectLocation entry={10,0,1};
+    MusaDwg1032ObjectIndex index={0};
+    uint64_t layer_ref=100;
+    MusaDwg1032CadColor entity={256,0,0};
+    MusaDwg1032LayerColor layer={100,{7,0,0}};
+    MusaDwg1032ResolvedColor out={{{0}},0};
+    MusaDwg1032ResolvedColor saved;
+    assert(musa_dwg1032_object_index_init(&index,&entry,1,1));
+    assert(musa_dwg1032_layer_color_select(
+        &index,&layer_ref,&entity,&layer,1,&out));
+    assert(out.color.aci==7 && !out.byblock);
+    saved=out;
+    entity.truecolor_rgb=0x112233;
+    assert(!musa_dwg1032_layer_color_select(
+        &index,&layer_ref,&entity,&layer,1,&out));
+    assert(memcmp(&out,&saved,sizeof(out))==0);
+    entity.truecolor_rgb=0;
+    layer.color.truecolor_rgb=0x445566;
+    assert(!musa_dwg1032_layer_color_select(
+        &index,&layer_ref,&entity,&layer,1,&out));
+    assert(memcmp(&out,&saved,sizeof(out))==0);
+    layer.color.truecolor_rgb=0;
+    entity=(MusaDwg1032CadColor){0,0,0};
+    assert(musa_dwg1032_layer_color_select(
+        &index,&layer_ref,&entity,&layer,1,&out));
+    assert(out.byblock && out.color.aci==0 &&
+           out.color.truecolor_rgb==0);
+    const MusaDwg1032ResolvedColor insert={{2,0,0},0};
+    MusaDwg1032ResolvedColor rendered={{{0}},0};
+    assert(musa_dwg1032_layer_color_apply_insert(
+        &out,1,&insert,&rendered));
+    assert(!rendered.byblock && rendered.color.aci==2);
+    saved=rendered;
+    MusaDwg1032ResolvedColor stale_insert={{2,0,0x112233},0};
+    assert(!musa_dwg1032_layer_color_apply_insert(
+        &out,1,&stale_insert,&rendered));
+    assert(memcmp(&rendered,&saved,sizeof(rendered))==0);
+    MusaDwg1032ResolvedColor stale_definition={{7,0,0x112233},0};
+    assert(!musa_dwg1032_layer_color_apply_insert(
+        &stale_definition,1,&insert,&rendered));
+    assert(memcmp(&rendered,&saved,sizeof(rendered))==0);
+}
+
 int main(void) {
+    reject_stale_rgb_across_color_stages();
     inheritance_and_fail_closed();
     large_layer_table_and_rollback();
     per_insert_byblock_provenance();
