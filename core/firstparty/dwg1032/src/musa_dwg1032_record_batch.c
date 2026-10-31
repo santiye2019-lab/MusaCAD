@@ -57,6 +57,8 @@ int musa_dwg1032_record_batch_extract(
         overlaps(payloads,out_bytes,section,sizeof(*section)) ||
         overlaps(payloads,out_bytes,index->entries,entries_bytes) ||
         overlaps(payloads,out_bytes,section->bytes,section->byte_count) ||
+        /* Sorting scratch is writable: it must never overwrite the
+         * immutable section descriptor or its backing object bytes. */
         overlaps(order,order_bytes,section,sizeof(*section)) ||
         overlaps(order,order_bytes,section->bytes,section->byte_count))
         return 0;
