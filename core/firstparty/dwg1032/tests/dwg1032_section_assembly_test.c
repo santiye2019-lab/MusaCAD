@@ -255,10 +255,90 @@ static void strict_file_page_assembly(void) {
     assert(musa_dwg1032_section_assemble_checked_file_pages(
         NULL,0,NULL,0,NULL,0,NULL,0));
 }
+/* Synthetic, already decompressed pages: no AC1032 authentication. */
+static void bounded_window_reads(void) {
+    const uint8_t physical[]={7,8,9,1,2,3,4,5,6};
+    MusaDwg1032FilePage pages[]={{0,3,3},{3,6,3},{6,0,3}};
+    size_t order[3];
+    uint8_t out[9];
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        pages,3,sizeof(physical),9,order,3));
+    memset(out,0xAA,sizeof(out));
+    assert(musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,2,out,5));
+    const uint8_t expected[]={3,4,5,6,7};
+    assert(memcmp(out,expected,sizeof(expected))==0);
+    for (size_t i=5;i<sizeof(out);++i) assert(out[i]==0xAA);
+    assert(musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,6,out,3));
+    assert(out[0]==7 && out[1]==8 && out[2]==9);
+    assert(musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,9,NULL,0));
+    memset(out,0xAA,sizeof(out));
+    assert(!musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,8,out,2));
+    assert(!musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,0,
+        (uint8_t *)(void *)physical,3));
+    assert(!musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,0,
+        (uint8_t *)(void *)pages,3));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xAA);
+    pages[2].file_offset=8; /* Late page is physically truncated. */
+    assert(!musa_dwg1032_file_pages_validate_window_directory(
+        pages,3,sizeof(physical),9,order,3));
+    assert(!musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,2,out,5));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xAA);
+    pages[2].file_offset=0;
+    pages[2].logical_offset=7; /* Missing logical byte. */
+    assert(!musa_dwg1032_file_pages_validate_window_directory(
+        pages,3,sizeof(physical),9,order,3));
+    pages[2].logical_offset=6;
+    pages[2].file_offset=6; /* Duplicate physical range. */
+    assert(!musa_dwg1032_file_pages_validate_window_directory(
+        pages,3,sizeof(physical),9,order,3));
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        NULL,0,0,0,NULL,0));
+    assert(musa_dwg1032_section_read_window(
+        NULL,0,NULL,0,0,0,NULL,0));
+    assert(!musa_dwg1032_section_read_window(
+        NULL,0,NULL,0,1,0,NULL,0));
+}
+static void bounded_window_large_pafta(void) {
+    enum { COUNT=20000, WINDOW=257 };
+    uint8_t *file=malloc(COUNT), *out=malloc(WINDOW);
+    MusaDwg1032FilePage *pages=malloc(COUNT*sizeof(*pages));
+    size_t *order=malloc(COUNT*sizeof(*order));
+    assert(file && out && pages && order);
+    for (size_t i=0;i<COUNT;++i) {
+        file[i]=(uint8_t)(i*37u);
+        pages[i]=(MusaDwg1032FilePage){
+            (uint64_t)i,(uint64_t)(COUNT-1u-i),1u};
+    }
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        pages,COUNT,COUNT,COUNT,order,COUNT));
+    for (size_t start=0;start<COUNT;start+=WINDOW) {
+        const size_t count=COUNT-start<WINDOW?COUNT-start:WINDOW;
+        memset(out,0xAA,WINDOW);
+        assert(musa_dwg1032_section_read_window(
+            file,COUNT,pages,COUNT,COUNT,start,out,count));
+        for (size_t j=0;j<count;++j)
+            assert(out[j]==file[COUNT-1u-(start+j)]);
+        for (size_t j=count;j<WINDOW;++j) assert(out[j]==0xAA);
+    }
+    memset(out,0xAA,WINDOW);
+    pages[COUNT-1u].file_offset=COUNT;
+    assert(!musa_dwg1032_section_read_window(
+        file,COUNT,pages,COUNT,COUNT,COUNT-WINDOW,out,WINDOW));
+    for (size_t j=0;j<WINDOW;++j) assert(out[j]==0xAA);
+    free(order);free(pages);free(out);free(file);
+}
 int main(void) {
     basic();stress();partitions();
     file_backed_pages();file_backed_large_reverse_physical_order();
     physical_directory_validation();physical_directory_stress();
     strict_file_page_assembly();
+    bounded_window_reads();bounded_window_large_pafta();
     return 0;
 }
