@@ -3,6 +3,7 @@
  */
 #include "musa_dwg1032_record_batch.h"
 #include "musa_dwg1032_object_map.h"
+#include "musa_dwg1032_object_spans.h"
 #include "musa_dwg1032_section_assembly.h"
 #ifdef NDEBUG
 #undef NDEBUG
@@ -120,6 +121,55 @@ static void three_candidates(void) {
     const MusaDwg1032Cursor zero={NULL,0,0};
     assert(musa_dwg1032_record_batch_extract(
         &empty,&zero,0,NULL,0,NULL,0));
+}
+/* Handle-based viewport lookup is independent of physical record order.
+ * Inputs are synthetic MS envelopes, not authenticated DWG entities. */
+static void handle_lookup(void) {
+    uint8_t bytes[]={1,0,0x21,0xee, 1,0,0x32,0xdd,
+                     1,0,0x43,0xcc};
+    const MusaDwg1032ObjectLocation spans[]={
+        {2u,8u,4u},{8u,0u,4u},{99u,4u,4u}
+    };
+    const MusaDwg1032ObjectIndex index={spans,3u,sizeof(bytes)};
+    const MusaDwg1032Cursor section={bytes,sizeof(bytes),0u};
+    size_t order[3];
+    assert(musa_dwg1032_object_spans_prepare(&index,order,3u));
+    MusaDwg1032ObjectLocation out={777u,888u,999u};
+    assert(musa_dwg1032_record_batch_extract_handle(
+        &index,&section,8u,1u,&out));
+    assert(out.handle==8u && out.offset==2u && out.length==1u);
+    assert(musa_dwg1032_record_batch_extract_handle(
+        &index,&section,2u,1u,&out));
+    assert(out.handle==2u && out.offset==10u && out.length==1u);
+    assert(musa_dwg1032_record_batch_extract_handle(
+        &index,&section,99u,1u,&out));
+    assert(out.handle==99u && out.offset==6u && out.length==1u);
+    const MusaDwg1032ObjectLocation saved=out;
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,0u,1u,&out));
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,100u,1u,&out));
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,99u,0u,&out));
+    bytes[4]=0u; /* A malformed target must not publish partial output. */
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,99u,1u,&out));
+    /* A bad unrelated record must not block a valid visible handle. */
+    assert(musa_dwg1032_record_batch_extract_handle(
+        &index,&section,2u,1u,&out));
+    assert(out.handle==2u && out.offset==10u);
+    out=saved;
+    bytes[4]=1u;
+    const MusaDwg1032Cursor misaligned={bytes,sizeof(bytes),1u};
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&misaligned,99u,1u,&out));
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,99u,1u,(MusaDwg1032ObjectLocation *)(void *)bytes));
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,99u,1u,(MusaDwg1032ObjectLocation *)(void *)spans));
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,99u,1u,NULL));
+    assert(memcmp(&out,&saved,sizeof(out))==0);
 }
 static void large_pafta(void) {
     enum { N=20000, STRIDE=4 };
@@ -317,4 +367,4 @@ static void verified_file_pages_to_records(void) {
         assert(assembled[i]==0xa5u);
 }
 
-int main(void) {three_candidates();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();return 0;}
+int main(void) {three_candidates();handle_lookup();large_pafta();verified_map_pipeline();verified_map_large_pafta();verified_file_pages_to_records();return 0;}
