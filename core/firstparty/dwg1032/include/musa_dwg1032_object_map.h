@@ -25,12 +25,19 @@ typedef struct MusaDwg1032MapIterator {
     uint64_t handle;
     uint64_t offset;
     uint64_t section_bytes;
+    size_t entries_read;
 } MusaDwg1032MapIterator;
 int musa_dwg1032_object_map_iterator_init(
     MusaDwg1032MapIterator *iterator, const uint8_t *bytes,
     size_t byte_count, uint64_t section_bytes);
 int musa_dwg1032_object_map_iterator_next(
     MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *entry);
+/* True only after exactly expected_count valid pairs and complete byte
+ * consumption. An incremental/page consumer must check this before
+ * accepting a full map; successfully reading a prefix is not enough.
+ * No allocation, mutation or section authentication is performed. */
+int musa_dwg1032_object_map_iterator_finished(
+    const MusaDwg1032MapIterator *iterator, size_t expected_count);
 /* Read exactly count consecutive entries from an immutable, caller-verified
  * object-map payload into a bounded page. The iterator and every output
  * entry remain unchanged if any pair in the requested page is malformed.
