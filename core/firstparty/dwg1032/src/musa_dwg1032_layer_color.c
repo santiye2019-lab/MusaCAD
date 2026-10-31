@@ -89,3 +89,34 @@ int musa_dwg1032_layer_color_select(
     }
     return 1;
 }
+
+/* A canonical unresolved ByBlock value carries no definition-level RGB/ACI.
+ * Explicit colors must have an ACI or an actual TrueColor override. */
+static int valid_resolved(const MusaDwg1032ResolvedColor *c) {
+    if (c->byblock>1u) return 0;
+    if (c->byblock)
+        return c->color.aci==0u && c->color.has_truecolor==0u &&
+               c->color.truecolor_rgb==0u;
+    return valid_color(&c->color) &&
+           (c->color.has_truecolor ||
+            (c->color.aci>=1u && c->color.aci<=255u)) &&
+           (c->color.has_truecolor || c->color.truecolor_rgb==0u);
+}
+
+int musa_dwg1032_layer_color_apply_insert(
+    const MusaDwg1032ResolvedColor *definition_colors, size_t count,
+    const MusaDwg1032ResolvedColor *insert_color,
+    MusaDwg1032ResolvedColor *resolved) {
+    if (!definition_colors || !insert_color || !resolved || !count ||
+        count>SIZE_MAX/sizeof(*definition_colors)) return 0;
+    const size_t bytes=count*sizeof(*definition_colors);
+    if (overlaps(resolved,bytes,definition_colors,bytes) ||
+        overlaps(resolved,bytes,insert_color,sizeof(*insert_color)) ||
+        !valid_resolved(insert_color)) return 0;
+    for (size_t i=0;i<count;++i)
+        if (!valid_resolved(&definition_colors[i])) return 0;
+    for (size_t i=0;i<count;++i)
+        resolved[i]=definition_colors[i].byblock
+            ? *insert_color : definition_colors[i];
+    return 1;
+}
