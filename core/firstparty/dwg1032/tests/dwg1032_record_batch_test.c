@@ -195,6 +195,20 @@ static void large_pafta(void) {
                out[i].offset==(N-1u-i)*STRIDE+2u &&
                out[i].length==1u);
     }
+    /* Sparse viewport requests on a 20k-object index use O(log n)
+     * handle lookup, without copying the full result array. */
+    MusaDwg1032ObjectLocation picked={999u,999u,999u};
+    for (size_t i=0;i<N;i+=97u) {
+        assert(musa_dwg1032_record_batch_extract_handle(
+            &index,&section,i+1u,1u,&picked));
+        assert(picked.handle==out[i].handle &&
+               picked.offset==out[i].offset &&
+               picked.length==out[i].length);
+    }
+    const MusaDwg1032ObjectLocation saved_pick=picked;
+    assert(!musa_dwg1032_record_batch_extract_handle(
+        &index,&section,N+1u,1u,&picked));
+    assert(memcmp(&picked,&saved_pick,sizeof(picked))==0);
     /* Compare 79 independently requested pages with the bulk extraction. */
     for (size_t start=0;start<N;start+=257u) {
         MusaDwg1032ObjectLocation page[257];
