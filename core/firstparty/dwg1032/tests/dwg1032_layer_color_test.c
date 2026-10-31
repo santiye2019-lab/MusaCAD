@@ -177,7 +177,7 @@ static void reject_stale_rgb_across_color_stages(void) {
     uint64_t layer_ref=100;
     MusaDwg1032CadColor entity={256,0,0};
     MusaDwg1032LayerColor layer={100,{7,0,0}};
-    MusaDwg1032ResolvedColor out={{{0}},0};
+    MusaDwg1032ResolvedColor out={{0,0,0},0};
     MusaDwg1032ResolvedColor saved;
     assert(musa_dwg1032_object_index_init(&index,&entry,1,1));
     assert(musa_dwg1032_layer_color_select(
@@ -200,7 +200,7 @@ static void reject_stale_rgb_across_color_stages(void) {
     assert(out.byblock && out.color.aci==0 &&
            out.color.truecolor_rgb==0);
     const MusaDwg1032ResolvedColor insert={{2,0,0},0};
-    MusaDwg1032ResolvedColor rendered={{{0}},0};
+    MusaDwg1032ResolvedColor rendered={{0,0,0},0};
     assert(musa_dwg1032_layer_color_apply_insert(
         &out,1,&insert,&rendered));
     assert(!rendered.byblock && rendered.color.aci==2);
