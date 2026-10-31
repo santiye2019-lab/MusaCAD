@@ -60,8 +60,9 @@ int musa_dwg1032_object_map_iterator_next(
 int musa_dwg1032_object_map_iterator_finished(
     const MusaDwg1032MapIterator *iterator, size_t expected_count) {
     if (!iterator ||
-        iterator->cursor.byte_count>SIZE_MAX/8u ||
-        (iterator->cursor.byte_count && !iterator->cursor.bytes))
+        iterator->cursor.byte_count>PTRDIFF_MAX/8u ||
+        (iterator->cursor.byte_count && !iterator->cursor.bytes) ||
+        iterator->cursor.bit_position>iterator->cursor.byte_count*8u)
         return 0;
     return iterator->entries_read==expected_count &&
            iterator->cursor.bit_position==
