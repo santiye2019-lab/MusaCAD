@@ -11,7 +11,36 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Large rotated/reflected arrays must match the single-instance path
+ * bit-for-bit after sharing the base affine across batch/page processing. */
+static void rotated_mirrored_20k(void) {
+    const size_t count=250u*80u;
+    MusaScene2dInsertArray a={
+        {17.25,-90.5,3.0,-7.0,-2.5,0.75,acos(-1.0)/7.0},
+        250u,80u,-1.25,3.75
+    };
+    double *full=malloc(count*6u*sizeof(*full));
+    assert(full);
+    size_t written=0,total=0;
+    assert(musa_scene2d_array_fill(&a,full,count,&written));
+    assert(written==count);
+    for (size_t i=0;i<count;i+=97u) {
+        double single[6];
+        assert(musa_scene2d_array_affine(&a,i%a.columns,i/a.columns,single));
+        assert(memcmp(single,full+6u*i,sizeof(single))==0);
+    }
+    double page[127u*6u];
+    for (size_t start=0;start<count;start+=127u) {
+        assert(musa_scene2d_array_fill_page(
+            &a,start,page,127u,&written,&total));
+        const size_t expected=(count-start)<127u ? count-start : 127u;
+        assert(total==count && written==expected);
+        assert(memcmp(page,full+6u*start,expected*6u*sizeof(double))==0);
+    }
+    free(full);
+}
 int main(void) {
+    rotated_mirrored_20k();
     MusaScene2dInsertArray array={{10,20,0,0,1,1,0},200,100,2,3};
     const size_t count=200u*100u;
     double *full=malloc(count*6u*sizeof(*full));
