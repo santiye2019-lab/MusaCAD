@@ -50,13 +50,21 @@ int musa_dwg1032_modular_signed(MusaDwg1032Cursor *cursor, int64_t *value) {
         const int more=(part&0x80u)!=0;
         const uint64_t payload=(uint64_t)(part&(more?0x7fu:0x3fu));
         const unsigned shift=i*7u;
-        if (payload>((uint64_t)INT64_MAX>>shift)) return 0;
+        const int negative=!more && (part&0x40u)!=0;
+        /* Only the negative terminal group may represent 2^63.
+         * Positive 2^63 is out of range; avoid signed negation of
+         * INT64_MIN, which would be undefined behaviour in C11. */
+        const uint64_t limit=negative
+            ? (UINT64_C(1)<<63u) : (uint64_t)INT64_MAX;
+        if (payload>(limit>>shift)) return 0;
         magnitude|=payload<<shift;
         if (!more) {
-            const int negative=(part&0x40u)!=0;
             if ((negative && !magnitude) ||
                 (i && !payload && !(previous&0x40u))) return 0;
-            *value=negative?-(int64_t)magnitude:(int64_t)magnitude;
+            *value=negative
+                ? (magnitude==(UINT64_C(1)<<63u)
+                    ? INT64_MIN : -(int64_t)magnitude)
+                : (int64_t)magnitude;
             *cursor=trial;
             return 1;
         }
