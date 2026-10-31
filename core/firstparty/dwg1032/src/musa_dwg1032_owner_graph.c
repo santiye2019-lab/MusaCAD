@@ -147,3 +147,65 @@ int musa_dwg1032_owner_graph_visibility(
         effective_visible[i]=(uint8_t)work[i].root;
     return 1;
 }
+
+/* A strict post-decode layer lookup. Never infer layer metadata from DWG
+ * object bytes here: the caller must authenticate and decode it separately. */
+int musa_dwg1032_owner_graph_layer_visibility(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *owner_handles,
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    MusaDwg1032OwnerWork *work, size_t work_count,
+    uint8_t *local_work, uint8_t *effective_visible) {
+    if (!index || !index->entries || !index->count || !owner_handles ||
+        !entity_layer_handles || !entity_visible || !layers || !layer_count ||
+        !work || !local_work || !effective_visible ||
+        work_count < index->count ||
+        index->count > SIZE_MAX / sizeof(*index->entries) ||
+        index->count > SIZE_MAX / sizeof(*owner_handles) ||
+        index->count > SIZE_MAX / sizeof(*entity_layer_handles) ||
+        index->count > SIZE_MAX / sizeof(*entity_visible) ||
+        layer_count > SIZE_MAX / sizeof(*layers) ||
+        work_count > SIZE_MAX / sizeof(*work) ||
+        index->count > SIZE_MAX / sizeof(*local_work) ||
+        index->count > SIZE_MAX / sizeof(*effective_visible)) return 0;
+
+    const size_t n=index->count;
+    const void *ptrs[]={index,index->entries,owner_handles,
+        entity_layer_handles,entity_visible,layers,work,local_work,
+        effective_visible};
+    const size_t sizes[]={sizeof(*index),n*sizeof(*index->entries),
+        n*sizeof(*owner_handles),n*sizeof(*entity_layer_handles),
+        n*sizeof(*entity_visible),layer_count*sizeof(*layers),
+        work_count*sizeof(*work),n*sizeof(*local_work),
+        n*sizeof(*effective_visible)};
+    for (size_t a=0;a<9u;++a)
+        for (size_t c=a+1u;c<9u;++c)
+            if (overlaps(ptrs[a],sizes[a],ptrs[c],sizes[c])) return 0;
+
+    uint64_t last=0;
+    for (size_t i=0;i<layer_count;++i) {
+        if (!layers[i].handle || layers[i].handle<=last ||
+            layers[i].on>1u || layers[i].thawed>1u) return 0;
+        last=layers[i].handle;
+    }
+    for (size_t i=0;i<n;++i) {
+        if (entity_visible[i]>1u || !entity_layer_handles[i]) return 0;
+        size_t low=0,high=layer_count;
+        while (low<high) {
+            const size_t mid=low+(high-low)/2u;
+            if (layers[mid].handle<entity_layer_handles[i])
+                low=mid+1u;
+            else high=mid;
+        }
+        if (low==layer_count ||
+            layers[low].handle!=entity_layer_handles[i]) return 0;
+        local_work[i]=(uint8_t)(entity_visible[i] &&
+            layers[low].on && layers[low].thawed);
+    }
+    /* The existing owner resolver publishes output only after checking
+     * the complete forest, so a late dangling owner or cycle rolls back. */
+    return musa_dwg1032_owner_graph_visibility(
+        index,owner_handles,local_work,work,work_count,effective_visible);
+}
