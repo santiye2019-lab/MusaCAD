@@ -29,6 +29,19 @@ int musa_scene2d_array_affine(const MusaScene2dInsertArray *array,
 int musa_scene2d_array_fill(const MusaScene2dInsertArray *array,
                              double *out, size_t capacity, size_t *written);
 
+/* Optional one-evaluation-per-instance fast path for large, already
+ * decoded planar MINSERT arrays. scratch and out each hold at least count*6
+ * doubles; capacity and scratch_capacity count six-double transforms.
+ * The caller supplies disjoint scratch storage; scratch may change on
+ * failure, but out and *written are never partially published.
+ * Reduces repeated FMA calculations versus the allocation-free two-pass
+ * API at the cost of O(count) caller-owned temporary storage.
+ * This is not an AC1032 entity decoder. */
+int musa_scene2d_array_fill_scratch(
+    const MusaScene2dInsertArray *array,
+    double *out, size_t capacity, double *scratch,
+    size_t scratch_capacity, size_t *written);
+
 /* Produce a bounded page of row-major INSERT-array transforms without
  * allocating or visiting preceding instances. start is a zero-based instance
  * index; indices >= columns*rows return an empty page. capacity is in
