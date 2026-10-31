@@ -42,6 +42,32 @@ int musa_dwg1032_owner_graph_visibility(
     const uint64_t *owner_handles, const uint8_t *local_visible,
     MusaDwg1032OwnerWork *work, size_t work_count,
     uint8_t *effective_visible);
+/* A caller-verified layer table, sorted by strictly increasing nonzero
+ * handles. on and thawed are strict Boolean values. This is not an AC1032
+ * layer-table decoder. */
+typedef struct MusaDwg1032LayerState {
+    uint64_t handle;
+    uint8_t on;
+    uint8_t thawed;
+} MusaDwg1032LayerState;
+
+/* Combine predecoded per-object entity visibility, a verified layer table,
+ * and inherited owner visibility. Every indexed object must have a nonzero
+ * layer handle present in layers; callers must not fabricate layer 0 or
+ * silently assume a missing layer is visible. Inputs and output/scratch
+ * buffers must be pairwise disjoint, including unused work capacity.
+ * local_work and work are caller-owned scratch; their contents may change
+ * on failure. effective_visible is unchanged on any failure. No heap,
+ * recursion, file parsing, viewport overrides, or DWG decompression.
+ * O(n log n + n log layer_count) for n objects. */
+int musa_dwg1032_owner_graph_layer_visibility(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *owner_handles,
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    MusaDwg1032OwnerWork *work, size_t work_count,
+    uint8_t *local_work, uint8_t *effective_visible);
 #ifdef __cplusplus
 }
 #endif
