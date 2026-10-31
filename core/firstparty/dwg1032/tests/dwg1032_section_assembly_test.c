@@ -334,11 +334,61 @@ static void bounded_window_large_pafta(void) {
     for (size_t j=0;j<WINDOW;++j) assert(out[j]==0xAA);
     free(order);free(pages);free(out);free(file);
 }
+/* Multi-byte viewport reads exercise the single-page shortcut and
+ * the transactional multi-page fallback against the same reversed map. */
+static void window_single_page_fast_path_stress(void) {
+    enum { COUNT=20000, STRIDE=16, TOTAL=COUNT*STRIDE };
+    uint8_t *file=malloc(TOTAL);
+    MusaDwg1032FilePage *pages=malloc(COUNT*sizeof(*pages));
+    size_t *order=malloc(COUNT*sizeof(*order));
+    assert(file && pages && order);
+    for (size_t i=0;i<TOTAL;++i)
+        file[i]=(uint8_t)((i*17u)^(i>>7u));
+    for (size_t i=0;i<COUNT;++i)
+        pages[i]=(MusaDwg1032FilePage){
+            (uint64_t)(i*STRIDE),
+            (uint64_t)((COUNT-1u-i)*STRIDE),STRIDE};
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        pages,COUNT,TOTAL,TOTAL,order,COUNT));
+    uint8_t out[20];
+    for (size_t i=0;i<COUNT;++i) {
+        memset(out,0xA5,sizeof(out));
+        assert(musa_dwg1032_section_read_window(
+            file,TOTAL,pages,COUNT,TOTAL,(uint64_t)(i*STRIDE+3u),
+            out,11u));
+        for (size_t j=0;j<11u;++j)
+            assert(out[j]==file[(COUNT-1u-i)*STRIDE+3u+j]);
+        for (size_t j=11u;j<sizeof(out);++j) assert(out[j]==0xA5);
+    }
+    /* A read crossing a logical page boundary uses the two-pass path. */
+    memset(out,0xA5,sizeof(out));
+    assert(musa_dwg1032_section_read_window(
+        file,TOTAL,pages,COUNT,TOTAL,17u*STRIDE+13u,out,6u));
+    for (size_t j=0;j<6u;++j) {
+        const size_t logical=17u*STRIDE+13u+j;
+        const size_t page=logical/STRIDE;
+        const size_t within=logical%STRIDE;
+        assert(out[j]==file[(COUNT-1u-page)*STRIDE+within]);
+    }
+    for (size_t j=6u;j<sizeof(out);++j) assert(out[j]==0xA5);
+    pages[17].file_offset=TOTAL;
+    memset(out,0xA5,sizeof(out));
+    assert(!musa_dwg1032_section_read_window(
+        file,TOTAL,pages,COUNT,TOTAL,17u*STRIDE+3u,out,11u));
+    for (size_t j=0;j<sizeof(out);++j) assert(out[j]==0xA5);
+    pages[17].file_offset=(COUNT-1u-17u)*STRIDE;
+    pages[18].file_offset=TOTAL;
+    assert(!musa_dwg1032_section_read_window(
+        file,TOTAL,pages,COUNT,TOTAL,17u*STRIDE+13u,out,6u));
+    for (size_t j=0;j<sizeof(out);++j) assert(out[j]==0xA5);
+    free(order);free(pages);free(file);
+}
 int main(void) {
     basic();stress();partitions();
     file_backed_pages();file_backed_large_reverse_physical_order();
     physical_directory_validation();physical_directory_stress();
     strict_file_page_assembly();
     bounded_window_reads();bounded_window_large_pafta();
+    window_single_page_fast_path_stress();
     return 0;
 }
