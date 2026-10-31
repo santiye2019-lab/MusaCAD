@@ -7,6 +7,7 @@
 #include "musa_dwg1032_object_map.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
@@ -122,9 +123,9 @@ int musa_dwg1032_record_batch_extract_scratch(
         if (!extract_one(index,section,i,max_payload_bytes,&scratch[i]))
             return 0;
     if (count) {
-        /* The scratch and output arrays have already been checked disjoint.
-         * The caller keeps both source buffers immutable throughout. */
-        for (size_t i=0;i<count;++i) payloads[i]=scratch[i];
+        /* One contiguous publication after all records have passed.
+         * The two buffers are checked disjoint before the first read. */
+        memcpy(payloads,scratch,result_bytes);
     }
     return 1;
 }
