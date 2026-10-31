@@ -27,6 +27,7 @@ int musa_dwg1032_object_map_iterator_next(
     if (!iterator || !entry ||
         iterator->cursor.byte_count>PTRDIFF_MAX/8u ||
         (iterator->cursor.byte_count && !iterator->cursor.bytes) ||
+        iterator->cursor.bit_position>iterator->cursor.byte_count*8u ||
         overlaps(iterator,sizeof(*iterator),entry,sizeof(*entry)) ||
         overlaps(iterator->cursor.bytes,iterator->cursor.byte_count,
                  entry,sizeof(*entry))) return 0;
@@ -72,6 +73,7 @@ int musa_dwg1032_object_map_iterator_page(
     if (!iterator || count>capacity ||
         iterator->cursor.byte_count>PTRDIFF_MAX/8u ||
         (iterator->cursor.byte_count && !iterator->cursor.bytes) ||
+        iterator->cursor.bit_position>iterator->cursor.byte_count*8u ||
         count>SIZE_MAX/sizeof(*out) ||
         (count && !out) ||
         overlaps(iterator,sizeof(*iterator),out,count*sizeof(*out)) ||
