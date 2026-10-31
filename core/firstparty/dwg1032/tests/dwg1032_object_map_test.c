@@ -293,4 +293,68 @@ static void candidate_stress(void) {
         entries,N,N*3u,out,N,order,N));
     assert(out[N-1u].length==3u); /* No partial publication. */
 }
-int main(void) {iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();return 0;}
+/* Complete verified payload -> candidate physical spans, with output rollback
+ * on both delta corruption and duplicate physical object locations. */
+static void decode_locations_atomic(void) {
+    const uint8_t payload[]={1u,10u,2u,0x45u,3u,20u};
+    MusaDwg1032ObjectLocation out[3]={
+        {99u,99u,99u},{99u,99u,99u},{99u,99u,99u}};
+    MusaDwg1032MapEntry scratch[3];
+    size_t order[3];
+    assert(musa_dwg1032_object_map_decode_locations(
+        payload,sizeof(payload),3u,26u,out,3u,scratch,3u,order,3u));
+    assert(out[0].handle==1u && out[0].offset==10u &&
+           out[0].length==15u);
+    assert(out[1].handle==3u && out[1].offset==5u &&
+           out[1].length==5u);
+    assert(out[2].handle==6u && out[2].offset==25u &&
+           out[2].length==1u);
+    MusaDwg1032ObjectLocation saved[3];
+    memcpy(saved,out,sizeof(out));
+    const uint8_t duplicate[]={1u,10u,2u,0u,3u,20u};
+    assert(!musa_dwg1032_object_map_decode_locations(
+        duplicate,sizeof(duplicate),3u,31u,
+        out,3u,scratch,3u,order,3u));
+    assert(memcmp(saved,out,sizeof(out))==0);
+    const uint8_t truncated[]={1u,10u,2u,0x45u,3u};
+    assert(!musa_dwg1032_object_map_decode_locations(
+        truncated,sizeof(truncated),3u,26u,
+        out,3u,scratch,3u,order,3u));
+    assert(memcmp(saved,out,sizeof(out))==0);
+    assert(!musa_dwg1032_object_map_decode_locations(
+        payload,sizeof(payload),3u,26u,out,2u,scratch,3u,order,3u));
+    assert(!musa_dwg1032_object_map_decode_locations(
+        payload,sizeof(payload),3u,26u,out,3u,scratch,2u,order,3u));
+    assert(!musa_dwg1032_object_map_decode_locations(
+        payload,sizeof(payload),3u,26u,out,3u,scratch,3u,order,2u));
+    assert(!musa_dwg1032_object_map_decode_locations(
+        payload,sizeof(payload),3u,26u,out,3u,scratch,3u,
+        (size_t *)(void *)out,3u));
+    assert(!musa_dwg1032_object_map_decode_locations(
+        payload,sizeof(payload),3u,26u,out,3u,
+        (MusaDwg1032MapEntry *)(void *)payload,3u,order,3u));
+    assert(memcmp(saved,out,sizeof(out))==0);
+    assert(musa_dwg1032_object_map_decode_locations(
+        NULL,0u,0u,0u,NULL,0u,NULL,0u,NULL,0u));
+}
+static void decode_locations_large(void) {
+    enum { N=20000 };
+    static uint8_t bytes[N*2u];
+    static MusaDwg1032ObjectLocation out[N];
+    static MusaDwg1032MapEntry scratch[N];
+    static size_t order[N];
+    for (size_t i=0;i<N;++i) {
+        bytes[2u*i]=1u;
+        bytes[2u*i+1u]=1u;
+    }
+    assert(musa_dwg1032_object_map_decode_locations(
+        bytes,sizeof(bytes),N,N+1u,out,N,scratch,N,order,N));
+    for (size_t i=0;i<N;++i)
+        assert(out[i].handle==i+1u && out[i].offset==i+1u &&
+               out[i].length==1u);
+    bytes[2u*N-1u]=0x40u;
+    assert(!musa_dwg1032_object_map_decode_locations(
+        bytes,sizeof(bytes),N,N+1u,out,N,scratch,N,order,N));
+    assert(out[N-1u].handle==N && out[N-1u].length==1u);
+}
+int main(void) {iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
