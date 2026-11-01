@@ -156,8 +156,97 @@ static void large_reverse_physical(void) {
     free(order);free(entries);free(pages);free(file);
 }
 
+/* An index borrows its entries. A stale ordinal must not bypass the
+ * handle/span safeguards used by the handle-based lookup, nor publish data
+ * when a record changes after validation. These are synthetic RAW pages. */
+static void mutated_ordinal_index_rollback(void) {
+    const uint8_t file[]={
+        2,0,0xaa,0xbb, 2,0,0xcc,0xdd, 2,0,0xee,0xff
+    };
+    const MusaDwg1032FilePage pages[]={
+        {0,0,4},{4,4,4},{8,8,4}
+    };
+    MusaDwg1032ObjectLocation entries[]={
+        {10,0,4},{20,4,4},{30,8,4}
+    };
+    MusaDwg1032ObjectIndex index={0};
+    size_t order[3];
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        pages,3,sizeof(file),sizeof(file),order,3));
+    assert(musa_dwg1032_object_index_init(
+        &index,entries,3,sizeof(file)));
+    assert(musa_dwg1032_object_spans_prepare(&index,order,3));
+
+    uint8_t candidate[2]={0xa5,0xa5};
+    uint8_t payload[2]={0xa5,0xa5};
+    uint64_t candidate_length=99,payload_length=77;
+    assert(musa_dwg1032_object_candidate_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,2,candidate,2,
+        &candidate_length));
+    assert(candidate_length==4 && candidate[0]==0xcc &&
+           candidate[1]==0xdd);
+    assert(musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+        &payload_length));
+    assert(payload_length==2 && payload[0]==0xcc &&
+           payload[1]==0xdd);
+
+    const MusaDwg1032ObjectLocation valid=entries[1];
+    const MusaDwg1032ObjectLocation invalid[]={
+        {0,4,4},   /* No handle. */
+        {10,4,4},  /* Duplicated predecessor. */
+        {30,4,4},  /* Duplicated successor. */
+        {20,4,0},  /* Empty candidate. */
+        {20,12,4}, /* Candidate beyond logical section. */
+        {20,4,9}   /* Candidate exceeds section end. */
+    };
+    for (size_t i=0;i<sizeof(invalid)/sizeof(invalid[0]);++i) {
+        entries[1]=invalid[i];
+        candidate[0]=candidate[1]=0xa5;
+        payload[0]=payload[1]=0xa5;
+        candidate_length=99;payload_length=77;
+        assert(!musa_dwg1032_object_candidate_read_window_at_position(
+            file,sizeof(file),pages,3,&index,1,2,candidate,2,
+            &candidate_length));
+        assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+            file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+            &payload_length));
+        assert(candidate_length==99 && payload_length==77);
+        assert(candidate[0]==0xa5 && candidate[1]==0xa5);
+        assert(payload[0]==0xa5 && payload[1]==0xa5);
+    }
+    entries[1]=valid;
+    entries[0].handle=20; /* Neighbor mutated, selected entry unchanged. */
+    assert(!musa_dwg1032_object_candidate_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,2,candidate,2,
+        &candidate_length));
+    assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+        &payload_length));
+    entries[0].handle=10;
+    entries[2].handle=20;
+    assert(!musa_dwg1032_object_candidate_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,2,candidate,2,
+        &candidate_length));
+    assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+        &payload_length));
+    assert(candidate_length==99 && payload_length==77);
+    assert(candidate[0]==0xa5 && payload[0]==0xa5);
+    entries[2].handle=30;
+    assert(musa_dwg1032_object_candidate_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,2,candidate,2,
+        &candidate_length));
+    assert(musa_dwg1032_object_ms_payload_read_window_at_position(
+        file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+        &payload_length));
+    assert(candidate_length==4 && payload_length==2);
+    assert(candidate[0]==0xcc && payload[1]==0xdd);
+}
+
 int main(void) {
     small();
     large_reverse_physical();
+    mutated_ordinal_index_rollback();
     return 0;
 }
