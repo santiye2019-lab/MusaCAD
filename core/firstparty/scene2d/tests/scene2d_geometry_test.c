@@ -15,6 +15,17 @@ int main(void) {
     MusaScene2dBox b={111,222,333,444};
     assert(musa_scene2d_line_bounds(4,7,-2,-3,&b));
     assert(contains(b,4,7) && contains(b,-2,-3));
+    /* Extreme but finite survey coordinates must not disappear because
+     * the one-ULP outward margin overflows the floating-point range. */
+    assert(musa_scene2d_line_bounds(DBL_MAX,-DBL_MAX,
+                                    DBL_MAX,-DBL_MAX,&b));
+    assert(b.min_x==DBL_MAX && b.max_x==DBL_MAX);
+    assert(b.min_y==-DBL_MAX && b.max_y==-DBL_MAX);
+    assert(isfinite(b.min_x) && isfinite(b.max_y));
+    assert(musa_scene2d_line_bounds(-DBL_MAX,DBL_MAX,
+                                    DBL_MAX,-DBL_MAX,&b));
+    assert(contains(b,-DBL_MAX,DBL_MAX) &&
+           contains(b,DBL_MAX,-DBL_MAX));
     assert(musa_scene2d_circle_bounds(2,3,5,&b));
     assert(contains(b,-3,3) && contains(b,7,3) && contains(b,2,-2));
     assert(musa_scene2d_arc_bounds(0,0,10,pi/4,3*pi/4,&b));
