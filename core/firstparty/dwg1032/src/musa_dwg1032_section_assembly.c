@@ -222,6 +222,21 @@ int musa_dwg1032_section_read_window(
         return 0;
     const size_t first_within=
         (size_t)(logical_offset-first_page.logical_offset);
+    /* Even a single-page window must not conceal a broken neighboring
+     * logical boundary when an untrusted caller omits prevalidation.
+     * Inspect only immediate neighbors to preserve logarithmic lookup. */
+    if (first) {
+        const MusaDwg1032FilePage previous=pages[first-1u];
+        if (!previous.byte_count ||
+            previous.logical_offset>section_bytes ||
+            (uint64_t)previous.byte_count>
+                section_bytes-previous.logical_offset ||
+            previous.logical_offset+(uint64_t)previous.byte_count !=
+                first_page.logical_offset) return 0;
+    }
+    if (first+1u<page_count &&
+        first_page.logical_offset+(uint64_t)first_page.byte_count !=
+            pages[first+1u].logical_offset) return 0;
     if (destination_size<=first_page.byte_count-first_within) {
         memcpy(destination,
                file_bytes+(size_t)first_page.file_offset+first_within,
