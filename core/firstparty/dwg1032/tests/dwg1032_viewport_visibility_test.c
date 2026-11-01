@@ -110,4 +110,138 @@ static void large_viewport_differential(void) {
     assert(!memcmp(out,saved,sizeof(out)));
 }
 
-int main(void) { viewport_contexts(); large_viewport_differential(); return 0; }
+
+/* Distinct viewport overrides must be composed with the *same* authenticated
+ * owner forest, without allowing a thawed child to reveal a hidden parent. */
+static void viewport_owner_contexts(void) {
+    MusaDwg1032ObjectLocation entries[]={
+        {10,0,1},{20,1,1},{30,2,1},{40,3,1},{50,4,1},{60,5,1}
+    };
+    MusaDwg1032ObjectIndex index={0};
+    assert(musa_dwg1032_object_index_init(&index,entries,6,6));
+    uint64_t owners[]={0,10,20,20,0,50};
+    uint64_t layer_refs[]={100,100,200,100,100,200};
+    uint8_t entity[]={1,1,1,1,1,1};
+    MusaDwg1032LayerState layers[]={{100,1,1},{200,1,1}};
+    MusaDwg1032ViewportFreeze override[]={{200,1}};
+    MusaDwg1032OwnerWork work[8];
+    uint8_t local[6],out[]={9,9,9,9,9,9};
+    assert(musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    const uint8_t frozen[]={1,1,0,1,1,0};
+    assert(!memcmp(out,frozen,sizeof(out)));
+    override[0].frozen=0;
+    assert(musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    const uint8_t thawed[]={1,1,1,1,1,1};
+    assert(!memcmp(out,thawed,sizeof(out)));
+    override[0].layer_handle=100;
+    override[0].frozen=1;
+    assert(musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    const uint8_t hidden[]={0,0,0,0,0,0};
+    assert(!memcmp(out,hidden,sizeof(out)));
+    /* A hidden ancestor prevents revealing even a thawed child. */
+    override[0].layer_handle=200;
+    override[0].frozen=0;
+    entity[1]=0;
+    assert(musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    const uint8_t hidden_parent[]={1,0,0,0,1,1};
+    assert(!memcmp(out,hidden_parent,sizeof(out)));
+    entity[1]=1;
+    uint8_t saved[6]; memcpy(saved,out,sizeof(saved));
+    owners[1]=30; /* A late cycle must not publish a prefix. */
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+    owners[1]=999;
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+    owners[1]=10;
+    layer_refs[5]=999;
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+    layer_refs[5]=200;
+    override[0].frozen=2;
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+    override[0].frozen=0;
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,out,out));
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        (MusaDwg1032OwnerWork *)(void *)layers,8,local,out));
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,SIZE_MAX,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+    entries[5].handle=20; /* Caller-mutated index must be rejected. */
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,8,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+}
+
+static void large_viewport_owner_chain(void) {
+    enum { N=20000 };
+    static MusaDwg1032ObjectLocation entries[N];
+    static uint64_t owners[N],layer_refs[N];
+    static uint8_t entity[N],local[N],out[N],saved[N];
+    static MusaDwg1032OwnerWork work[N];
+    const MusaDwg1032LayerState layers[]={{100,1,1},{200,1,1}};
+    MusaDwg1032ViewportFreeze override[]={{200,1}};
+    for (size_t i=0u;i<N;++i) {
+        entries[i]=(MusaDwg1032ObjectLocation){
+            (uint64_t)i+1u,(uint64_t)i,1u};
+        owners[i]=i?(uint64_t)i:0u;
+        layer_refs[i]=(i==N/2u)?200u:100u;
+        entity[i]=1u;
+        out[i]=9u;
+    }
+    MusaDwg1032ObjectIndex index={0};
+    assert(musa_dwg1032_object_index_init(&index,entries,N,N));
+    assert(musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,N,local,out));
+    for (size_t i=0u;i<N;++i)
+        assert(out[i]==(uint8_t)(i<N/2u));
+    override[0].frozen=0;
+    assert(musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,N,local,out));
+    for (size_t i=0u;i<N;++i) assert(out[i]==1u);
+    memcpy(saved,out,sizeof(out));
+    owners[0]=N; /* 20k-node cycle is discovered before publishing. */
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,N,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+    owners[0]=0u;
+    entity[N-1u]=2u;
+    assert(!musa_dwg1032_viewport_owner_visibility(
+        &index,owners,layer_refs,entity,layers,2,override,1,
+        work,N,local,out));
+    assert(!memcmp(out,saved,sizeof(out)));
+}
+
+int main(void) {
+    viewport_contexts();
+    large_viewport_differential();
+    viewport_owner_contexts();
+    large_viewport_owner_chain();
+    return 0;
+}
+
