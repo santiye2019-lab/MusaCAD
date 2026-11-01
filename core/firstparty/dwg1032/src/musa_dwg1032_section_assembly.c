@@ -211,6 +211,9 @@ int musa_dwg1032_section_read_window(
     const MusaDwg1032FilePage first_page=pages[first];
     if (!first_page.byte_count ||
         first_page.logical_offset>logical_offset ||
+        first_page.logical_offset>section_bytes ||
+        (uint64_t)first_page.byte_count>
+            section_bytes-first_page.logical_offset ||
         logical_offset-first_page.logical_offset>=
             (uint64_t)first_page.byte_count ||
         first_page.file_offset>(uint64_t)file_size ||
@@ -238,6 +241,8 @@ int musa_dwg1032_section_read_window(
              * one ended; overlapping logical pages must not be spliced
              * into a plausible but incorrect object payload. */
             if (!p.byte_count ||
+                p.logical_offset>section_bytes ||
+                (uint64_t)p.byte_count>section_bytes-p.logical_offset ||
                 (i==first ? (p.logical_offset>pos ||
                              pos-p.logical_offset>=(uint64_t)p.byte_count)
                           : p.logical_offset!=pos) ||
