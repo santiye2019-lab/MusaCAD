@@ -221,3 +221,10 @@
 - Regression coverage: ByBlock, ByLayer, explicit ACI, caller-output rollback, single-layer conversion, 20,000-layer full conversion and late malformed-record page rollback. Synthetic fixtures with no TrueColor flag now explicitly zero the RGB payload.
 - Source origin: local independent C11 input-validation change, with no GPL/AGPL/LGPL, LibreDWG, historical native CAD source, or unknown-provenance code copied, adapted, or linked.
 - Limit: still only a post-decode scene adapter; this does not decode AC1032 sections, decompress pages, parse genuine DWG layer colors, or integrate Android rendering. CI must be checked on the final commit.
+
+## 2026-11-02 — single-pass viewport candidate scratch path
+
+- Added `musa_scene2d_collect_visible_scratch` to the existing isolated MIT C11 scene2d target. For already decoded and resolved 2B nodes, it evaluates each world-space transformed AABB only once, stages selected indices in caller-owned disjoint scratch, and publishes the list only after the entire batch validates. The original O(1)-workspace two-pass collector is unchanged.
+- Dedicated 20,000-node differential regression checks the scratch path against the original collector, rotated/hidden instances, late malformed nodes, capacity rejection, output rollback, alias guards and empty viewports. CTest target: `independent_scene2d_viewport_scratch_20k`. GitHub Actions success must be confirmed against the exact final SHA; this commit alone does not prove test passage.
+- **Provenance:** independently authored with elementary four-corner affine viewport intersection, array traversal and standard C11 `memcpy`; only existing first-party MIT scene2d routines are used. No GPL/AGPL/LGPL, LibreDWG, legacy MusaCAD CAD code, third-party CAD parser, or unknown-origin source was copied, adapted or linked.
+- **Scope:** synthetic predecoded 2B viewport optimization, not AC1032 page decompression, authentic TEXT/MTEXT or block decoding, Android DWG integration, or a measured real-pafta speedup. No modifications to `main`, `MusaCAD2/`, existing 3B sources or production JNI. Legacy Android GPL linkage remains an independent release blocker.
