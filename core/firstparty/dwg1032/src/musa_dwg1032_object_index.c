@@ -31,6 +31,28 @@ int musa_dwg1032_object_index_init(MusaDwg1032ObjectIndex *index,
     *index=candidate;
     return 1;
 }
+/* An index borrows caller-owned records. Validate the selected object and
+ * both immediate neighbors on each lookup, not just their handle ordering.
+ * This bounded check cannot detect corruption elsewhere in the index. */
+static int entry_valid(const MusaDwg1032ObjectIndex *index, size_t at) {
+    const MusaDwg1032ObjectLocation e=index->entries[at];
+    return e.handle && e.length && e.offset<=index->section_bytes &&
+           e.length<=index->section_bytes-e.offset;
+}
+int musa_dwg1032_object_index_neighborhood_valid(
+    const MusaDwg1032ObjectIndex *index, size_t position) {
+    if (!index || !index->entries ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        position>=index->count || !entry_valid(index,position)) return 0;
+    const uint64_t handle=index->entries[position].handle;
+    if (position &&
+        (!entry_valid(index,position-1u) ||
+         index->entries[position-1u].handle>=handle)) return 0;
+    if (position+1u<index->count &&
+        (!entry_valid(index,position+1u) ||
+         index->entries[position+1u].handle<=handle)) return 0;
+    return 1;
+}
 int musa_dwg1032_object_index_find(const MusaDwg1032ObjectIndex *index,
                                     uint64_t handle, size_t *position) {
     if (!disjoint_index(index,position,sizeof(*position)) ||
@@ -42,17 +64,7 @@ int musa_dwg1032_object_index_find(const MusaDwg1032ObjectIndex *index,
         else hi=mid;
     }
     if (lo==index->count || index->entries[lo].handle!=handle) return 0;
-    /* The index borrows caller-owned storage. Even after successful
-     * initialization a stale or accidentally modified entry must not
-     * yield an out-of-section object span. Check the selected record and
-     * its immediate handle neighbors in constant time; this does not
-     * replace the requirement to keep the full index immutable. */
-    const MusaDwg1032ObjectLocation found=index->entries[lo];
-    if (!found.length || found.offset>index->section_bytes ||
-        found.length>index->section_bytes-found.offset ||
-        (lo && index->entries[lo-1u].handle>=found.handle) ||
-        (lo+1u<index->count &&
-         index->entries[lo+1u].handle<=found.handle)) return 0;
+    if (!musa_dwg1032_object_index_neighborhood_valid(index,lo)) return 0;
     *position=lo;
     return 1;
 }

@@ -26,6 +26,11 @@ typedef struct MusaDwg1032ObjectIndex {
 int musa_dwg1032_object_index_init(MusaDwg1032ObjectIndex *index,
                                     const MusaDwg1032ObjectLocation *entries,
                                     size_t count, uint64_t section_bytes);
+/* O(1) local fail-closed check of the selected entry and its immediate
+ * neighbors, including spans and handle ordering. Does not revalidate
+ * the entire borrowed index or decode DWG records. */
+int musa_dwg1032_object_index_neighborhood_valid(
+    const MusaDwg1032ObjectIndex *index, size_t position);
 /* O(log count). Requires a validated, unmodified index; output unchanged
  * on failure. Entries must outlive the index. */
 int musa_dwg1032_object_index_find(const MusaDwg1032ObjectIndex *index,

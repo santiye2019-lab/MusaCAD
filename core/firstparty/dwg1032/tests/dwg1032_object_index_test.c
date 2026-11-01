@@ -90,6 +90,21 @@ static void stale_backing_storage(void) {
     entries[2].handle=4u; /* Immediate duplicate successor. */
     assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
     entries[2].handle=8u;
+    entries[0].handle=0u; /* A zero predecessor is not a valid neighbor. */
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[0].handle=2u;
+    entries[0].length=0u; /* Neighbor's span changed after init. */
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[0].length=2u;
+    entries[2].offset=6u; /* Neighbor exceeds section boundary. */
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[2].offset=4u;
+    entries[2].length=0u;
+    assert(!musa_dwg1032_object_index_neighborhood_valid(&idx,1u));
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[2].length=2u;
+    assert(musa_dwg1032_object_index_neighborhood_valid(&idx,1u));
+    assert(!musa_dwg1032_object_index_neighborhood_valid(&idx,3u));
     assert(musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==1u);
 }
 int main(void) {normal();malformed();many();stale_backing_storage();return 0;}
