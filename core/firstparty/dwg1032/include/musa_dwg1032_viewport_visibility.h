@@ -65,6 +65,20 @@ int musa_dwg1032_viewport_insert_visibility(
     const MusaDwg1032LayerState *layers, size_t layer_count,
     const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
     uint8_t *effective_visible);
+
+/* Caller-scratch variant for large, already-decoded 2D drawings. Resolve
+ * each entity layer once, write only to scratch while validating, and copy
+ * the complete mask after success. Scratch may change on failure; the
+ * published local_visible mask never does. Scratch capacity (including
+ * unused bytes) and output must be disjoint from each other and all inputs.
+ * No allocations, no DWG byte parsing, no final render permission.
+ * O(n log layers + n log overrides), plus O(n) final publication. */
+int musa_dwg1032_viewport_local_visibility_scratch(
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible, size_t entity_count,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *local_visible, uint8_t *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif
