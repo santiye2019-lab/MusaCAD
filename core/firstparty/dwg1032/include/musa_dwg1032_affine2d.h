@@ -29,6 +29,17 @@ int musa_dwg1032_affine2_compose(const MusaDwg1032Affine2 *outer,
  * O(count) time, O(1) memory. */
 int musa_dwg1032_affine2_apply(const MusaDwg1032Affine2 *transform,
     const MusaDwg1032Point2 *points, size_t count, MusaDwg1032Point2 *out);
+/* Caller-scratch variant for large, already-decoded 2D INSERT batches.
+ * Map each point once into scratch, then publish the entire batch only
+ * after all coordinates are finite. Unlike apply(), avoids a second map
+ * pass at the cost of O(count) caller-owned workspace. No allocation.
+ * scratch_capacity must be >= count; the entire scratch capacity must be
+ * disjoint from points, out and transform. Output must also be disjoint
+ * from points and transform. On failure out is completely unchanged;
+ * scratch may contain partial results. Does not decode AC1032 pages. */
+int musa_dwg1032_affine2_apply_scratch(const MusaDwg1032Affine2 *transform,
+    const MusaDwg1032Point2 *points, size_t count, MusaDwg1032Point2 *out,
+    MusaDwg1032Point2 *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif

@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
@@ -82,5 +83,26 @@ int musa_dwg1032_affine2_apply(const MusaDwg1032Affine2 *transform,
         (void)mapped(transform,points[i],&trial);
         out[i]=trial;
     }
+    return 1;
+}
+
+int musa_dwg1032_affine2_apply_scratch(const MusaDwg1032Affine2 *transform,
+    const MusaDwg1032Point2 *points, size_t count, MusaDwg1032Point2 *out,
+    MusaDwg1032Point2 *scratch, size_t scratch_capacity) {
+    if (!transform || !points || !out || !scratch || !count ||
+        count>SIZE_MAX/sizeof(*points) ||
+        scratch_capacity<count ||
+        scratch_capacity>SIZE_MAX/sizeof(*scratch) ||
+        !valid(transform)) return 0;
+    const size_t bytes=count*sizeof(*points);
+    const size_t scratch_bytes=scratch_capacity*sizeof(*scratch);
+    if (overlaps(points,bytes,out,bytes) ||
+        overlaps(transform,sizeof(*transform),out,bytes) ||
+        overlaps(points,bytes,scratch,scratch_bytes) ||
+        overlaps(transform,sizeof(*transform),scratch,scratch_bytes) ||
+        overlaps(out,bytes,scratch,scratch_bytes)) return 0;
+    for (size_t i=0;i<count;++i)
+        if (!mapped(transform,points[i],&scratch[i])) return 0;
+    memcpy(out,scratch,bytes);
     return 1;
 }
