@@ -59,6 +59,14 @@ int musa_scene2d_text_run_bounds(const MusaScene2dTextGlyph *glyphs,
         return 0;
     for (size_t k=0;k<6;++k)
         if (!isfinite(text_affine[k])) return 0;
+    /* Only advances before the last ink-bearing glyph affect visible
+     * bounds. Trailing spaces may have enormous but finite advances;
+     * accumulating them can overflow despite valid, already placed ink.
+     * Search backwards so ordinary ink-terminated runs remain O(1) here. */
+    size_t last_ink=count;
+    for (size_t j=count;j>0;--j) {
+        if (glyphs[j-1u].has_ink) { last_ink=j-1u; break; }
+    }
     double pen_x=0, pen_y=0;
     MusaScene2dBox result={INFINITY,INFINITY,-INFINITY,-INFINITY};
     int any=0;
@@ -116,10 +124,9 @@ int musa_scene2d_text_run_bounds(const MusaScene2dTextGlyph *glyphs,
             }
             any=1;
         }
-        /* The final glyph's advance is not used to place any ink.
-         * Do not reject valid bounds because an unused trailing advance
-         * would overflow the pen (common with malformed font metrics). */
-        if (i+1u<count) {
+        /* Advance only while another ink-bearing glyph needs a pen
+         * position. Still validate all trailing glyph metrics above. */
+        if (i<last_ink) {
             pen_x+=g->advance_x;
             pen_y+=g->advance_y;
             if (!isfinite(pen_x) || !isfinite(pen_y)) return 0;
