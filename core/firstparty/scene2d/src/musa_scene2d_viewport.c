@@ -36,9 +36,19 @@ int musa_scene2d_resolve_viewport(
                        layers, layer_count * sizeof(*layers)))
         return 0;
 
-    for (size_t i = 0; i < layer_count; ++i)
+    int mask_unchanged = 1;
+    for (size_t i = 0; i < layer_count; ++i) {
         if (viewport_layer_visible[i] > 1 || layers[i].visible > 1)
             return 0;
+        if (!viewport_layer_visible[i]) mask_unchanged = 0;
+    }
+
+    /* Most model-space views do not override any layer visibility.
+     * Avoid allocating/copying the entire layer table for these views,
+     * while retaining the same graph and color validation as resolve(). */
+    if (mask_unchanged || !node_count)
+        return musa_scene2d_resolve(nodes, node_count, layers, layer_count,
+                                    out, capacity, written);
 
     MusaScene2dLayer *effective = malloc(layer_count * sizeof(*effective));
     if (!effective) return 0;
