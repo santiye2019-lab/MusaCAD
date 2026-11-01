@@ -103,10 +103,49 @@ static void finite_translation_cancellation(void) {
     assert(!musa_dwg1032_affine2_apply(&overflow,&point,1u,&out));
     assert(memcmp(&out,&saved,sizeof out)==0);
 }
+
+/* Compare the one-pass scratch path against the two-pass transactional
+ * baseline on a large synthetic sheet. Neither path parses DWG bytes. */
+static void scratch_batch_and_atomicity(void) {
+    enum { N=20000 };
+    static MusaDwg1032Point2 input[N], baseline[N], output[N], scratch[N];
+    const MusaDwg1032Point2 at={1000000.0,-2000000.0};
+    MusaDwg1032Affine2 t;
+    assert(musa_dwg1032_affine2_insert(&at,2.0,-3.0,0.0,&t));
+    for (size_t i=0;i<N;++i) {
+        input[i]=(MusaDwg1032Point2){(double)i,-(double)i};
+        output[i]=(MusaDwg1032Point2){-7.0,-9.0};
+    }
+    assert(musa_dwg1032_affine2_apply(&t,input,N,baseline));
+    assert(musa_dwg1032_affine2_apply_scratch(&t,input,N,output,scratch,N));
+    assert(memcmp(baseline,output,sizeof(output))==0);
+    /* A late invalid point must not publish any partial output. */
+    input[N-1].x=NAN;
+    assert(!musa_dwg1032_affine2_apply_scratch(&t,input,N,output,scratch,N));
+    assert(memcmp(baseline,output,sizeof(output))==0);
+    input[N-1].x=(double)(N-1);
+    assert(!musa_dwg1032_affine2_apply_scratch(&t,input,N,output,scratch,N-1));
+    assert(!musa_dwg1032_affine2_apply_scratch(&t,input,N,output,output,N));
+    assert(!musa_dwg1032_affine2_apply_scratch(&t,input,N,output,input,N));
+    assert(!musa_dwg1032_affine2_apply_scratch(&t,input,N,input,scratch,N));
+    assert(memcmp(baseline,output,sizeof(output))==0);
+    /* The scratch path must retain finite cancellation near DBL_MAX. */
+    const MusaDwg1032Affine2 cancellation={1.0,1.0,-1e308,0.0,1.0,0.0};
+    const MusaDwg1032Point2 extreme={1e308,1e308};
+    MusaDwg1032Point2 result={-3.0,-4.0},temp={0.0,0.0};
+    assert(musa_dwg1032_affine2_apply_scratch(
+        &cancellation,&extreme,1u,&result,&temp,1u));
+    assert(result.x==1e308 && result.y==1e308);
+    const MusaDwg1032Affine2 overflow={1.0,1.0,0.0,0.0,1.0,0.0};
+    assert(!musa_dwg1032_affine2_apply_scratch(
+        &overflow,&extreme,1u,&result,&temp,1u));
+    assert(result.x==1e308 && result.y==1e308);
+}
 int main(void) {
     instance_and_nested();
     reject_bad_and_atomic();
     large_sheet();
     finite_translation_cancellation();
+    scratch_batch_and_atomicity();
     return 0;
 }
