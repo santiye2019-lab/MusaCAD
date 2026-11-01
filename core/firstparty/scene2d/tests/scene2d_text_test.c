@@ -143,6 +143,26 @@ int main(void) {
     assert(!musa_scene2d_text_run_bounds(terminal,2,text_identity,&box));
     assert(memcmp(&terminal_saved,&box,sizeof(box))==0);
     terminal[1].advance_x=1e308;
+    /* Trailing whitespace after the last visible glyph must not make
+     * otherwise finite text bounds fail from unused pen overflow. */
+    MusaScene2dTextGlyph trailing[4]={
+        {{0,0,1,1},1e308,0,1},
+        {{NAN,NAN,NAN,NAN},1e308,0,0},
+        {{NAN,NAN,NAN,NAN},1e308,0,0},
+        {{NAN,NAN,NAN,NAN},1e308,0,0}
+    };
+    assert(musa_scene2d_text_run_bounds(trailing,4,text_identity,&box));
+    assert(box.min_x<0 && box.max_x>1 &&
+           box.min_y<0 && box.max_y>1);
+    const MusaScene2dBox trailing_saved=box;
+    trailing[3].advance_y=NAN;
+    assert(!musa_scene2d_text_run_bounds(trailing,4,text_identity,&box));
+    assert(memcmp(&trailing_saved,&box,sizeof(box))==0);
+    trailing[3].advance_y=0;
+    trailing[2].has_ink=1;
+    trailing[2].ink=(MusaScene2dBox){0,0,1,1};
+    assert(!musa_scene2d_text_run_bounds(trailing,4,text_identity,&box));
+    assert(memcmp(&trailing_saved,&box,sizeof(box))==0);
     const MusaScene2dTextGlyph nonterminal[3]={
         terminal[0],terminal[1],terminal[0]
     };
