@@ -76,8 +76,23 @@ int musa_scene2d_text_run_bounds(const MusaScene2dTextGlyph *glyphs,
                 const double y=pen_y+((j&2u)?b.max_y:b.min_y);
                 const double ax=text_affine[0]*x, cy=text_affine[2]*y;
                 const double bx=text_affine[1]*x, dy=text_affine[3]*y;
-                const double wx=ax+cy+text_affine[4];
-                const double wy=bx+dy+text_affine[5];
+                /* Ordinary coordinates use the simple fast path. When
+                 * its intermediate sum overflows, fused evaluation can
+                 * preserve a finite translation after cancellation. */
+                double wx=ax+cy+text_affine[4];
+                double wy=bx+dy+text_affine[5];
+                if (!isfinite(wx))
+                    wx=fma(text_affine[0],x,
+                           fma(text_affine[2],y,text_affine[4]));
+                if (!isfinite(wx))
+                    wx=fma(text_affine[2],y,
+                           fma(text_affine[0],x,text_affine[4]));
+                if (!isfinite(wy))
+                    wy=fma(text_affine[1],x,
+                           fma(text_affine[3],y,text_affine[5]));
+                if (!isfinite(wy))
+                    wy=fma(text_affine[3],y,
+                           fma(text_affine[1],x,text_affine[5]));
                 /* Scale before summing absolute terms: two individually
                  * finite products can overflow their absolute sum even
                  * when opposite signs cancel to a finite world point. */
