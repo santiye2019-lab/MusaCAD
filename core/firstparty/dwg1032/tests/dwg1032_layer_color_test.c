@@ -310,7 +310,81 @@ static void large_layer_zero_instance_atomicity(void) {
     }
 }
 
+
+/* The single-lookup scratch path must agree with the original two-pass
+ * resolver for 20k synthetic objects and preserve output on late failure.
+ * This does not establish real AC1032 color/table decode compatibility. */
+static void scratch_color_large_pafta(void) {
+    enum { N=20000, L=1024 };
+    static MusaDwg1032ObjectLocation entries[N];
+    static uint64_t layer_refs[N];
+    static MusaDwg1032CadColor entity[N];
+    static MusaDwg1032LayerColor layers[L];
+    static MusaDwg1032ResolvedColor reference[N],out[N],scratch[N];
+    for (size_t j=0;j<L;++j) {
+        layers[j].handle=(uint64_t)j+1u;
+        layers[j].color=(j%3u)
+            ? (MusaDwg1032CadColor){(uint16_t)(j%255u+1u),0,0}
+            : (MusaDwg1032CadColor){256,1,(uint32_t)(j*701u)};
+    }
+    for (size_t i=0;i<N;++i) {
+        entries[i]=(MusaDwg1032ObjectLocation){i+1u,i,1u};
+        layer_refs[i]=(uint64_t)(i%L)+1u;
+        switch (i%4u) {
+            case 0u: entity[i]=(MusaDwg1032CadColor){256,0,0}; break;
+            case 1u: entity[i]=(MusaDwg1032CadColor){0,0,0}; break;
+            case 2u: entity[i]=(MusaDwg1032CadColor){
+                (uint16_t)(i%255u+1u),0,0}; break;
+            default: entity[i]=(MusaDwg1032CadColor){
+                256,1,(uint32_t)((i*37u)&0xffffffu)}; break;
+        }
+    }
+    MusaDwg1032ObjectIndex index={0};
+    assert(musa_dwg1032_object_index_init(&index,entries,N,N));
+    assert(musa_dwg1032_layer_color_select(
+        &index,layer_refs,entity,layers,L,reference));
+    assert(musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,scratch,N));
+    for (size_t i=0;i<N;++i) {
+        assert(out[i].byblock==reference[i].byblock);
+        assert(out[i].color.aci==reference[i].color.aci);
+        assert(out[i].color.has_truecolor==
+               reference[i].color.has_truecolor);
+        assert(out[i].color.truecolor_rgb==
+               reference[i].color.truecolor_rgb);
+    }
+    MusaDwg1032ResolvedColor saved[N];
+    memcpy(saved,out,sizeof(saved));
+    layer_refs[N-1u]=UINT64_MAX;
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,scratch,N));
+    assert(memcmp(out,saved,sizeof(out))==0);
+    layer_refs[N-1u]=(uint64_t)((N-1u)%L)+1u;
+    layers[L-1u].color=(MusaDwg1032CadColor){256,0,0};
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,scratch,N));
+    assert(memcmp(out,saved,sizeof(out))==0);
+    layers[L-1u].color=(MusaDwg1032CadColor){
+        (uint16_t)((L-1u)%255u+1u),0,0};
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,out,N));
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,scratch,N-1u));
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,
+        (MusaDwg1032ResolvedColor *)(void *)entries,N));
+    assert(memcmp(out,saved,sizeof(out))==0);
+    assert(musa_dwg1032_layer_color_select_scratch(
+        &index,layer_refs,entity,layers,L,out,scratch,N));
+    for (size_t i=0;i<N;++i)
+        assert(out[i].byblock==reference[i].byblock &&
+               out[i].color.aci==reference[i].color.aci &&
+               out[i].color.has_truecolor==reference[i].color.has_truecolor &&
+               out[i].color.truecolor_rgb==reference[i].color.truecolor_rgb);
+}
+
 int main(void) {
+    scratch_color_large_pafta();
     large_layer_zero_instance_atomicity();
     per_insert_layer_zero_context();
     reject_stale_rgb_across_color_stages();
