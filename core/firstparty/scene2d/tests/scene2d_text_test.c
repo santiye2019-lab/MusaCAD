@@ -96,9 +96,23 @@ int main(void) {
                                          (MusaScene2dBox *)(void *)g));
     assert(!musa_scene2d_text_run_bounds(g,3,rotate,
                          (MusaScene2dBox *)(void *)(rotate+2)));
+    /* Two large but finite, opposite-signed x products cancel.
+     * Their absolute sum must not overflow the conservative ink margin. */
+    const MusaScene2dTextGlyph cancelling={
+        {1,1,1,1},0,0,1
+    };
+    const double cancelling_affine[6]={1e308,0,-1e308,1,1,0};
+    assert(musa_scene2d_text_run_bounds(
+        &cancelling,1,cancelling_affine,&box));
+    assert(isfinite(box.min_x) && isfinite(box.max_x) &&
+           isfinite(box.min_y) && isfinite(box.max_y));
+    assert(box.min_x<0 && box.max_x>0 &&
+           box.min_y<1 && box.max_y>1);
+    /* A failed later bounds calculation cannot corrupt the prior result. */
+    const MusaScene2dBox cancelling_saved=box;
     const double huge[6]={1e308,0,0,1,0,0};
     assert(!musa_scene2d_text_run_bounds(g,3,huge,&box));
-    assert(memcmp(&saved,&box,sizeof(box))==0);
+    assert(memcmp(&cancelling_saved,&box,sizeof(box))==0);
     assert(!musa_scene2d_text_run_bounds(g,0,rotate,&box));
     MusaScene2dTextGlyph blank={ {NAN,NAN,NAN,NAN},1,0,0 };
     assert(!musa_scene2d_text_run_bounds(&blank,1,rotate,&box));
