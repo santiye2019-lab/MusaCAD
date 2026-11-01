@@ -233,8 +233,14 @@ int musa_dwg1032_section_read_window(
         for (size_t i=first;remaining;) {
             if (i>=page_count) return 0;
             const MusaDwg1032FilePage p=pages[i];
-            if (!p.byte_count || p.logical_offset>pos ||
-                pos-p.logical_offset>=(uint64_t)p.byte_count ||
+            /* The first page may start before the requested offset.
+             * Every following page must start exactly where the previous
+             * one ended; overlapping logical pages must not be spliced
+             * into a plausible but incorrect object payload. */
+            if (!p.byte_count ||
+                (i==first ? (p.logical_offset>pos ||
+                             pos-p.logical_offset>=(uint64_t)p.byte_count)
+                          : p.logical_offset!=pos) ||
                 p.file_offset>(uint64_t)file_size ||
                 (uint64_t)p.byte_count>(uint64_t)file_size-p.file_offset)
                 return 0;
