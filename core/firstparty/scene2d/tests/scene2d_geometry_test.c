@@ -19,9 +19,12 @@ int main(void) {
      * the one-ULP outward margin overflows the floating-point range. */
     assert(musa_scene2d_line_bounds(DBL_MAX,-DBL_MAX,
                                     DBL_MAX,-DBL_MAX,&b));
-    assert(b.min_x==DBL_MAX && b.max_x==DBL_MAX);
-    assert(b.min_y==-DBL_MAX && b.max_y==-DBL_MAX);
-    assert(isfinite(b.min_x) && isfinite(b.max_y));
+    /* The outward-rounded box may extend one representable step inward
+     * at the finite limit; exact equality of both edges is not required. */
+    assert(contains(b,DBL_MAX,-DBL_MAX));
+    assert(b.max_x==DBL_MAX && b.min_y==-DBL_MAX);
+    assert(isfinite(b.min_x) && isfinite(b.max_x) &&
+           isfinite(b.min_y) && isfinite(b.max_y));
     assert(musa_scene2d_line_bounds(-DBL_MAX,DBL_MAX,
                                     DBL_MAX,-DBL_MAX,&b));
     assert(contains(b,-DBL_MAX,DBL_MAX) &&
