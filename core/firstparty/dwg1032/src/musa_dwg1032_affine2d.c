@@ -15,11 +15,24 @@ static int valid(const MusaDwg1032Affine2 *t) {
     return isfinite(t->xx) && isfinite(t->xy) && isfinite(t->tx) &&
            isfinite(t->yx) && isfinite(t->yy) && isfinite(t->ty);
 }
+/* A finite affine result can be lost when the two products are added
+ * before a large translation of the opposite sign. Keep the ordinary
+ * fast path, then retry with fused multiply-add in both orders. */
+static double translated_pair(double a, double x, double b, double y,
+                              double offset) {
+    double result=a*x+b*y+offset;
+    if (!isfinite(result)) {
+        result=fma(a,x,fma(b,y,offset));
+        if (!isfinite(result))
+            result=fma(b,y,fma(a,x,offset));
+    }
+    return result;
+}
 static int mapped(const MusaDwg1032Affine2 *t,
                   MusaDwg1032Point2 p, MusaDwg1032Point2 *result) {
     if (!isfinite(p.x) || !isfinite(p.y)) return 0;
-    const double x=t->xx*p.x+t->xy*p.y+t->tx;
-    const double y=t->yx*p.x+t->yy*p.y+t->ty;
+    const double x=translated_pair(t->xx,p.x,t->xy,p.y,t->tx);
+    const double y=translated_pair(t->yx,p.x,t->yy,p.y,t->ty);
     if (!isfinite(x) || !isfinite(y)) return 0;
     result->x=x; result->y=y;
     return 1;
@@ -43,12 +56,12 @@ int musa_dwg1032_affine2_compose(const MusaDwg1032Affine2 *outer,
         overlaps(outer,sizeof(*outer),out,sizeof(*out)) ||
         overlaps(inner,sizeof(*inner),out,sizeof(*out))) return 0;
     const MusaDwg1032Affine2 t={
-        outer->xx*inner->xx+outer->xy*inner->yx,
-        outer->xx*inner->xy+outer->xy*inner->yy,
-        outer->xx*inner->tx+outer->xy*inner->ty+outer->tx,
-        outer->yx*inner->xx+outer->yy*inner->yx,
-        outer->yx*inner->xy+outer->yy*inner->yy,
-        outer->yx*inner->tx+outer->yy*inner->ty+outer->ty};
+        translated_pair(outer->xx,inner->xx,outer->xy,inner->yx,0.0),
+        translated_pair(outer->xx,inner->xy,outer->xy,inner->yy,0.0),
+        translated_pair(outer->xx,inner->tx,outer->xy,inner->ty,outer->tx),
+        translated_pair(outer->yx,inner->xx,outer->yy,inner->yx,0.0),
+        translated_pair(outer->yx,inner->xy,outer->yy,inner->yy,0.0),
+        translated_pair(outer->yx,inner->tx,outer->yy,inner->ty,outer->ty)};
     if (!valid(&t)) return 0;
     *out=t;
     return 1;
