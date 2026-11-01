@@ -224,6 +224,66 @@ static void iterator_paged_large(void) {
     assert(same_iterator(&saved,&iterator));
     assert(memcmp(snapshot,out,sizeof(out))==0);
 }
+/* Differential stress: one-pass scratch paging must match the established
+ * two-pass reader and preserve both published state and output on failure.
+ * This exercises 20,000 synthetic delta pairs, not a real DWG fixture. */
+static void iterator_paged_scratch_equivalence(void) {
+    enum { N=20000, PAGE=257 };
+    static uint8_t bytes[N*2u];
+    for (size_t i=0;i<N;++i) {
+        bytes[2u*i]=1u;
+        bytes[2u*i+1u]=1u;
+    }
+    MusaDwg1032MapIterator slow,fast;
+    MusaDwg1032MapEntry expected[PAGE],out[PAGE],scratch[PAGE];
+    assert(musa_dwg1032_object_map_iterator_init(
+        &slow,bytes,sizeof(bytes),N+1u));
+    assert(musa_dwg1032_object_map_iterator_init(
+        &fast,bytes,sizeof(bytes),N+1u));
+    for (size_t start=0;start<N;start+=PAGE) {
+        const size_t count=N-start<PAGE ? N-start : PAGE;
+        assert(musa_dwg1032_object_map_iterator_page(
+            &slow,expected,count,PAGE));
+        assert(musa_dwg1032_object_map_iterator_page_scratch(
+            &fast,out,count,PAGE,scratch,PAGE));
+        assert(same_iterator(&slow,&fast));
+        for (size_t i=0;i<count;++i)
+            assert(same_entry(&expected[i],&out[i]));
+    }
+    assert(musa_dwg1032_object_map_iterator_finished(&fast,N));
+    const MusaDwg1032MapIterator completed=fast;
+    assert(musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,NULL,0u,0u,NULL,0u));
+    assert(same_iterator(&completed,&fast));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,out,1u,PAGE,out,PAGE));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,out,1u,PAGE,(MusaDwg1032MapEntry *)(void *)&fast,PAGE));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,(MusaDwg1032MapEntry *)(void *)&fast,1u,PAGE,scratch,PAGE));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,out,1u,PAGE,NULL,PAGE));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,NULL,1u,PAGE,scratch,PAGE));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,out,PAGE+1u,PAGE,scratch,PAGE+1u));
+    assert(same_iterator(&completed,&fast));
+
+    bytes[sizeof(bytes)-1u]=0x40u; /* Invalid final signed delta. */
+    assert(musa_dwg1032_object_map_iterator_init(
+        &fast,bytes,sizeof(bytes),N+1u));
+    const size_t processed=(N/PAGE)*PAGE;
+    for (size_t start=0;start<processed;start+=PAGE)
+        assert(musa_dwg1032_object_map_iterator_page_scratch(
+            &fast,out,PAGE,PAGE,scratch,PAGE));
+    const MusaDwg1032MapIterator saved=fast;
+    MusaDwg1032MapEntry snapshot[PAGE];
+    memcpy(snapshot,out,sizeof(out));
+    assert(!musa_dwg1032_object_map_iterator_page_scratch(
+        &fast,out,N-processed,PAGE,scratch,PAGE));
+    assert(same_iterator(&saved,&fast));
+    assert(memcmp(snapshot,out,sizeof(out))==0);
+}
 static void small(void) {
     const uint8_t payload[]={1,10,2,0x45,3,20};
     MusaDwg1032MapEntry out[3]={{99,99},{99,99},{99,99}};
@@ -418,4 +478,4 @@ static void iterator_extreme_negative_delta(void) {
     assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
     assert(same_iterator(&saved,&iterator) && same_entry(&last,&entry));
 }
-int main(void) {iterator_extreme_negative_delta();iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
+int main(void) {iterator_paged_scratch_equivalence();iterator_extreme_negative_delta();iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
