@@ -18,6 +18,14 @@ static int ranges_overlap(const void *a, size_t na, const void *b, size_t nb) {
     const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
     return x <= y ? y - x < na : x - y < nb;
 }
+/* A large translation can overflow the inner multiply-add even when the
+ * final world coordinate is representable. Evaluate the other association
+ * only on the nonfinite path; ordinary drawings retain the fast path. */
+static double world_component(double ax, double x, double ay, double y,
+                              double translation) {
+    const double value=fma(ax,x,fma(ay,y,translation));
+    return isfinite(value) ? value : fma(ay,y,fma(ax,x,translation));
+}
 static int prepare_one(const MusaScene2dNode *n,
                        const MusaScene2dResolved *r, MusaScene2dBox local,
                        MusaScene2dPreparedBounds *dst) {
@@ -38,10 +46,10 @@ static int prepare_one(const MusaScene2dNode *n,
         const double y = (k & 2u) ? local.max_y : local.min_y;
         /* Avoid losing small world-space offsets when a large local
          * coordinate cancels the translation (large CAD site plans). */
-        const double wx = fma(r->world[0],x,
-                              fma(r->world[2],y,r->world[4]));
-        const double wy = fma(r->world[1],x,
-                              fma(r->world[3],y,r->world[5]));
+        const double wx = world_component(r->world[0],x,r->world[2],y,
+                                          r->world[4]);
+        const double wy = world_component(r->world[1],x,r->world[3],y,
+                                          r->world[5]);
         if (!isfinite(wx) || !isfinite(wy)) return 0;
         if (wx < minx) minx = wx;
         if (wx > maxx) maxx = wx;
