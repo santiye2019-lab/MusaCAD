@@ -6,6 +6,7 @@
 #include <float.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int valid_box(MusaScene2dBox b) {
     return isfinite(b.min_x) && isfinite(b.min_y) &&
@@ -106,6 +107,56 @@ int musa_scene2d_collect_visible(
                         viewport, &hit);
         if (hit) indices[out_count++] = i;
     }
+    *written = hits;
+    return 1;
+}
+
+/* The two-pass, allocation-free API remains available. This opt-in path
+ * avoids repeating four-corner transforms on large already-decoded scenes. */
+int musa_scene2d_collect_visible_scratch(
+    const MusaScene2dNode *nodes, const MusaScene2dResolved *resolved,
+    const MusaScene2dBox *local_bounds, size_t count, MusaScene2dBox viewport,
+    size_t *indices, size_t capacity, size_t *written,
+    size_t *scratch, size_t scratch_capacity) {
+    if (!written || !valid_box(viewport) ||
+        count > SIZE_MAX / sizeof(*nodes) ||
+        count > SIZE_MAX / sizeof(*resolved) ||
+        count > SIZE_MAX / sizeof(*local_bounds) ||
+        capacity > SIZE_MAX / sizeof(*indices) ||
+        scratch_capacity > SIZE_MAX / sizeof(*scratch) ||
+        scratch_capacity < count ||
+        (count && (!nodes || !resolved || !local_bounds ||
+                   !indices || !scratch)))
+        return 0;
+    const size_t nodes_bytes = count * sizeof(*nodes);
+    const size_t resolved_bytes = count * sizeof(*resolved);
+    const size_t boxes_bytes = count * sizeof(*local_bounds);
+    const size_t output_bytes = capacity * sizeof(*indices);
+    const size_t scratch_bytes = scratch_capacity * sizeof(*scratch);
+    const void *inputs[] = {nodes, resolved, local_bounds};
+    const size_t input_bytes[] = {nodes_bytes, resolved_bytes, boxes_bytes};
+    for (size_t i = 0; i < 3; ++i) {
+        if (overlap(indices, output_bytes, inputs[i], input_bytes[i]) ||
+            overlap(scratch, scratch_bytes, inputs[i], input_bytes[i]) ||
+            overlap(written, sizeof(*written), inputs[i], input_bytes[i]))
+            return 0;
+    }
+    if (overlap(indices, output_bytes, scratch, scratch_bytes) ||
+        overlap(indices, output_bytes, written, sizeof(*written)) ||
+        overlap(scratch, scratch_bytes, written, sizeof(*written)))
+        return 0;
+    size_t hits = 0;
+    for (size_t i = 0; i < count; ++i) {
+        int hit = 0;
+        if (!candidate(&nodes[i], &resolved[i], local_bounds[i],
+                       viewport, &hit))
+            return 0;
+        if (hit) {
+            if (hits == capacity) return 0;
+            scratch[hits++] = i;
+        }
+    }
+    if (hits) memcpy(indices, scratch, hits * sizeof(*indices));
     *written = hits;
     return 1;
 }
