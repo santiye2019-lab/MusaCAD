@@ -87,6 +87,11 @@ static void small(void) {
         (uint64_t *)(void *)pages));
     assert(length==999);
     for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5);
+    assert(!musa_dwg1032_object_candidate_read_window_at_position(
+        NULL,sizeof(file),pages,3,&index,0,0,out,1,&length));
+    assert(!musa_dwg1032_object_candidate_read_window_at_position(
+        file,SIZE_MAX,pages,3,&index,0,0,out,1,&length));
+    assert(length==999 && out[0]==0xA5);
 
     /* A late bad physical page must not expose a partial object window. */
     pages[1].file_offset=sizeof(file);
