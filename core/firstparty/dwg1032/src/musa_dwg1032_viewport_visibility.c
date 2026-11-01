@@ -4,6 +4,7 @@
 #include "musa_dwg1032_viewport_visibility.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
@@ -191,5 +192,61 @@ int musa_dwg1032_viewport_insert_visibility(
         }
         effective_visible[i]=visible;
     }
+    return 1;
+}
+
+/* Single layer lookup per entity. The caller's scratch buffer absorbs
+ * partial work; no public mask is published until all inputs validate.
+ * This is post-decode evidence, not a DWG parser or render permission. */
+int musa_dwg1032_viewport_local_visibility_scratch(
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible, size_t entity_count,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *local_visible, uint8_t *scratch, size_t scratch_capacity) {
+    if (!entity_count || !entity_layer_handles || !entity_visible ||
+        !layers || !layer_count || !local_visible || !scratch ||
+        scratch_capacity<entity_count || (override_count && !overrides) ||
+        entity_count>SIZE_MAX/sizeof(*entity_layer_handles) ||
+        layer_count>SIZE_MAX/sizeof(*layers) ||
+        override_count>SIZE_MAX/sizeof(*overrides))
+        return 0;
+    const void *inputs[]={entity_layer_handles,entity_visible,layers,overrides};
+    const size_t input_bytes[]={
+        entity_count*sizeof(*entity_layer_handles),entity_count,
+        layer_count*sizeof(*layers),override_count*sizeof(*overrides)
+    };
+    if (overlaps(local_visible,entity_count,scratch,scratch_capacity))
+        return 0;
+    for (size_t i=0u;i<4u;++i)
+        if (overlaps(local_visible,entity_count,inputs[i],input_bytes[i]) ||
+            overlaps(scratch,scratch_capacity,inputs[i],input_bytes[i]))
+            return 0;
+    uint64_t previous=0u;
+    for (size_t i=0u;i<layer_count;++i) {
+        if (!layers[i].handle || layers[i].handle<=previous ||
+            layers[i].on>1u || layers[i].thawed>1u) return 0;
+        previous=layers[i].handle;
+    }
+    previous=0u;
+    for (size_t i=0u;i<override_count;++i) {
+        const uint64_t h=overrides[i].layer_handle;
+        if (!h || h<=previous || overrides[i].frozen>1u) return 0;
+        const size_t at=layer_at(layers,layer_count,h);
+        if (at==layer_count || layers[at].handle!=h) return 0;
+        previous=h;
+    }
+    for (size_t i=0u;i<entity_count;++i) {
+        const uint64_t h=entity_layer_handles[i];
+        if (!h || entity_visible[i]>1u) return 0;
+        const size_t at=layer_at(layers,layer_count,h);
+        if (at==layer_count || layers[at].handle!=h) return 0;
+        const size_t ov=override_at(overrides,override_count,h);
+        const int frozen=ov<override_count &&
+            overrides[ov].layer_handle==h && overrides[ov].frozen;
+        scratch[i]=(uint8_t)(entity_visible[i] && layers[at].on &&
+                             layers[at].thawed && !frozen);
+    }
+    memcpy(local_visible,scratch,entity_count);
     return 1;
 }
