@@ -479,8 +479,8 @@ static void iterator_extreme_negative_delta(void) {
     assert(same_iterator(&saved,&iterator) && same_entry(&last,&entry));
 }
 /* Compare the one-pass location bridge against the independent two-stage
- * decode + physical ordering path on a large, reverse-offset map. Both
- * paths must reject late corruption without publishing partial locations. */
+ * decode + physical ordering path on a large synthetic map. Both paths
+ * must reject late corruption without publishing partial locations. */
 static void decode_locations_differential(void) {
     enum { N=20000 };
     static uint8_t bytes[N*2u+1u];
@@ -489,13 +489,8 @@ static void decode_locations_differential(void) {
     static size_t slow_order[N],fast_order[N];
     for (size_t i=0;i<N;++i) {
         bytes[2u*i]=1u;
-        /* Reversed offsets: begin at N, then subtract one per record.
-         * The first offset is N, and the final offset is 1. */
-        bytes[2u*i+1u]=i==0u ? 0u : 0x41u;
+        bytes[2u*i+1u]=1u;
     }
-    /* Use a forward-offset map for the reference comparison; physical
-     * offset sorting is independently covered by candidate_stress(). */
-    for (size_t i=0;i<N;++i) bytes[2u*i+1u]=1u;
     assert(musa_dwg1032_object_map_decode(
         bytes,N*2u,N,N+1u,entries,N));
     assert(musa_dwg1032_object_map_candidate_spans(
