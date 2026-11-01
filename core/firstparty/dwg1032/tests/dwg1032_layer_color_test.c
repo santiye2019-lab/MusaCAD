@@ -365,7 +365,7 @@ static void scratch_color_large_pafta(void) {
         &index,layer_refs,entity,layers,L,out,scratch,N));
     assert(memcmp(out,saved,sizeof(out))==0);
     layers[L-1u].color=(MusaDwg1032CadColor){
-        (uint16_t)((L-1u)%255u+1u),0,0};
+        256,1,(uint32_t)((L-1u)*701u)};
     assert(!musa_dwg1032_layer_color_select_scratch(
         &index,layer_refs,entity,layers,L,out,out,N));
     assert(!musa_dwg1032_layer_color_select_scratch(
