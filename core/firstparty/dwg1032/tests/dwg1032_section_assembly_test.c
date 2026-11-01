@@ -294,6 +294,14 @@ static void bounded_window_reads(void) {
     pages[2].logical_offset=7; /* Missing logical byte. */
     assert(!musa_dwg1032_file_pages_validate_window_directory(
         pages,3,sizeof(physical),9,order,3));
+    pages[2].logical_offset=5; /* Overlapping logical page. */
+    assert(!musa_dwg1032_file_pages_validate_window_directory(
+        pages,3,sizeof(physical),9,order,3));
+    /* Even when an untrusted caller skips directory prevalidation,
+     * a cross-page read must not silently splice overlapping bytes. */
+    assert(!musa_dwg1032_section_read_window(
+        physical,sizeof(physical),pages,3,9,4,out,4));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xAA);
     pages[2].logical_offset=6;
     pages[2].file_offset=6; /* Duplicate physical range. */
     assert(!musa_dwg1032_file_pages_validate_window_directory(
