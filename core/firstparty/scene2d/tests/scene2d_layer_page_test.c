@@ -35,7 +35,13 @@ int main(void) {
         assert(musa_scene2d_layers_from_cad_page(cad,N,next,palette,256,
                   0x112233u,page,PAGE,&written,&total));
         assert(total==N && written>0 && written<=PAGE);
-        assert(memcmp(page,full+next,written*sizeof(*page))==0);
+        /* Struct tail padding is unspecified after C member assignment;
+         * compare the CAD-visible fields, not bytewise padding. */
+        for (size_t k=0;k<written;++k) {
+            assert(page[k].handle==full[next+k].handle);
+            assert(page[k].rgba==full[next+k].rgba);
+            assert(page[k].visible==full[next+k].visible);
+        }
         const uint8_t *raw=(const uint8_t *)page;
         for (size_t i=written*sizeof(*page);i<sizeof(page);++i)
             assert(raw[i]==0xa5u);
@@ -97,7 +103,11 @@ int main(void) {
     assert(musa_scene2d_layers_from_cad_page(cad,N,N-20u,palette,256,
                   0x112233u,page,PAGE,&written,&total));
     assert(written==20 && total==N);
-    assert(memcmp(page,full+N-20u,written*sizeof(*page))==0);
+    for (size_t k=0;k<written;++k) {
+        assert(page[k].handle==full[N-20u+k].handle);
+        assert(page[k].rgba==full[N-20u+k].rgba);
+        assert(page[k].visible==full[N-20u+k].visible);
+    }
     assert(musa_scene2d_layers_from_cad_page(NULL,0,0,NULL,0,
                   0,NULL,0,&written,&total));
     assert(written==0 && total==0);
