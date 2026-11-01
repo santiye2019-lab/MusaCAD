@@ -32,6 +32,20 @@ static void test_viewport_inheritance(void) {
     size_t written = 77;
     assert(musa_scene2d_resolve_viewport(nodes,7,layers,4,all,out,7,&written));
     assert(written == 7);
+    /* The allocation-free all-visible viewport must exactly match
+     * ordinary scene resolution, including nested block transforms. */
+    MusaScene2dResolved plain[7];
+    size_t plain_written = 0;
+    assert(musa_scene2d_resolve(nodes,7,layers,4,plain,7,&plain_written));
+    assert(plain_written == written);
+    for (size_t i=0;i<7u;++i) {
+        assert(out[i].handle == plain[i].handle);
+        assert(out[i].effective_layer == plain[i].effective_layer);
+        assert(out[i].rgba == plain[i].rgba);
+        assert(out[i].visible == plain[i].visible);
+        for (size_t j=0;j<6u;++j)
+            assert(out[i].world[j] == plain[i].world[j]);
+    }
     assert(out[2].visible && out[2].effective_layer == 10);
     assert(out[2].rgba == 0xffff0000u);
     assert(out[2].world[4] == 15 && out[2].world[5] == 28);
@@ -92,6 +106,13 @@ static void test_rejection_is_atomic(void) {
                                           mask,out,7,
                                           (size_t *)(void *)layers));
     assert(written == 77 && memcmp(out,saved,sizeof out) == 0);
+    assert(musa_scene2d_resolve_viewport(NULL,0,layers,4,
+                                         mask,NULL,0,&written));
+    assert(written == 0);
+    /* Empty drawings must also accept a frozen viewport without needing
+     * a disposable copy of the layer table. */
+    mask[1]=0;
+    written=77;
     assert(musa_scene2d_resolve_viewport(NULL,0,layers,4,
                                          mask,NULL,0,&written));
     assert(written == 0);
