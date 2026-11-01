@@ -207,3 +207,10 @@
 - **Origin:** Original C11 implementation based on the existing independently authored 2D affine adapter, caller-owned scratch arrays and elementary disjoint-memory checks. No legacy MusaCAD/LibreDWG source or GPL/AGPL/LGPL code was imported, modified, or linked.
 - **Behavior:** Optional `musa_scene2d_insert_affine_batch_scratch` computes each already-decoded INSERT transform once and publishes the full result only after every placement succeeds. The existing lower-memory two-pass API remains unchanged. Invalid late placements and buffer aliasing preserve output; scratch may be partially filled on failure.
 - **Evidence and limits:** The regression compares 20,000 independently rotated/mirrored synthetic INSERTs against the existing batch path, including rollback and overlap rejection. This is **not** a real-world speed benchmark, a DWG object decoder, AC1032 compressed-page support, or Android rendering integration. CI status must be checked separately before claiming test success.
+
+## 2026-11-01 — finite-limit analytic geometry and viewport retention
+
+- **Files:** `src/musa_scene2d_geometry.c`, `tests/scene2d_geometry_test.c`.
+- **Independent origin:** A small C11/IEEE-754 finite-boundary check and `nextafter` rounding adjustment, authored directly for the MIT-only first-party scene module. No GPL/AGPL/LGPL, LibreDWG, third-party CAD reader, legacy implementation, or uncertain-origin code was copied, adapted, or linked.
+- **Behavior:** Finite 2D primitive bounds at `+/-DBL_MAX` no longer become infinite solely because the outward one-ULP margin crosses the representable range. Nonfinite arithmetic and malformed bounds remain rejected; bounds saturate at finite representable limits.
+- **Regression:** Synthetic extreme-endpoint LINE cases check both signs and an end-to-end scene-resolution, world-bound cache and viewport query. This is not a real AC1032 DWG test, decompression proof, or Android render verification. Verify CI on the exact commit before treating tests as passed. The production app, existing 3D code, `MusaCAD2/`, and `main` are untouched.
