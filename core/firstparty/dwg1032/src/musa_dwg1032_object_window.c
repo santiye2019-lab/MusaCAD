@@ -22,6 +22,8 @@ int musa_dwg1032_object_candidate_read_window_at_position(
     if (!index || !candidate_length || position>=index->count ||
         index->count>SIZE_MAX/sizeof(*index->entries) ||
         page_count>SIZE_MAX/sizeof(*pages) ||
+        file_size>PTRDIFF_MAX ||
+        (file_size && !file_bytes) ||
         (index->count && !index->entries) ||
         (page_count && !pages) ||
         (byte_count && !destination))
@@ -90,6 +92,8 @@ int musa_dwg1032_object_ms_payload_read_window_at_position(
     if (!index || !payload_length || position>=index->count || !max_payload_bytes ||
         index->count>SIZE_MAX/sizeof(*index->entries) ||
         page_count>SIZE_MAX/sizeof(*pages) ||
+        file_size>PTRDIFF_MAX ||
+        (file_size && !file_bytes) ||
         (index->count && !index->entries) ||
         (page_count && !pages) ||
         (byte_count && !destination))
