@@ -78,10 +78,14 @@ int musa_scene2d_text_run_bounds(const MusaScene2dTextGlyph *glyphs,
                 const double bx=text_affine[1]*x, dy=text_affine[3]*y;
                 const double wx=ax+cy+text_affine[4];
                 const double wy=bx+dy+text_affine[5];
-                const double ex=32.0*DBL_EPSILON*
-                    (fabs(ax)+fabs(cy)+fabs(text_affine[4])+1.0);
-                const double ey=32.0*DBL_EPSILON*
-                    (fabs(bx)+fabs(dy)+fabs(text_affine[5])+1.0);
+                /* Scale before summing absolute terms: two individually
+                 * finite products can overflow their absolute sum even
+                 * when opposite signs cancel to a finite world point. */
+                const double roundoff=32.0*DBL_EPSILON;
+                const double ex=roundoff*fabs(ax)+roundoff*fabs(cy)+
+                                roundoff*fabs(text_affine[4])+roundoff;
+                const double ey=roundoff*fabs(bx)+roundoff*fabs(dy)+
+                                roundoff*fabs(text_affine[5])+roundoff;
                 if (!isfinite(wx) || !isfinite(wy) ||
                     !isfinite(ex) || !isfinite(ey)) return 0;
                 const double lx=nextafter(wx-ex,-INFINITY);
