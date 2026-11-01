@@ -342,6 +342,29 @@ static void bounded_window_large_pafta(void) {
     for (size_t j=0;j<WINDOW;++j) assert(out[j]==0xAA);
     free(order);free(pages);free(out);free(file);
 }
+/* A forged page may physically fit the file yet extend past the declared
+ * logical section. Reject even a short in-range window, without writes. */
+static void window_rejects_logical_page_overrun(void) {
+    const uint8_t file[]={10u,11u,12u,13u,14u,15u};
+    uint8_t out[4]={0xa5u,0xa5u,0xa5u,0xa5u};
+    MusaDwg1032FilePage single[]={{0u,0u,6u}};
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),single,1u,4u,0u,out,2u));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xa5u);
+    MusaDwg1032FilePage crossing[]={{0u,0u,2u},{2u,2u,4u}};
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),crossing,2u,4u,1u,out,3u));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xa5u);
+    size_t order[2];
+    assert(!musa_dwg1032_file_pages_validate_window_directory(
+        crossing,2u,sizeof(file),4u,order,2u));
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        crossing,2u,sizeof(file),6u,order,2u));
+    assert(musa_dwg1032_section_read_window(
+        file,sizeof(file),crossing,2u,6u,1u,out,3u));
+    assert(out[0]==11u && out[1]==12u && out[2]==13u);
+    assert(out[3]==0xa5u);
+}
 /* Multi-byte viewport reads exercise the single-page shortcut and
  * the transactional multi-page fallback against the same reversed map. */
 static void window_single_page_fast_path_stress(void) {
@@ -397,6 +420,7 @@ int main(void) {
     physical_directory_validation();physical_directory_stress();
     strict_file_page_assembly();
     bounded_window_reads();bounded_window_large_pafta();
+    window_rejects_logical_page_overrun();
     window_single_page_fast_path_stress();
     return 0;
 }
