@@ -24,7 +24,8 @@ int main(void) {
         cad[i].frozen=(uint8_t)(i%11u==0u);
         cad[i].viewport_frozen=(uint8_t)(i%13u==0u);
         cad[i].has_truecolor=(uint8_t)(i%17u==0u);
-        cad[i].truecolor_rgb=(uint32_t)(i&0xffffffu);
+        cad[i].truecolor_rgb=cad[i].has_truecolor
+            ? (uint32_t)(i&0xffffffu) : 0u;
     }
     assert(musa_scene2d_layers_from_cad(cad,N,palette,256,0x112233u,full,N));
     MusaScene2dLayer page[PAGE];

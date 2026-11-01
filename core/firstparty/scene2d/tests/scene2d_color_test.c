@@ -90,6 +90,20 @@ int main(void) {
         (MusaScene2dColorSelection *)(void *)&c));
     assert(!musa_scene2d_cad_color_select(&c,palette,256,0,
         (MusaScene2dColorSelection *)(void *)&palette[8]));
+    /* An inactive but nonzero RGB is malformed source metadata, even
+     * when ACI/ByLayer/ByBlock would otherwise select successfully. */
+    c=(MusaScene2dCadColor){0,0,0x123456u};
+    saved=s;
+    assert(!musa_scene2d_cad_color_select(&c,NULL,0,0,&s));
+    assert(memcmp(&s,&saved,sizeof s)==0);
+    c.aci=256;
+    assert(!musa_scene2d_cad_color_select(&c,NULL,0,0,&s));
+    c.aci=7;
+    assert(!musa_scene2d_cad_color_select(&c,NULL,0,0,&s));
+    assert(memcmp(&s,&saved,sizeof s)==0);
+    c.truecolor_rgb=0;
+    assert(musa_scene2d_cad_color_select(&c,NULL,0,0,&s));
+    assert(s.mode==MUSA_SCENE2D_EXPLICIT && s.rgba==0xff000000u);
     graph_color_inheritance();
     return 0;
 }

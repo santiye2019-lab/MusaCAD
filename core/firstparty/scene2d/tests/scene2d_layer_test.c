@@ -33,6 +33,10 @@ int main(void) {
     cad.signed_aci=42; cad.has_truecolor=0;
     assert(!musa_scene2d_layer_from_cad(&cad,NULL,0,0,&layer));
     uint32_t palette[256]={0}; palette[42]=0xabcdefu;
+    /* Stale TrueColor cannot silently fall back to indexed layer ACI. */
+    assert(!musa_scene2d_layer_from_cad(&cad,palette,256,0,&layer));
+    assert(memcmp(&saved,&layer,sizeof(layer))==0);
+    cad.truecolor_rgb=0;
     assert(musa_scene2d_layer_from_cad(&cad,palette,256,0,&layer));
     assert(layer.rgba==0xffabcdefu && layer.visible==1);
     cad.frozen=2;

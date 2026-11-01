@@ -17,6 +17,7 @@ int musa_scene2d_cad_color_select(const MusaScene2dCadColor *color,
     static const uint32_t basic[7]={0,0xff0000u,0xffff00u,0x00ff00u,
                                      0x00ffffu,0x0000ffu,0xff00ffu};
     if (!color || !out || color->aci>256u || color->has_truecolor>1u ||
+        (!color->has_truecolor && color->truecolor_rgb!=0u) ||
         foreground_rgb>0xffffffu ||
         ((palette_rgb==NULL) != (palette_count==0)) ||
         (palette_rgb && palette_count!=256u) ||

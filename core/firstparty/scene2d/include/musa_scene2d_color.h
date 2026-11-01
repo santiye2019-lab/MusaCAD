@@ -22,6 +22,8 @@ typedef struct MusaScene2dColorSelection {
  * ACI 7 follows the caller's foreground RGB (e.g. black on white canvas).
  * A supplied palette also determines the value of ACI 7.
  * No DWG bytes, color-book names or transparency are decoded here.
+ * When has_truecolor is zero, truecolor_rgb must also be zero: stale RGB
+ * metadata is rejected rather than silently replacing its provenance.
  * Invalid arguments preserve *out. Input and output must not overlap. */
 int musa_scene2d_cad_color_select(const MusaScene2dCadColor *color,
                                   const uint32_t *palette_rgb,
