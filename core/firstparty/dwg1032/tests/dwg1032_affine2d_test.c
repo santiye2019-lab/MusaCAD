@@ -78,9 +78,35 @@ static void large_sheet(void) {
     assert(!musa_dwg1032_affine2_apply(&t,p,N,out));
     assert(near(out[N-1].x,1000000+2*(N-1)));
 }
+/* Synthetic large-sheet coordinates: a finite result must not disappear
+ * merely because the intermediate product sum exceeds double range. */
+static void finite_translation_cancellation(void) {
+    const double huge=1e308;
+    const MusaDwg1032Affine2 outer={1.0,1.0,-huge,0.0,1.0,0.0};
+    const MusaDwg1032Point2 point={huge,huge};
+    MusaDwg1032Point2 out={-17.0,-19.0};
+    assert(musa_dwg1032_affine2_apply(&outer,&point,1u,&out));
+    assert(out.x==huge && out.y==huge);
+
+    const MusaDwg1032Affine2 inner={1.0,0.0,huge,0.0,1.0,huge};
+    MusaDwg1032Affine2 composed={0};
+    assert(musa_dwg1032_affine2_compose(&outer,&inner,&composed));
+    assert(composed.tx==huge && composed.ty==huge);
+    const MusaDwg1032Point2 origin={0.0,0.0};
+    assert(musa_dwg1032_affine2_apply(&composed,&origin,1u,&out));
+    assert(out.x==huge && out.y==huge);
+
+    /* A genuinely unrepresentable world coordinate must still fail
+     * without publishing a partially updated output. */
+    const MusaDwg1032Affine2 overflow={1.0,1.0,0.0,0.0,1.0,0.0};
+    const MusaDwg1032Point2 saved=out;
+    assert(!musa_dwg1032_affine2_apply(&overflow,&point,1u,&out));
+    assert(memcmp(&out,&saved,sizeof out)==0);
+}
 int main(void) {
     instance_and_nested();
     reject_bad_and_atomic();
     large_sheet();
+    finite_translation_cancellation();
     return 0;
 }
