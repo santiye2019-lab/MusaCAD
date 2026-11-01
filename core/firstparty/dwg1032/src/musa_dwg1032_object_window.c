@@ -13,6 +13,23 @@ static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     return x<=y ? y-x<an : x-y<bn;
 }
 
+/* The ordinal fast path bypasses object_index_find. Recheck the selected
+ * borrowed record and its immediate handle neighbors before touching file
+ * bytes, so stale caller storage cannot expose an invalid candidate span.
+ * This constant-time guard does not replace full index validation. */
+static int candidate_entry_is_consistent(
+    const MusaDwg1032ObjectIndex *index, size_t position) {
+    if (!index || !index->entries || position>=index->count) return 0;
+    const MusaDwg1032ObjectLocation e=index->entries[position];
+    if (!e.handle || !e.length || e.offset>index->section_bytes ||
+        e.length>index->section_bytes-e.offset ||
+        (position && index->entries[position-1u].handle>=e.handle) ||
+        (position+1u<index->count &&
+         index->entries[position+1u].handle<=e.handle))
+        return 0;
+    return 1;
+}
+
 int musa_dwg1032_object_candidate_read_window_at_position(
     const uint8_t *file_bytes, size_t file_size,
     const MusaDwg1032FilePage *pages, size_t page_count,
@@ -46,10 +63,9 @@ int musa_dwg1032_object_candidate_read_window_at_position(
         overlaps(destination,byte_count,file_bytes,file_size))
         return 0;
 
+    if (!candidate_entry_is_consistent(index,position)) return 0;
     const MusaDwg1032ObjectLocation entry=index->entries[position];
-    if (!entry.length || entry.offset>index->section_bytes ||
-        entry.length>index->section_bytes-entry.offset ||
-        candidate_offset>entry.length ||
+    if (candidate_offset>entry.length ||
         (uint64_t)byte_count>entry.length-candidate_offset)
         return 0;
 
@@ -116,10 +132,9 @@ int musa_dwg1032_object_ms_payload_read_window_at_position(
         overlaps(destination,byte_count,file_bytes,file_size))
         return 0;
 
+    if (!candidate_entry_is_consistent(index,position)) return 0;
     const MusaDwg1032ObjectLocation entry=index->entries[position];
-    if (entry.length<2u || entry.offset>index->section_bytes ||
-        entry.length>index->section_bytes-entry.offset)
-        return 0;
+    if (entry.length<2u) return 0;
 
     uint8_t prefix[4]={0};
     if (!musa_dwg1032_section_read_window(
