@@ -3,6 +3,7 @@
 #include "musa_dwg1032_modular.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
@@ -97,6 +98,37 @@ int musa_dwg1032_object_map_iterator_page(
         out[i]=entry;
     }
     *iterator=publish;
+    return 1;
+}
+/* Single-pass transactional paging for large, verified object maps.
+ * Caller-owned scratch trades O(count) storage for half the delta parses.
+ * Only the final copy and iterator update publish results. */
+int musa_dwg1032_object_map_iterator_page_scratch(
+    MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *out,
+    size_t count, size_t capacity, MusaDwg1032MapEntry *scratch,
+    size_t scratch_capacity) {
+    if (!iterator || count>capacity || count>scratch_capacity ||
+        iterator->cursor.byte_count>PTRDIFF_MAX/8u ||
+        (iterator->cursor.byte_count && !iterator->cursor.bytes) ||
+        iterator->cursor.bit_position>iterator->cursor.byte_count*8u ||
+        count>SIZE_MAX/sizeof(*out) ||
+        (count && (!out || !scratch)))
+        return 0;
+    const size_t bytes=count*sizeof(*out);
+    if (overlaps(iterator,sizeof(*iterator),out,bytes) ||
+        overlaps(iterator,sizeof(*iterator),scratch,bytes) ||
+        overlaps(iterator->cursor.bytes,iterator->cursor.byte_count,
+                 out,bytes) ||
+        overlaps(iterator->cursor.bytes,iterator->cursor.byte_count,
+                 scratch,bytes) ||
+        overlaps(out,bytes,scratch,bytes))
+        return 0;
+    MusaDwg1032MapIterator trial=*iterator;
+    for (size_t i=0;i<count;++i)
+        if (!musa_dwg1032_object_map_iterator_next(&trial,&scratch[i]))
+            return 0;
+    if (count) memcpy(out,scratch,bytes);
+    *iterator=trial;
     return 1;
 }
 static int parse(const uint8_t *bytes, size_t byte_count, size_t count,
