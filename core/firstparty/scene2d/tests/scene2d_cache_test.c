@@ -208,6 +208,58 @@ static void test_fused_large_coordinate_viewport(void) {
     assert(nd==1u && nc==1u && ni==1u);
     assert(direct[0]==0u && cached[0]==0u && indexed[0]==0u);
 }
+/* Both direct and cached viewport culling must retain a finite point
+ * when an intermediate translated sum overflows before cancellation.
+ * The spatial index must return the same visible object. */
+static void test_reordered_fused_affine_extremes(void) {
+    const MusaScene2dNode n[] = {
+        {1,0,0,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,I}
+    };
+    const MusaScene2dResolved r[] = {
+        {1,0,0xff000000u,1,
+         {-1.5,-1.5,1.5,1.5,1.5e308,1.5e308}}
+    };
+    const MusaScene2dBox local[] = {
+        {1e308,1e308,1e308,1e308}
+    };
+    const MusaScene2dBox view = {1.5e308,1.5e308,1.5e308,1.5e308};
+    MusaScene2dPreparedBounds prepared[1];
+    size_t written=99;
+    assert(musa_scene2d_prepare_bounds(n,r,local,1,prepared,1,&written));
+    assert(written==1 && prepared[0].visible);
+    assert(prepared[0].box.min_x<=view.min_x &&
+           prepared[0].box.max_x>=view.max_x &&
+           prepared[0].box.min_y<=view.min_y &&
+           prepared[0].box.max_y>=view.max_y);
+    MusaScene2dIndexNode tree[2];
+    size_t leaves=0;
+    assert(musa_scene2d_index_build(prepared,1,tree,2,&leaves));
+    size_t direct[1]={99}, cached[1]={98}, indexed[1]={97};
+    size_t nd=99,nc=99,ni=99;
+    assert(musa_scene2d_collect_visible(n,r,local,1,view,direct,1,&nd));
+    assert(musa_scene2d_collect_prepared(prepared,1,view,cached,1,&nc));
+    assert(musa_scene2d_index_query(tree,1,leaves,view,indexed,1,&ni));
+    assert(nd==1 && nc==1 && ni==1);
+    assert(direct[0]==0 && cached[0]==0 && indexed[0]==0);
+    const MusaScene2dBox miss={1e308,1e308,1e308,1e308};
+    assert(musa_scene2d_collect_visible(n,r,local,1,miss,direct,1,&nd));
+    assert(musa_scene2d_collect_prepared(prepared,1,miss,cached,1,&nc));
+    assert(musa_scene2d_index_query(tree,1,leaves,miss,indexed,1,&ni));
+    assert(nd==0 && nc==0 && ni==0);
+    /* A genuinely unrepresentable world point still fails atomically. */
+    const MusaScene2dBox overflow_local[] = {
+        {-1e308,1e308,-1e308,1e308}
+    };
+    const MusaScene2dPreparedBounds saved=prepared[0];
+    written=77;
+    assert(!musa_scene2d_prepare_bounds(
+        n,r,overflow_local,1,prepared,1,&written));
+    assert(written==77 && memcmp(&saved,prepared,sizeof(saved))==0);
+    nd=77; direct[0]=99;
+    assert(!musa_scene2d_collect_visible(
+        n,r,overflow_local,1,view,direct,1,&nd));
+    assert(nd==77 && direct[0]==99);
+}
 static void test_large_scene(void) {
     const size_t count = 20000;
     MusaScene2dNode *n = calloc(count,sizeof *n);
@@ -239,6 +291,7 @@ int main(void) {
     test_atomic_failures();
     test_extreme_coordinate_consistency();
     test_fused_large_coordinate_viewport();
+    test_reordered_fused_affine_extremes();
     test_large_scene();
     return 0;
 }
