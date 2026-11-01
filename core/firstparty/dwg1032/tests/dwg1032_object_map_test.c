@@ -478,4 +478,39 @@ static void iterator_extreme_negative_delta(void) {
     assert(!musa_dwg1032_object_map_iterator_next(&iterator,&entry));
     assert(same_iterator(&saved,&iterator) && same_entry(&last,&entry));
 }
-int main(void) {iterator_paged_scratch_equivalence();iterator_extreme_negative_delta();iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
+/* Compare the one-pass location bridge against the independent two-stage
+ * decode + physical ordering path on a large, reverse-offset map. Both
+ * paths must reject late corruption without publishing partial locations. */
+static void decode_locations_differential(void) {
+    enum { N=20000 };
+    static uint8_t bytes[N*2u+1u];
+    static MusaDwg1032MapEntry entries[N],scratch[N];
+    static MusaDwg1032ObjectLocation expected[N],actual[N];
+    static size_t slow_order[N],fast_order[N];
+    for (size_t i=0;i<N;++i) {
+        bytes[2u*i]=1u;
+        /* Reversed offsets: begin at N, then subtract one per record.
+         * The first offset is N, and the final offset is 1. */
+        bytes[2u*i+1u]=i==0u ? 0u : 0x41u;
+    }
+    /* Use a forward-offset map for the reference comparison; physical
+     * offset sorting is independently covered by candidate_stress(). */
+    for (size_t i=0;i<N;++i) bytes[2u*i+1u]=1u;
+    assert(musa_dwg1032_object_map_decode(
+        bytes,N*2u,N,N+1u,entries,N));
+    assert(musa_dwg1032_object_map_candidate_spans(
+        entries,N,N+1u,expected,N,slow_order,N));
+    assert(musa_dwg1032_object_map_decode_locations(
+        bytes,N*2u,N,N+1u,actual,N,scratch,N,fast_order,N));
+    assert(memcmp(expected,actual,sizeof(expected))==0);
+    bytes[N*2u-1u]=0x40u; /* Invalid negative zero in the last pair. */
+    assert(!musa_dwg1032_object_map_decode_locations(
+        bytes,N*2u,N,N+1u,actual,N,scratch,N,fast_order,N));
+    assert(memcmp(expected,actual,sizeof(expected))==0);
+    bytes[N*2u-1u]=1u;
+    bytes[N*2u]=0x7fu; /* A complete map with trailing data is invalid. */
+    assert(!musa_dwg1032_object_map_decode_locations(
+        bytes,sizeof(bytes),N,N+1u,actual,N,scratch,N,fast_order,N));
+    assert(memcmp(expected,actual,sizeof(expected))==0);
+}
+int main(void) {decode_locations_differential();iterator_paged_scratch_equivalence();iterator_extreme_negative_delta();iterator_streaming();iterator_completion();iterator_paged_atomic();iterator_large_map();iterator_paged_large();small();stress();candidate_spans();candidate_stress();decode_locations_atomic();decode_locations_large();return 0;}
