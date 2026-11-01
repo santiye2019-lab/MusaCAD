@@ -63,4 +63,33 @@ static void many(void) {
         assert(found==i);
     }
 }
-int main(void) {normal();malformed();many();return 0;}
+/* An index is a view of caller storage: stale records must never be
+ * published as valid object spans, even when their handle still matches.
+ * A failed lookup must not overwrite the caller's previous position. */
+static void stale_backing_storage(void) {
+    MusaDwg1032ObjectLocation entries[]={
+        {2u,0u,2u},{4u,2u,2u},{8u,4u,2u}
+    };
+    MusaDwg1032ObjectIndex idx;
+    assert(musa_dwg1032_object_index_init(&idx,entries,3u,6u));
+    size_t pos=99u;
+    assert(musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==1u);
+    pos=99u;
+    entries[1].length=0u;
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[1].length=3u;
+    entries[1].offset=5u;
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[1].offset=UINT64_MAX;
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[1].offset=2u;
+    entries[1].length=2u;
+    entries[0].handle=4u; /* Immediate duplicate predecessor. */
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[0].handle=2u;
+    entries[2].handle=4u; /* Immediate duplicate successor. */
+    assert(!musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==99u);
+    entries[2].handle=8u;
+    assert(musa_dwg1032_object_index_find(&idx,4u,&pos) && pos==1u);
+}
+int main(void) {normal();malformed();many();stale_backing_storage();return 0;}
