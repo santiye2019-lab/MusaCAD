@@ -7,12 +7,17 @@
 
 static const double MUSA_PI = 3.14159265358979323846264338327950288;
 static int widen(MusaScene2dBox b, MusaScene2dBox *out) {
-    b.min_x = nextafter(b.min_x, -INFINITY);
-    b.min_y = nextafter(b.min_y, -INFINITY);
-    b.max_x = nextafter(b.max_x, INFINITY);
-    b.max_y = nextafter(b.max_y, INFINITY);
+    /* A finite primitive touching +/-DBL_MAX must remain indexable.
+     * Saturate outward rounding at the finite coordinate limits rather
+     * than turning a valid endpoint into infinity and dropping its entity.
+     * Reject nonfinite arithmetic results before publication. */
     if (!isfinite(b.min_x) || !isfinite(b.min_y) ||
-        !isfinite(b.max_x) || !isfinite(b.max_y)) return 0;
+        !isfinite(b.max_x) || !isfinite(b.max_y) ||
+        b.min_x>b.max_x || b.min_y>b.max_y) return 0;
+    b.min_x = nextafter(b.min_x, -DBL_MAX);
+    b.min_y = nextafter(b.min_y, -DBL_MAX);
+    b.max_x = nextafter(b.max_x, DBL_MAX);
+    b.max_y = nextafter(b.max_y, DBL_MAX);
     *out = b;
     return 1;
 }
