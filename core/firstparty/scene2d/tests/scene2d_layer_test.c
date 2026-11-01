@@ -66,6 +66,13 @@ int main(void) {
     inputs[count-1].signed_aci=42;
     assert(!musa_scene2d_layers_from_cad(inputs,count,palette,256,0,outputs,count-1));
     assert(musa_scene2d_layers_from_cad(NULL,0,NULL,0,0,NULL,0));
+    /* Empty bulk conversions must not silently accept an invalid palette
+     * or foreground that a nonempty conversion would reject. */
+    assert(!musa_scene2d_layers_from_cad(NULL,0,NULL,1,0,NULL,0));
+    assert(!musa_scene2d_layers_from_cad(NULL,0,palette,0,0,NULL,0));
+    assert(!musa_scene2d_layers_from_cad(NULL,0,palette,255,0,NULL,0));
+    assert(!musa_scene2d_layers_from_cad(NULL,0,NULL,0,0x1000000u,NULL,0));
+    assert(musa_scene2d_layers_from_cad(NULL,0,palette,256,0xffffffu,NULL,0));
     free(outputs); free(inputs);
     return 0;
 }
