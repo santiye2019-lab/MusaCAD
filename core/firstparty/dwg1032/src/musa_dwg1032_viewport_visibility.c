@@ -83,3 +83,44 @@ int musa_dwg1032_viewport_local_visibility(
     }
     return 1;
 }
+
+/* Two-stage, fail-closed composition. The owner resolver never publishes
+ * output until the complete forest has passed validation. */
+int musa_dwg1032_viewport_owner_visibility(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *owner_handles,
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    MusaDwg1032OwnerWork *work, size_t work_count,
+    uint8_t *local_work, uint8_t *effective_visible) {
+    if (!index || !index->entries || !index->count || !owner_handles ||
+        !entity_layer_handles || !entity_visible || !layers || !layer_count ||
+        (override_count && !overrides) || !work || !local_work ||
+        !effective_visible || work_count<index->count ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        index->count>SIZE_MAX/sizeof(*owner_handles) ||
+        index->count>SIZE_MAX/sizeof(*entity_layer_handles) ||
+        layer_count>SIZE_MAX/sizeof(*layers) ||
+        override_count>SIZE_MAX/sizeof(*overrides) ||
+        work_count>SIZE_MAX/sizeof(*work))
+        return 0;
+    const size_t n=index->count;
+    const void *ptrs[]={index,index->entries,owner_handles,
+        entity_layer_handles,entity_visible,layers,overrides,
+        work,local_work,effective_visible};
+    const size_t sizes[]={sizeof(*index),n*sizeof(*index->entries),
+        n*sizeof(*owner_handles),n*sizeof(*entity_layer_handles),
+        n*sizeof(*entity_visible),layer_count*sizeof(*layers),
+        override_count*sizeof(*overrides),work_count*sizeof(*work),
+        n*sizeof(*local_work),n*sizeof(*effective_visible)};
+    for (size_t i=0u;i<10u;++i)
+        for (size_t j=i+1u;j<10u;++j)
+            if (overlaps(ptrs[i],sizes[i],ptrs[j],sizes[j])) return 0;
+    if (!musa_dwg1032_viewport_local_visibility(
+            entity_layer_handles,entity_visible,n,layers,layer_count,
+            overrides,override_count,local_work)) return 0;
+    return musa_dwg1032_owner_graph_visibility(
+        index,owner_handles,local_work,work,work_count,effective_visible);
+}

@@ -28,6 +28,23 @@ int musa_dwg1032_viewport_local_visibility(
     const MusaDwg1032LayerState *layers, size_t layer_count,
     const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
     uint8_t *local_visible);
+/* Compose verified viewport-local visibility with the validated owner
+ * forest. Every indexed object must have a caller-decoded layer and owner.
+ * A hidden ancestor remains hidden even when a child's viewport layer is
+ * thawed. Per-INSERT layer-zero inheritance must still be evaluated for
+ * each instance; this function does not authorize final rendering.
+ * All buffers (including full work capacity) must be pairwise disjoint.
+ * local_work and work are scratch; effective_visible remains unchanged
+ * on failure. O(n log n + n log layers + n log overrides), no heap. */
+int musa_dwg1032_viewport_owner_visibility(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *owner_handles,
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    MusaDwg1032OwnerWork *work, size_t work_count,
+    uint8_t *local_work, uint8_t *effective_visible);
 #ifdef __cplusplus
 }
 #endif
