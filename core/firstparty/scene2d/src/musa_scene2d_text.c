@@ -97,9 +97,14 @@ int musa_scene2d_text_run_bounds(const MusaScene2dTextGlyph *glyphs,
             }
             any=1;
         }
-        pen_x+=g->advance_x;
-        pen_y+=g->advance_y;
-        if (!isfinite(pen_x) || !isfinite(pen_y)) return 0;
+        /* The final glyph's advance is not used to place any ink.
+         * Do not reject valid bounds because an unused trailing advance
+         * would overflow the pen (common with malformed font metrics). */
+        if (i+1u<count) {
+            pen_x+=g->advance_x;
+            pen_y+=g->advance_y;
+            if (!isfinite(pen_x) || !isfinite(pen_y)) return 0;
+        }
     }
     if (!any) return 0;
     *out=result;
