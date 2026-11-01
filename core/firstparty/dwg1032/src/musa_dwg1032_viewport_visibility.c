@@ -124,3 +124,72 @@ int musa_dwg1032_viewport_owner_visibility(
     return musa_dwg1032_owner_graph_visibility(
         index,owner_handles,local_work,work,work_count,effective_visible);
 }
+
+/* A block definition's layer-zero state is not the INSERT instance's layer
+ * state. Resolve each child in the selected viewport; never reuse the
+ * definition's layer-zero visibility for a different INSERT instance. */
+int musa_dwg1032_viewport_insert_visibility(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible, size_t count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *effective_visible) {
+    if (!layer_zero_handle || insert_visible>1u ||
+        !layers || !layer_count ||
+        (override_count && !overrides) ||
+        (count && (!source_layer_handles || !definition_owner_visible ||
+                   !effective_visible)) ||
+        count>SIZE_MAX/sizeof(*source_layer_handles) ||
+        layer_count>SIZE_MAX/sizeof(*layers) ||
+        override_count>SIZE_MAX/sizeof(*overrides))
+        return 0;
+    if (overlaps(effective_visible,count,source_layer_handles,
+                 count*sizeof(*source_layer_handles)) ||
+        overlaps(effective_visible,count,definition_owner_visible,count) ||
+        overlaps(effective_visible,count,layers,
+                 layer_count*sizeof(*layers)) ||
+        overlaps(effective_visible,count,overrides,
+                 override_count*sizeof(*overrides)))
+        return 0;
+
+    uint64_t previous=0u;
+    for (size_t i=0u;i<layer_count;++i) {
+        if (!layers[i].handle || layers[i].handle<=previous ||
+            layers[i].on>1u || layers[i].thawed>1u) return 0;
+        previous=layers[i].handle;
+    }
+    const size_t zero_at=layer_at(layers,layer_count,layer_zero_handle);
+    if (zero_at==layer_count ||
+        layers[zero_at].handle!=layer_zero_handle) return 0;
+    previous=0u;
+    for (size_t i=0u;i<override_count;++i) {
+        const uint64_t h=overrides[i].layer_handle;
+        if (!h || h<=previous || overrides[i].frozen>1u) return 0;
+        const size_t at=layer_at(layers,layer_count,h);
+        if (at==layer_count || layers[at].handle!=h) return 0;
+        previous=h;
+    }
+    /* Do not publish an early child if a later layer is unproven. */
+    for (size_t i=0u;i<count;++i) {
+        const uint64_t h=source_layer_handles[i];
+        if (!h || definition_owner_visible[i]>1u) return 0;
+        const size_t at=layer_at(layers,layer_count,h);
+        if (at==layer_count || layers[at].handle!=h) return 0;
+    }
+    for (size_t i=0u;i<count;++i) {
+        const uint64_t h=source_layer_handles[i];
+        uint8_t visible=(uint8_t)(
+            insert_visible && definition_owner_visible[i]);
+        if (h!=layer_zero_handle) {
+            const size_t at=layer_at(layers,layer_count,h);
+            const size_t ov=override_at(overrides,override_count,h);
+            const int frozen=ov<override_count &&
+                overrides[ov].layer_handle==h && overrides[ov].frozen;
+            visible=(uint8_t)(visible && layers[at].on &&
+                              layers[at].thawed && !frozen);
+        }
+        effective_visible[i]=visible;
+    }
+    return 1;
+}

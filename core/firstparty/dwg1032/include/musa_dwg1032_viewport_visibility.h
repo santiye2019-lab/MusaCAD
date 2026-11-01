@@ -45,6 +45,26 @@ int musa_dwg1032_viewport_owner_visibility(
     const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
     MusaDwg1032OwnerWork *work, size_t work_count,
     uint8_t *local_work, uint8_t *effective_visible);
+
+/* Resolve direct children of ONE concrete INSERT in ONE viewport.
+ * The definition's layer-zero child ignores the definition-time layer-zero
+ * on/thawed/frozen state and inherits the already-proven INSERT visibility;
+ * every other child uses its own validated layer and viewport freeze.
+ * definition_owner_visible is owner-only evidence (strict 0/1), not a
+ * precomposed global-layer visibility flag. Call once per INSERT instance,
+ * including nested inserts after their parent context has been resolved.
+ * All handles and layer/override tables must be authenticated by the caller;
+ * this function does not decode DWG, calculate instance ownership, or grant
+ * final render permission. On failure output is unchanged. No heap, O(n log
+ * layers + n log overrides), all result/source ranges disjoint. Empty
+ * instances accept NULL child arrays but still validate layer metadata. */
+int musa_dwg1032_viewport_insert_visibility(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible, size_t count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *effective_visible);
 #ifdef __cplusplus
 }
 #endif

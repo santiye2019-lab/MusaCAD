@@ -237,11 +237,126 @@ static void large_viewport_owner_chain(void) {
     assert(!memcmp(out,saved,sizeof(out)));
 }
 
+
+/* Layer zero is definition-local: the same BLOCK must use the selected
+ * INSERT instance's visibility in each viewport, not its original state. */
+static void viewport_insert_instances(void) {
+    MusaDwg1032LayerState layers[]={
+        {10,0,0},{20,1,1},{30,1,1},{40,1,0}
+    };
+    uint64_t handles[]={10,20,30,40,10,30};
+    uint8_t owner[]={1,1,1,1,0,0};
+    MusaDwg1032ViewportFreeze vp[]={{10,1},{20,1},{30,0}};
+    uint8_t out[]={9,9,9,9,9,9};
+    assert(musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    const uint8_t a[]={1,0,1,0,0,0};
+    assert(!memcmp(out,a,sizeof(out)));
+    vp[1].frozen=0;
+    vp[2].frozen=1;
+    assert(musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    const uint8_t b[]={1,1,0,0,0,0};
+    assert(!memcmp(out,b,sizeof(out)));
+    assert(musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,0,layers,4,vp,3,out));
+    const uint8_t hidden[]={0,0,0,0,0,0};
+    assert(!memcmp(out,hidden,sizeof(out)));
+    memcpy(out,b,sizeof(out));
+    uint8_t saved[6]; memcpy(saved,out,sizeof(saved));
+    handles[5]=999;
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    assert(!memcmp(saved,out,sizeof(out)));
+    handles[5]=30;
+    owner[5]=2;
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    assert(!memcmp(saved,out,sizeof(out)));
+    owner[5]=0;
+    vp[2].layer_handle=20; /* Repeated viewport override. */
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    vp[2].layer_handle=30;
+    vp[2].frozen=2; /* Boolean only. */
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    vp[2].frozen=1;
+    layers[3].on=2;
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,out));
+    layers[3].on=1;
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,999,1,layers,4,vp,3,out));
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,2,layers,4,vp,3,out));
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,owner));
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,6,10,1,layers,4,vp,3,(uint8_t *)(void *)handles));
+    assert(!memcmp(saved,out,sizeof(out)));
+    assert(musa_dwg1032_viewport_insert_visibility(
+        NULL,NULL,0,10,1,layers,4,vp,3,NULL));
+}
+/* Differential reference for 20,000 children and two instances. Unlike the
+ * implementation, this oracle uses simple linear layer/override search. */
+static void large_viewport_insert_differential(void) {
+    enum { N=20000, L=1024, V=128 };
+    static uint64_t handles[N];
+    static uint8_t owner[N],out[N],saved[N];
+    static MusaDwg1032LayerState layers[L];
+    static MusaDwg1032ViewportFreeze vp[V];
+    for (size_t j=0u;j<L;++j) {
+        layers[j]=(MusaDwg1032LayerState){
+            (uint64_t)j+1u,
+            (uint8_t)(j%17u!=0u),(uint8_t)(j%19u!=0u)};
+    }
+    for (size_t j=0u;j<V;++j)
+        vp[j]=(MusaDwg1032ViewportFreeze){
+            (uint64_t)(j*8u+1u),(uint8_t)(j%3u==0u)};
+    for (size_t i=0u;i<N;++i) {
+        handles[i]=(uint64_t)((i*37u)%L)+1u;
+        owner[i]=(uint8_t)(i%11u!=0u);
+        out[i]=9u;
+    }
+    for (uint8_t insert=0;insert<=1u;++insert) {
+        assert(musa_dwg1032_viewport_insert_visibility(
+            handles,owner,N,1u,insert,layers,L,vp,V,out));
+        for (size_t i=0u;i<N;++i) {
+            const uint64_t h=handles[i];
+            uint8_t expected=(uint8_t)(insert && owner[i]);
+            if (h!=1u) {
+                size_t j=0u;
+                while (j<L && layers[j].handle!=h) ++j;
+                assert(j<L);
+                uint8_t frozen=0u;
+                for (size_t k=0u;k<V;++k)
+                    if (vp[k].layer_handle==h) frozen=vp[k].frozen;
+                expected=(uint8_t)(expected && layers[j].on &&
+                                   layers[j].thawed && !frozen);
+            }
+            assert(out[i]==expected);
+        }
+    }
+    memcpy(saved,out,sizeof(saved));
+    owner[N-1u]=2u;
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,N,1u,1u,layers,L,vp,V,out));
+    assert(!memcmp(saved,out,sizeof(out)));
+    owner[N-1u]=1u;
+    handles[N-1u]=UINT64_MAX;
+    assert(!musa_dwg1032_viewport_insert_visibility(
+        handles,owner,N,1u,1u,layers,L,vp,V,out));
+    assert(!memcmp(saved,out,sizeof(out)));
+}
+
 int main(void) {
     viewport_contexts();
     large_viewport_differential();
     viewport_owner_contexts();
     large_viewport_owner_chain();
+    viewport_insert_instances();
+    large_viewport_insert_differential();
     return 0;
 }
 

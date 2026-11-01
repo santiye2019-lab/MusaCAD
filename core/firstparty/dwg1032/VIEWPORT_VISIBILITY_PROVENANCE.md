@@ -15,3 +15,9 @@
 - Fail-closed tests cover distinct viewport states, hidden parents, a late ownership cycle, dangling handles, unknown layers, invalid flags, mutated object indices, output aliasing and a 20,000-object owner chain. The existing CTest target executes these cases on each supported CI host.
 - This is not a DWG viewport parser, final INSERT instance renderer, AC1032 decompressor, real-file acceptance test or Android integration. Existing GPL-linked Android native dependency remains a release blocker; no license-clearance claim is made.
 - All added C11 logic and synthetic test fixtures were independently authored for this repository. No third-party CAD implementation was copied, adapted or linked.
+
+## Per-INSERT viewport layer-zero inheritance (2026-11-01)
+
+- Added first-party C11 `musa_dwg1032_viewport_insert_visibility` to recompute direct child visibility for each concrete INSERT and selected viewport. The definition's layer-zero on/thawed/viewport-frozen bits are deliberately ignored only for layer-zero children; their visibility is inherited from the proven INSERT instance. Nonzero child layers retain their own verified global and viewport visibility, combined with owner-only flags.
+- The routine validates all layer and sparse override tables, layer-zero identity, every child handle and flag, and output aliasing *before* publishing any child result. 20,000-child independent linear-reference checks, multiple viewport states, hidden instances and malformed late entries exercise its all-or-nothing behavior.
+- This is a predecoded composition aid only. Nested INSERTs require per-instance calls; authenticated source provenance, original DWG read, entity decoding, final scene rendering and independent real DWG fixtures remain incomplete. The Android GPL-linked native library remains a release blocker. No third-party CAD implementation was copied or linked.
