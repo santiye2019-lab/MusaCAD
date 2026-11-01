@@ -22,6 +22,19 @@ int musa_scene2d_collect_visible(
     const MusaScene2dNode *nodes, const MusaScene2dResolved *resolved,
     const MusaScene2dBox *local_bounds, size_t count, MusaScene2dBox viewport,
     size_t *indices, size_t capacity, size_t *written);
+/* Caller-scratch variant for large predecoded scenes. Evaluate each
+ * candidate exactly once, storing selected indices in caller-owned scratch,
+ * then publish the completed list only after every node validates.
+ * scratch_capacity >= count; scratch, output, inputs and written must be
+ * pairwise disjoint where writes can occur. Scratch may be modified on
+ * failure, but indices and *written remain unchanged. O(count) time,
+ * O(count) caller-owned scratch; no allocation or DWG byte decoding.
+ * A zero-node call succeeds with written=0 and no arrays required. */
+int musa_scene2d_collect_visible_scratch(
+    const MusaScene2dNode *nodes, const MusaScene2dResolved *resolved,
+    const MusaScene2dBox *local_bounds, size_t count, MusaScene2dBox viewport,
+    size_t *indices, size_t capacity, size_t *written,
+    size_t *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif
