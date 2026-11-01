@@ -106,5 +106,29 @@ int main(void) {
     assert(musa_scene2d_collect_prepared(cache,2,
              (MusaScene2dBox){15,23,15,23},indices,2,&written));
     assert(written == 1 && indices[0] == 1);
+    /* End-to-end: a finite endpoint at the representable limit must
+     * survive scene resolution, world-bound caching and viewport culling. */
+    const MusaScene2dNode extreme_node={
+        301,0,10,0,MUSA_SCENE2D_ENTITY,1,MUSA_SCENE2D_BYLAYER,
+        {1,0,0,1,0,0}
+    };
+    MusaScene2dResolved extreme_resolved;
+    MusaScene2dPreparedBounds extreme_prepared;
+    MusaScene2dBox extreme_local;
+    size_t extreme_written=99, extreme_index=99;
+    assert(musa_scene2d_line_bounds(DBL_MAX,-DBL_MAX,
+                                    DBL_MAX,-DBL_MAX,&extreme_local));
+    assert(musa_scene2d_resolve(&extreme_node,1,layers,2,
+                                &extreme_resolved,1,&extreme_written));
+    assert(extreme_written==1);
+    assert(musa_scene2d_prepare_bounds(
+        &extreme_node,&extreme_resolved,&extreme_local,1,
+        &extreme_prepared,1,&extreme_written));
+    assert(extreme_prepared.visible==1);
+    assert(musa_scene2d_collect_prepared(
+        &extreme_prepared,1,
+        (MusaScene2dBox){DBL_MAX,-DBL_MAX,DBL_MAX,-DBL_MAX},
+        &extreme_index,1,&extreme_written));
+    assert(extreme_written==1 && extreme_index==0);
     return 0;
 }
