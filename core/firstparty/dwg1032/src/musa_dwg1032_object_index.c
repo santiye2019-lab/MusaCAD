@@ -42,6 +42,17 @@ int musa_dwg1032_object_index_find(const MusaDwg1032ObjectIndex *index,
         else hi=mid;
     }
     if (lo==index->count || index->entries[lo].handle!=handle) return 0;
+    /* The index borrows caller-owned storage. Even after successful
+     * initialization a stale or accidentally modified entry must not
+     * yield an out-of-section object span. Check the selected record and
+     * its immediate handle neighbors in constant time; this does not
+     * replace the requirement to keep the full index immutable. */
+    const MusaDwg1032ObjectLocation found=index->entries[lo];
+    if (!found.length || found.offset>index->section_bytes ||
+        found.length>index->section_bytes-found.offset ||
+        (lo && index->entries[lo-1u].handle>=found.handle) ||
+        (lo+1u<index->count &&
+         index->entries[lo+1u].handle<=found.handle)) return 0;
     *position=lo;
     return 1;
 }
