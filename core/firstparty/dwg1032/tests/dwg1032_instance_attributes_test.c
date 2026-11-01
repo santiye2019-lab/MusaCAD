@@ -92,8 +92,10 @@ static void large_instance_crosscheck(void) {
     MusaDwg1032ResolvedColor *scratch=calloc(N,sizeof(*scratch));
     uint8_t *visible=calloc(N,sizeof(*visible));
     uint8_t *vwork=calloc(N,sizeof(*vwork));
+    MusaDwg1032ResolvedColor *saved_out=calloc(N,sizeof(*saved_out));
+    uint8_t *saved_visible=calloc(N,sizeof(*saved_visible));
     assert(definition && raw && handles && owners && out && scratch &&
-           visible && vwork);
+           visible && vwork && saved_out && saved_visible);
     MusaDwg1032LayerState layers[L];
     MusaDwg1032ViewportFreeze vp[V];
     for(size_t j=0u;j<L;++j) {
@@ -140,22 +142,36 @@ static void large_instance_crosscheck(void) {
         }
         assert(visible[i]==expected);
     }
-    /* Later failure in viewport logic after valid color computation must
-     * leave BOTH completed public arrays fully unchanged. */
+    /* Preserve exact snapshots, including output that belongs to
+     * thousands of preceding children. An invalid last owner flag must
+     * not publish newly computed colors from the earlier successful stage. */
+    memcpy(saved_out,out,N*sizeof(*out));
+    memcpy(saved_visible,visible,N);
     owners[N-1u]=2u;
     assert(!musa_dwg1032_instance_attributes(
         definition,raw,handles,owners,N,1u,1u,&red,&blue,
         layers,L,vp,V,out,visible,scratch,N,vwork,N));
-    for(size_t i=0u;i<N;++i) {
-        assert(!out[i].byblock);
-        assert(visible[i]<=1u);
-    }
+    assert(!memcmp(saved_out,out,N*sizeof(*out)));
+    assert(!memcmp(saved_visible,visible,N));
     owners[N-1u]=1u;
+    /* Conversely, late malformed source color must never alter either
+     * output, even though all viewport flags would otherwise validate. */
     raw[N-1u].truecolor_rgb=0xffu;
     assert(!musa_dwg1032_instance_attributes(
         definition,raw,handles,owners,N,1u,1u,&red,&blue,
         layers,L,vp,V,out,visible,scratch,N,vwork,N));
+    assert(!memcmp(saved_out,out,N*sizeof(*out)));
+    assert(!memcmp(saved_visible,visible,N));
     raw[N-1u].truecolor_rgb=0;
+    /* A syntactically valid but absent layer at the last object also
+     * rejects the transaction without changing either public result. */
+    handles[N-1u]=UINT64_MAX;
+    assert(!musa_dwg1032_instance_attributes(
+        definition,raw,handles,owners,N,1u,1u,&red,&blue,
+        layers,L,vp,V,out,visible,scratch,N,vwork,N));
+    assert(!memcmp(saved_out,out,N*sizeof(*out)));
+    assert(!memcmp(saved_visible,visible,N));
+    free(saved_visible);free(saved_out);
     free(vwork);free(visible);free(scratch);free(out);
     free(owners);free(handles);free(raw);free(definition);
 }
