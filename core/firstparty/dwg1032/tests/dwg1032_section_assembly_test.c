@@ -414,6 +414,36 @@ static void window_single_page_fast_path_stress(void) {
     for (size_t j=0;j<sizeof(out);++j) assert(out[j]==0xA5);
     free(order);free(pages);free(file);
 }
+/* A short read must not accept a locally inconsistent directory merely
+ * because the requested byte range fits in a single physical page. */
+static void single_page_neighbor_corruption(void) {
+    const uint8_t file[]={10u,11u,12u,13u,14u,15u};
+    MusaDwg1032FilePage pages[]={
+        {0u,0u,2u},{2u,2u,2u},{4u,4u,2u}
+    };
+    uint8_t out[3]={0xA5u,0xA5u,0xA5u};
+    assert(musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==12u && out[1]==0xA5u);
+    memset(out,0xA5,sizeof(out));
+    pages[2].logical_offset=3u; /* Next page overlaps the current one. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5u);
+    pages[2].logical_offset=5u; /* Next page leaves a logical gap. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5u);
+    pages[2].logical_offset=4u;
+    pages[0].byte_count=3u; /* Previous page overlaps the current one. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5u);
+    pages[0].byte_count=1u; /* Previous page leaves a logical gap. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5u);
+}
 int main(void) {
     basic();stress();partitions();
     file_backed_pages();file_backed_large_reverse_physical_order();
@@ -422,5 +452,6 @@ int main(void) {
     bounded_window_reads();bounded_window_large_pafta();
     window_rejects_logical_page_overrun();
     window_single_page_fast_path_stress();
+    single_page_neighbor_corruption();
     return 0;
 }
