@@ -232,11 +232,23 @@ int musa_dwg1032_section_read_window(
             (uint64_t)previous.byte_count>
                 section_bytes-previous.logical_offset ||
             previous.logical_offset+(uint64_t)previous.byte_count !=
-                first_page.logical_offset) return 0;
+                first_page.logical_offset ||
+            previous.file_offset>(uint64_t)file_size ||
+            (uint64_t)previous.byte_count>
+                (uint64_t)file_size-previous.file_offset) return 0;
     }
-    if (first+1u<page_count &&
-        first_page.logical_offset+(uint64_t)first_page.byte_count !=
-            pages[first+1u].logical_offset) return 0;
+    if (first+1u<page_count) {
+        const MusaDwg1032FilePage next=pages[first+1u];
+        if (!next.byte_count ||
+            next.logical_offset>section_bytes ||
+            (uint64_t)next.byte_count>
+                section_bytes-next.logical_offset ||
+            first_page.logical_offset+(uint64_t)first_page.byte_count !=
+                next.logical_offset ||
+            next.file_offset>(uint64_t)file_size ||
+            (uint64_t)next.byte_count>
+                (uint64_t)file_size-next.file_offset) return 0;
+    }
     if (destination_size<=first_page.byte_count-first_within) {
         memcpy(destination,
                file_bytes+(size_t)first_page.file_offset+first_within,
