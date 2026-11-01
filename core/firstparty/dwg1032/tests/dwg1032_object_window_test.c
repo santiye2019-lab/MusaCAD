@@ -234,6 +234,46 @@ static void mutated_ordinal_index_rollback(void) {
     assert(candidate_length==99 && payload_length==77);
     assert(candidate[0]==0xa5 && payload[0]==0xa5);
     entries[2].handle=30;
+    /* Neighbor span corruption must also fail closed in both ordinal
+     * candidate and MS payload paths without publishing partial data. */
+    const MusaDwg1032ObjectLocation saved_previous=entries[0];
+    const MusaDwg1032ObjectLocation saved_next=entries[2];
+    const MusaDwg1032ObjectLocation bad_previous[]={
+        {0,0,4},{10,0,0},{10,12,4},{10,UINT64_MAX,4}
+    };
+    const MusaDwg1032ObjectLocation bad_next[]={
+        {30,8,0},{30,12,4},{30,UINT64_MAX,4}
+    };
+    for (size_t i=0;i<sizeof(bad_previous)/sizeof(bad_previous[0]);++i) {
+        entries[0]=bad_previous[i];
+        candidate[0]=candidate[1]=payload[0]=payload[1]=0xa5;
+        candidate_length=99;payload_length=77;
+        assert(!musa_dwg1032_object_candidate_read_window_at_position(
+            file,sizeof(file),pages,3,&index,1,2,candidate,2,
+            &candidate_length));
+        assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+            file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+            &payload_length));
+        assert(candidate_length==99 && payload_length==77);
+        assert(candidate[0]==0xa5 && candidate[1]==0xa5);
+        assert(payload[0]==0xa5 && payload[1]==0xa5);
+    }
+    entries[0]=saved_previous;
+    for (size_t i=0;i<sizeof(bad_next)/sizeof(bad_next[0]);++i) {
+        entries[2]=bad_next[i];
+        candidate[0]=candidate[1]=payload[0]=payload[1]=0xa5;
+        candidate_length=99;payload_length=77;
+        assert(!musa_dwg1032_object_candidate_read_window_at_position(
+            file,sizeof(file),pages,3,&index,1,2,candidate,2,
+            &candidate_length));
+        assert(!musa_dwg1032_object_ms_payload_read_window_at_position(
+            file,sizeof(file),pages,3,&index,1,0,2,payload,2,
+            &payload_length));
+        assert(candidate_length==99 && payload_length==77);
+        assert(candidate[0]==0xa5 && candidate[1]==0xa5);
+        assert(payload[0]==0xa5 && payload[1]==0xa5);
+    }
+    entries[2]=saved_next;
     assert(musa_dwg1032_object_candidate_read_window_at_position(
         file,sizeof(file),pages,3,&index,1,2,candidate,2,
         &candidate_length));
