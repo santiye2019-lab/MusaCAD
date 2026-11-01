@@ -214,3 +214,10 @@
 - **Independent origin:** A small C11/IEEE-754 finite-boundary check and `nextafter` rounding adjustment, authored directly for the MIT-only first-party scene module. No GPL/AGPL/LGPL, LibreDWG, third-party CAD reader, legacy implementation, or uncertain-origin code was copied, adapted, or linked.
 - **Behavior:** Finite 2D primitive bounds at `+/-DBL_MAX` no longer become infinite solely because the outward one-ULP margin crosses the representable range. Nonfinite arithmetic and malformed bounds remain rejected; bounds saturate at finite representable limits.
 - **Regression:** Synthetic extreme-endpoint LINE cases check both signs and an end-to-end scene-resolution, world-bound cache and viewport query. This is not a real AC1032 DWG test, decompression proof, or Android render verification. Verify CI on the exact commit before treating tests as passed. The production app, existing 3D code, `MusaCAD2/`, and `main` are untouched.
+
+## 2026-11-01 — strict predecoded TrueColor provenance at scene boundary
+
+- Independently authored MIT C11 guard in `musa_scene2d_cad_color_select` rejects a nonzero RGB payload when `has_truecolor==0`. Previously an inactive stale RGB could be silently ignored while the layer/ACI palette produced an apparently valid scene color. The contract now agrees with the separate first-party DWG post-decode color validator.
+- Regression coverage: ByBlock, ByLayer, explicit ACI, caller-output rollback, single-layer conversion, 20,000-layer full conversion and late malformed-record page rollback. Synthetic fixtures with no TrueColor flag now explicitly zero the RGB payload.
+- Source origin: local independent C11 input-validation change, with no GPL/AGPL/LGPL, LibreDWG, historical native CAD source, or unknown-provenance code copied, adapted, or linked.
+- Limit: still only a post-decode scene adapter; this does not decode AC1032 sections, decompress pages, parse genuine DWG layer colors, or integrate Android rendering. CI must be checked on the final commit.

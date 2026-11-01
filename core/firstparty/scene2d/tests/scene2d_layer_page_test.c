@@ -78,6 +78,26 @@ int main(void) {
     for (size_t i=0;i<sizeof page;++i)
         assert(((const uint8_t *)page)[i]==0xa5u);
     cad[N-1].frozen=0u;
+    /* A late stale RGB on an ACI-only layer must not leak a partial
+     * page or alter an earlier full conversion of 20,000 layers. */
+    static MusaScene2dLayer saved_full[N];
+    memcpy(saved_full,full,sizeof full);
+    cad[N-1].truecolor_rgb=0x334455u;
+    memset(page,0xa5,sizeof page);
+    written=123; total=456;
+    assert(!musa_scene2d_layers_from_cad_page(cad,N,N-20u,palette,256,
+                  0x112233u,page,PAGE,&written,&total));
+    assert(written==123 && total==456);
+    for (size_t i=0;i<sizeof page;++i)
+        assert(((const uint8_t *)page)[i]==0xa5u);
+    assert(!musa_scene2d_layers_from_cad(cad,N,palette,256,
+                                          0x112233u,full,N));
+    assert(memcmp(saved_full,full,sizeof full)==0);
+    cad[N-1].truecolor_rgb=0u;
+    assert(musa_scene2d_layers_from_cad_page(cad,N,N-20u,palette,256,
+                  0x112233u,page,PAGE,&written,&total));
+    assert(written==20 && total==N);
+    assert(memcmp(page,full+N-20u,written*sizeof(*page))==0);
     assert(musa_scene2d_layers_from_cad_page(NULL,0,0,NULL,0,
                   0,NULL,0,&written,&total));
     assert(written==0 && total==0);
