@@ -102,6 +102,27 @@ int main(void) {
     assert(!musa_scene2d_text_run_bounds(g,0,rotate,&box));
     MusaScene2dTextGlyph blank={ {NAN,NAN,NAN,NAN},1,0,0 };
     assert(!musa_scene2d_text_run_bounds(&blank,1,rotate,&box));
+    /* A trailing glyph advance cannot affect already-bounded ink.
+     * An overflowing advance before a subsequent glyph still rejects. */
+    MusaScene2dTextGlyph terminal[2]={
+        {{0,0,1,1},1e308,0,1},
+        {{NAN,NAN,NAN,NAN},1e308,0,0}
+    };
+    const double text_identity[6]={1,0,0,1,0,0};
+    assert(musa_scene2d_text_run_bounds(terminal,2,text_identity,&box));
+    assert(box.min_x<0 && box.max_x>1 &&
+           box.min_y<0 && box.max_y>1);
+    const MusaScene2dBox terminal_saved=box;
+    terminal[1].advance_x=INFINITY;
+    assert(!musa_scene2d_text_run_bounds(terminal,2,text_identity,&box));
+    assert(memcmp(&terminal_saved,&box,sizeof(box))==0);
+    terminal[1].advance_x=1e308;
+    const MusaScene2dTextGlyph nonterminal[3]={
+        terminal[0],terminal[1],terminal[0]
+    };
+    assert(!musa_scene2d_text_run_bounds(
+        nonterminal,3,text_identity,&box));
+    assert(memcmp(&terminal_saved,&box,sizeof(box))==0);
     const size_t count=20000;
     MusaScene2dTextGlyph *many=calloc(count,sizeof(*many));
     assert(many);
