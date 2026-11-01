@@ -243,8 +243,18 @@ int musa_dwg1032_object_map_decode_locations(
         overlaps(out,count*sizeof(*out),order,count*sizeof(*order)) ||
         overlaps(scratch,count*sizeof(*scratch),order,count*sizeof(*order)))
         return 0;
-    if (!musa_dwg1032_object_map_decode(
-            bytes,byte_count,count,section_bytes,scratch,scratch_capacity))
+    /* Scratch is disposable on failure, so decode each delta just once.
+     * Keep the public output untouched until the full map (including its
+     * exact byte count) and every physical candidate span are validated.
+     * The public object_map_decode still uses two passes because its own
+     * destination must remain unchanged on malformed input. */
+    MusaDwg1032MapIterator iterator;
+    if (!musa_dwg1032_object_map_iterator_init(
+            &iterator,bytes,byte_count,section_bytes)) return 0;
+    for (size_t i=0;i<count;++i)
+        if (!musa_dwg1032_object_map_iterator_next(&iterator,&scratch[i]))
+            return 0;
+    if (!musa_dwg1032_object_map_iterator_finished(&iterator,count))
         return 0;
     return musa_dwg1032_object_map_candidate_spans(
         scratch,count,section_bytes,out,capacity,order,order_capacity);
