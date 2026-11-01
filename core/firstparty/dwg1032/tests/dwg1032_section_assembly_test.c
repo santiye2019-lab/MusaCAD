@@ -444,6 +444,42 @@ static void single_page_neighbor_corruption(void) {
         file,sizeof(file),pages,3u,6u,2u,out,1u));
     for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5u);
 }
+/* A single-page read must not accept malformed immediate neighbors,
+ * even when those physical pages are not part of the requested window.
+ * This is defense in depth; complete directory prevalidation is required. */
+static void single_page_neighbor_physical_bounds(void) {
+    const uint8_t file[]={10u,11u,12u,13u,14u,15u};
+    MusaDwg1032FilePage pages[]={
+        {0u,0u,2u},{2u,2u,2u},{4u,4u,2u}
+    };
+    uint8_t out[4]={0xa5u,0xa5u,0xa5u,0xa5u};
+    assert(musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==12u && out[1]==0xa5u);
+    memset(out,0xa5,sizeof(out));
+    pages[0].file_offset=5u; /* Previous page runs off physical file. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==0xa5u && out[1]==0xa5u);
+    pages[0].file_offset=0u;
+    pages[2].file_offset=6u; /* Next page starts beyond physical EOF. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==0xa5u && out[1]==0xa5u);
+    pages[2].file_offset=4u;
+    pages[2].byte_count=3u; /* Next page exceeds logical section. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==0xa5u && out[1]==0xa5u);
+    pages[2].byte_count=0u; /* Empty neighbor is invalid. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==0xa5u && out[1]==0xa5u);
+    pages[2].byte_count=2u;
+    assert(musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3u,6u,2u,out,1u));
+    assert(out[0]==12u && out[1]==0xa5u);
+}
 int main(void) {
     basic();stress();partitions();
     file_backed_pages();file_backed_large_reverse_physical_order();
@@ -453,5 +489,6 @@ int main(void) {
     window_rejects_logical_page_overrun();
     window_single_page_fast_path_stress();
     single_page_neighbor_corruption();
+    single_page_neighbor_physical_bounds();
     return 0;
 }
