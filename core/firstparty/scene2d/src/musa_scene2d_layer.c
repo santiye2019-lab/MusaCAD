@@ -51,6 +51,9 @@ int musa_scene2d_layers_from_cad(const MusaScene2dCadLayer *cad,
     if ((!cad && count) || (!out && count) || capacity<count ||
         count>SIZE_MAX/sizeof(*cad) || count>SIZE_MAX/sizeof(*out) ||
         palette_count>SIZE_MAX/sizeof(uint32_t) ||
+        ((palette_rgb==NULL)!=(palette_count==0u)) ||
+        (palette_rgb && palette_count!=256u) ||
+        foreground_rgb>0xffffffu ||
         overlaps(cad,count*sizeof(*cad),out,count*sizeof(*out)) ||
         overlaps(palette_rgb,palette_count*sizeof(uint32_t),out,
                  count*sizeof(*out))) return 0;
