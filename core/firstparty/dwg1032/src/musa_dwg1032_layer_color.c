@@ -4,6 +4,7 @@
 #include "musa_dwg1032_layer_color.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
@@ -179,5 +180,75 @@ int musa_dwg1032_layer_color_apply_insert_context(
         else
             resolved[i]=definition_colors[i];
     }
+    return 1;
+}
+
+/* Caller-owned scratch avoids repeating the layer binary search for every
+ * ByLayer entity during a second publication pass. All public output is
+ * committed only after every handle, source color and layer has passed. */
+int musa_dwg1032_layer_color_select_scratch(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *entity_layer_handles,
+    const MusaDwg1032CadColor *entity_colors,
+    const MusaDwg1032LayerColor *layers, size_t layer_count,
+    MusaDwg1032ResolvedColor *resolved,
+    MusaDwg1032ResolvedColor *scratch, size_t scratch_capacity) {
+    if (!index || !index->entries || !index->count ||
+        !entity_layer_handles || !entity_colors || !layers ||
+        !layer_count || !resolved || !scratch ||
+        scratch_capacity<index->count ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        index->count>SIZE_MAX/sizeof(*entity_layer_handles) ||
+        index->count>SIZE_MAX/sizeof(*entity_colors) ||
+        index->count>SIZE_MAX/sizeof(*resolved) ||
+        scratch_capacity>SIZE_MAX/sizeof(*scratch) ||
+        layer_count>SIZE_MAX/sizeof(*layers)) return 0;
+    const size_t n=index->count;
+    const size_t output_bytes=n*sizeof(*resolved);
+    const size_t scratch_bytes=scratch_capacity*sizeof(*scratch);
+    const void *sources[]={index,index->entries,entity_layer_handles,
+                           entity_colors,layers};
+    const size_t source_bytes[]={sizeof(*index),
+        n*sizeof(*index->entries),n*sizeof(*entity_layer_handles),
+        n*sizeof(*entity_colors),layer_count*sizeof(*layers)};
+    if (overlaps(resolved,output_bytes,scratch,scratch_bytes)) return 0;
+    for (size_t i=0;i<5u;++i)
+        if (overlaps(resolved,output_bytes,sources[i],source_bytes[i]) ||
+            overlaps(scratch,scratch_bytes,sources[i],source_bytes[i]))
+            return 0;
+    uint64_t previous=0;
+    for (size_t i=0;i<n;++i) {
+        const MusaDwg1032ObjectLocation e=index->entries[i];
+        if (!e.handle || e.handle<=previous || !e.length ||
+            e.offset>index->section_bytes ||
+            e.length>index->section_bytes-e.offset ||
+            !entity_layer_handles[i] || !valid_color(&entity_colors[i]))
+            return 0;
+        previous=e.handle;
+    }
+    previous=0;
+    for (size_t i=0;i<layer_count;++i) {
+        const MusaDwg1032CadColor *c=&layers[i].color;
+        if (!layers[i].handle || layers[i].handle<=previous ||
+            !valid_color(c) ||
+            (!c->has_truecolor && (c->aci==0u || c->aci==256u)))
+            return 0;
+        previous=layers[i].handle;
+    }
+    for (size_t i=0;i<n;++i) {
+        const size_t at=find_layer(layers,layer_count,entity_layer_handles[i]);
+        if (at==layer_count || layers[at].handle!=entity_layer_handles[i])
+            return 0;
+        const MusaDwg1032CadColor c=entity_colors[i];
+        MusaDwg1032ResolvedColor result={{0,0,0},0};
+        if (c.has_truecolor || (c.aci!=0u && c.aci!=256u))
+            result.color=c;
+        else if (c.aci==0u)
+            result.byblock=1u;
+        else
+            result.color=layers[at].color;
+        scratch[i]=result;
+    }
+    memcpy(resolved,scratch,output_bytes);
     return 1;
 }
