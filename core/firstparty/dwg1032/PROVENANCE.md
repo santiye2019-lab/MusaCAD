@@ -282,3 +282,15 @@
 - Origin: independently authored from ordinary binary search, array validation and C11 `memcpy` using the existing first-party type definitions. No GPL/AGPL/LGPL implementation, LibreDWG source, undocumented third-party parser or source of uncertain provenance was copied, adapted or linked. Existing 3D and Android JNI code remain unchanged.
 - Regression: 20,000 synthetic records across 1,024 layers are compared against the original resolver; late invalid layer handles, malformed layer colors and buffer aliasing must preserve the complete output. GitHub CI status is tracked separately for the final commit.
 - Scope: this only resolves already decoded color and layer handles. It does not read, authenticate or decompress an actual AC1032 file, establish real DWG color provenance, or enable Android DWG import.
+
+## 2026-11-01: scratch-backed RAW section window reads
+
+- Independently written C11 helper for already verified and decompressed
+  logical pages. It copies touched pages once into caller-owned scratch,
+  then publishes only after all checks pass. No DWG section discovery,
+  compression, CRC authentication or entity decoding is provided.
+- Tests cover 20,000 reverse-ordered synthetic pages, late truncation,
+  logical gaps/overlaps, rollback, aliasing, and differential checks against
+  the existing two-pass window reader.
+- Not wired into Android JNI or existing 3D. No real-file compatibility
+  or measured speedup claim. No GPL/AGPL/LGPL source or linkage imported.

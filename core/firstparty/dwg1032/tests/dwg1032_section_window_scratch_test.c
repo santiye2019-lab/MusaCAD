@@ -82,4 +82,32 @@ static void large_reversed_pages(void) {
     for (size_t j=0;j<WINDOW;++j) assert(out[j]==0xA5);
     free(pages);free(scratch);free(out);free(file);
 }
-int main(void) { small_windows();large_reversed_pages();return 0; }
+/* Cross-check a reversed physical directory against the older two-pass
+ * reader for many viewport windows, including partial boundary pages. */
+static void differential_windows(void) {
+    enum { PAGE_COUNT=512, STRIDE=8, TOTAL=PAGE_COUNT*STRIDE, MAX_WINDOW=100 };
+    uint8_t *file=malloc(TOTAL);
+    MusaDwg1032FilePage *pages=malloc(PAGE_COUNT*sizeof(*pages));
+    uint8_t old_out[MAX_WINDOW],new_out[MAX_WINDOW],scratch[MAX_WINDOW];
+    assert(file && pages);
+    for (size_t i=0;i<TOTAL;++i) file[i]=(uint8_t)((i*19u)^(i>>3u));
+    for (size_t i=0;i<PAGE_COUNT;++i)
+        pages[i]=(MusaDwg1032FilePage){
+            (uint64_t)(i*STRIDE),(uint64_t)((PAGE_COUNT-1u-i)*STRIDE),
+            STRIDE};
+    for (size_t i=0;i<400u;++i) {
+        const size_t start=(i*131u)%TOTAL;
+        size_t length=1u+(i*17u)%MAX_WINDOW;
+        if (length>TOTAL-start) length=TOTAL-start;
+        memset(old_out,0xA5,sizeof(old_out));
+        memset(new_out,0xA5,sizeof(new_out));
+        assert(musa_dwg1032_section_read_window(
+            file,TOTAL,pages,PAGE_COUNT,TOTAL,start,old_out,length));
+        assert(musa_dwg1032_section_read_window_scratch(
+            file,TOTAL,pages,PAGE_COUNT,TOTAL,start,
+            new_out,length,scratch,MAX_WINDOW));
+        assert(!memcmp(old_out,new_out,sizeof(old_out)));
+    }
+    free(pages);free(file);
+}
+int main(void) { small_windows();large_reversed_pages();differential_windows();return 0; }
