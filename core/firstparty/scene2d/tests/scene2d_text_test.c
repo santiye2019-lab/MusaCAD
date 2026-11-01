@@ -108,11 +108,23 @@ int main(void) {
            isfinite(box.min_y) && isfinite(box.max_y));
     assert(box.min_x<0 && box.max_x>0 &&
            box.min_y<1 && box.max_y>1);
+    /* The naive ax + cy overflows before a negative translation can
+     * cancel it. Both x products and the final point are representable. */
+    const MusaScene2dTextGlyph shifted={
+        {1e308,1e308,1e308,1e308},0,0,1
+    };
+    const double shifted_affine[6]={1.5,0,1.5,1e-308,-1.5e308,0};
+    assert(musa_scene2d_text_run_bounds(
+        &shifted,1,shifted_affine,&box));
+    assert(isfinite(box.min_x) && isfinite(box.max_x) &&
+           isfinite(box.min_y) && isfinite(box.max_y));
+    assert(box.min_x>0 && box.max_x>box.min_x &&
+           box.min_y<1.1 && box.max_y>0.9);
     /* A failed later bounds calculation cannot corrupt the prior result. */
-    const MusaScene2dBox cancelling_saved=box;
+    const MusaScene2dBox large_saved=box;
     const double huge[6]={1e308,0,0,1,0,0};
     assert(!musa_scene2d_text_run_bounds(g,3,huge,&box));
-    assert(memcmp(&cancelling_saved,&box,sizeof(box))==0);
+    assert(memcmp(&large_saved,&box,sizeof(box))==0);
     assert(!musa_scene2d_text_run_bounds(g,0,rotate,&box));
     MusaScene2dTextGlyph blank={ {NAN,NAN,NAN,NAN},1,0,0 };
     assert(!musa_scene2d_text_run_bounds(&blank,1,rotate,&box));
