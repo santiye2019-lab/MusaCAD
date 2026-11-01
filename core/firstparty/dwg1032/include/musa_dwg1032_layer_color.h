@@ -75,6 +75,21 @@ int musa_dwg1032_layer_color_apply_insert_context(
     const MusaDwg1032ResolvedColor *insert_color,
     const MusaDwg1032ResolvedColor *insert_layer_color,
     MusaDwg1032ResolvedColor *resolved);
+/* Faster caller-scratch variant of layer_color_select for large decoded
+ * drawings. Resolves each entity's layer with one binary search, stores the
+ * result in caller-owned scratch, and publishes all colors in one memcpy
+ * only after the complete batch succeeds. The full scratch_capacity range
+ * must be disjoint from all input and output arrays; scratch may change on
+ * failure, while resolved is never partially modified. This is post-decode
+ * color resolution only: no real DWG layer/entity parsing or JNI import.
+ * O(n log layer_count + n), no allocation. */
+int musa_dwg1032_layer_color_select_scratch(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *entity_layer_handles,
+    const MusaDwg1032CadColor *entity_colors,
+    const MusaDwg1032LayerColor *layers, size_t layer_count,
+    MusaDwg1032ResolvedColor *resolved,
+    MusaDwg1032ResolvedColor *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif
