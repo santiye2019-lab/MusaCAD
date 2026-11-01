@@ -50,6 +50,16 @@ int musa_dwg1032_object_map_iterator_finished(
 int musa_dwg1032_object_map_iterator_page(
     MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *out,
     size_t count, size_t capacity);
+/* One-pass page decode using caller-owned, disjoint scratch storage.
+ * Unlike iterator_page(), each delta pair is parsed once. On malformed
+ * input, the iterator and destination remain unchanged; scratch may be
+ * modified. The caller must still verify iterator_finished() after the
+ * complete map. No allocation or DWG page authentication is performed.
+ * count == 0 is valid with null output/scratch. */
+int musa_dwg1032_object_map_iterator_page_scratch(
+    MusaDwg1032MapIterator *iterator, MusaDwg1032MapEntry *out,
+    size_t count, size_t capacity, MusaDwg1032MapEntry *scratch,
+    size_t scratch_capacity);
 /* Decode exactly count (unsigned MC handle delta, signed MC file-offset
  * delta) pairs from a verified, already decompressed object-map payload.
  * Enforces strictly increasing nonzero handles, in-section offsets, no
