@@ -17,6 +17,14 @@ static int overlap(const void *a, size_t an, const void *b, size_t bn) {
     const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
     return x <= y ? y - x < an : x - y < bn;
 }
+/* Keep direct viewport culling numerically consistent with the cached
+ * spatial index when a large inner translation sum overflows but the
+ * complete affine coordinate is finite. */
+static double world_component(double ax, double x, double ay, double y,
+                              double translation) {
+    const double value=fma(ax,x,fma(ay,y,translation));
+    return isfinite(value) ? value : fma(ay,y,fma(ax,x,translation));
+}
 /* All four affine corners bound a transformed rectangle, including
  * reflections, rotations, shears and negative scales. */
 static int candidate(const MusaScene2dNode *node,
@@ -38,10 +46,10 @@ static int candidate(const MusaScene2dNode *node,
         const double x = (j & 1u) ? local.max_x : local.min_x;
         const double y = (j & 2u) ? local.max_y : local.min_y;
         /* Match cached bounds exactly for large-coordinate cancellation. */
-        const double wx = fma(r->world[0],x,
-                              fma(r->world[2],y,r->world[4]));
-        const double wy = fma(r->world[1],x,
-                              fma(r->world[3],y,r->world[5]));
+        const double wx = world_component(r->world[0],x,r->world[2],y,
+                                          r->world[4]);
+        const double wy = world_component(r->world[1],x,r->world[3],y,
+                                          r->world[5]);
         if (!isfinite(wx) || !isfinite(wy)) return 0;
         if (wx < min_x) min_x = wx;
         if (wx > max_x) max_x = wx;
