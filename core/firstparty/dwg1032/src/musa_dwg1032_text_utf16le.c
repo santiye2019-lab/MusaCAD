@@ -94,3 +94,24 @@ int musa_dwg1032_text_utf16le_to_utf8(
     *written=position;
     return 1;
 }
+
+/* The text length is supplied by an independently validated record schema.
+ * No on-disk DWG text layout or encoding choice is inferred here. */
+int musa_dwg1032_text_utf16le_take(
+    MusaDwg1032Cursor *record, size_t byte_count,
+    char *utf8, size_t capacity, size_t *written) {
+    if (!record || !utf8 || !written ||
+        overlaps(record,sizeof(*record),utf8,capacity) ||
+        overlaps(record,sizeof(*record),written,sizeof(*written)) ||
+        overlaps(record->bytes,record->byte_count,utf8,capacity) ||
+        overlaps(record->bytes,record->byte_count,written,sizeof(*written)))
+        return 0;
+    MusaDwg1032Cursor trial=*record;
+    MusaDwg1032Cursor field;
+    if (!musa_dwg1032_cursor_take_bytes(&trial,byte_count,&field) ||
+        !musa_dwg1032_text_utf16le_to_utf8(
+            field.bytes,field.byte_count,utf8,capacity,written))
+        return 0;
+    *record=trial;
+    return 1;
+}
