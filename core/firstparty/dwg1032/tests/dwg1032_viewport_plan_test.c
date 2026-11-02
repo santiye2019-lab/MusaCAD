@@ -83,7 +83,7 @@ static void reject_invalid_metadata_atomically(void) {
     assert(memcmp(&plan,&saved,sizeof(plan))==0);
     overrides[V-1u].layer_handle=(uint64_t)((V-1u)*8u+1u);
     assert(!musa_dwg1032_viewport_plan_init(
-        &plan,layers,L,overrides,V-1u+(size_t)SIZE_MAX));
+        &plan,layers,L,overrides,SIZE_MAX));
     assert(memcmp(&plan,&saved,sizeof(plan))==0);
     assert(!musa_dwg1032_viewport_plan_init(
         (MusaDwg1032ViewportPlan *)(void *)layers,
