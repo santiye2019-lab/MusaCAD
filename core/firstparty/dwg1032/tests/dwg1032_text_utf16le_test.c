@@ -206,7 +206,7 @@ static void exact_capacity_preflight(void) {
     size_t written=0u;
     assert(musa_dwg1032_text_utf16le_to_utf8(
         sample,sizeof(sample),output,required,&written));
-    assert(written+1u==required && output[written]=='\\0');
+    assert(written+1u==required && output[written]=='\0');
     assert(musa_dwg1032_text_utf16le_measure(NULL,0u,&required));
     assert(required==1u);
     required=777u;
