@@ -182,6 +182,75 @@ static void reverse_insert_mapping(void) {
     assert(!musa_dwg1032_affine2_inverse(&zero_row,&reverse));
     assert(memcmp(&original,&reverse,sizeof reverse)==0);
 }
+/* Synthetic decoded block extents: world bounds must enclose all four
+ * corners, not only the diagonal pair. No DWG record parsing is implied. */
+static void block_bounds_and_viewport_culling(void) {
+    const MusaDwg1032Bounds2 local={0.0,-1.0,2.0,3.0};
+    const MusaDwg1032Affine2 shear={2.0,1.0,10.0,-1.0,3.0,-5.0};
+    MusaDwg1032Bounds2 world={-7.0,-8.0,-9.0,-10.0};
+    assert(musa_dwg1032_affine2_bounds(&shear,&local,&world));
+    assert(near(world.min_x,9.0) && near(world.max_x,17.0));
+    assert(near(world.min_y,-10.0) && near(world.max_y,4.0));
+    unsigned char visible=9u;
+    const MusaDwg1032Bounds2 touching={17.0,4.0,20.0,10.0};
+    assert(musa_dwg1032_bounds2_intersects(&world,&touching,&visible));
+    assert(visible==1u);
+    const MusaDwg1032Bounds2 outside={17.01,4.0,20.0,10.0};
+    assert(musa_dwg1032_bounds2_intersects(&world,&outside,&visible));
+    assert(visible==0u);
+    const MusaDwg1032Bounds2 inside={10.0,-2.0,11.0,0.0};
+    assert(musa_dwg1032_bounds2_intersects(&world,&inside,&visible));
+    assert(visible==1u);
+
+    const MusaDwg1032Point2 insertion={100.0,200.0};
+    MusaDwg1032Affine2 rotated;
+    const MusaDwg1032Bounds2 rectangle={0.0,0.0,4.0,2.0};
+    assert(musa_dwg1032_affine2_insert(
+        &insertion,2.0,-3.0,acos(-1.0)/2.0,&rotated));
+    assert(musa_dwg1032_affine2_bounds(&rotated,&rectangle,&world));
+    assert(near(world.min_x,100.0) && near(world.max_x,106.0));
+    assert(near(world.min_y,200.0) && near(world.max_y,208.0));
+
+    const MusaDwg1032Bounds2 point={1.0,2.0,1.0,2.0};
+    assert(musa_dwg1032_affine2_bounds(&shear,&point,&world));
+    assert(near(world.min_x,14.0) && near(world.max_x,14.0));
+    assert(near(world.min_y,0.0) && near(world.max_y,0.0));
+
+    const MusaDwg1032Bounds2 saved=world;
+    const MusaDwg1032Bounds2 inverted={3.0,0.0,2.0,1.0};
+    const MusaDwg1032Bounds2 invalid={0.0,NAN,2.0,3.0};
+    const MusaDwg1032Affine2 overflow={
+        1e308,1e308,0.0,0.0,1.0,0.0
+    };
+    const MusaDwg1032Bounds2 huge={1e308,0.0,1e308,1e308};
+    assert(!musa_dwg1032_affine2_bounds(&shear,&inverted,&world));
+    assert(!musa_dwg1032_affine2_bounds(&shear,&invalid,&world));
+    assert(!musa_dwg1032_affine2_bounds(&overflow,&huge,&world));
+    assert(!musa_dwg1032_affine2_bounds(&shear,&world,&world));
+    assert(!musa_dwg1032_affine2_bounds(NULL,&local,&world));
+    assert(memcmp(&saved,&world,sizeof world)==0);
+    visible=9u;
+    assert(!musa_dwg1032_bounds2_intersects(&inverted,&inside,&visible));
+    assert(!musa_dwg1032_bounds2_intersects(&inside,&invalid,&visible));
+    assert(!musa_dwg1032_bounds2_intersects(
+        &inside,&inside,(unsigned char *)(void *)&inside));
+    assert(visible==9u);
+
+    /* 20,000 independently placed block occurrences; bounded memory. */
+    const MusaDwg1032Bounds2 unit={0.0,0.0,1.0,1.0};
+    const MusaDwg1032Bounds2 viewport={5000.0,-1.0,6000.0,2.0};
+    size_t hits=0u;
+    for (size_t i=0u;i<20000u;++i) {
+        const MusaDwg1032Affine2 translation={
+            1.0,0.0,(double)i,0.0,1.0,0.0
+        };
+        assert(musa_dwg1032_affine2_bounds(&translation,&unit,&world));
+        assert(musa_dwg1032_bounds2_intersects(
+            &world,&viewport,&visible));
+        hits+=(size_t)visible;
+    }
+    assert(hits==1002u);
+}
 int main(void) {
     instance_and_nested();
     reject_bad_and_atomic();
@@ -189,5 +258,6 @@ int main(void) {
     finite_translation_cancellation();
     scratch_batch_and_atomicity();
     reverse_insert_mapping();
+    block_bounds_and_viewport_culling();
     return 0;
 }
