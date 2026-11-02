@@ -114,7 +114,7 @@ static void cursor_field_transaction(void) {
     const uint8_t input[]={
         'A',0,0xe7,0,0x3d,0xd8,0x00,0xde,'B',0
     };
-    const char expected[]="A\\xc3\\xa7\\xf0\\x9f\\x98\\x80";
+    const char expected[]="A\xc3\xa7\xf0\x9f\x98\x80";
     MusaDwg1032Cursor record;
     char output[32];
     size_t written=91u;
@@ -147,10 +147,10 @@ static void cursor_field_transaction(void) {
     assert(musa_dwg1032_text_utf16le_take(
         &record,2u,output,sizeof(output),&written));
     assert(record.bit_position==80u && written==1u &&
-           output[0]=='B' && output[1]=='\\0');
+           output[0]=='B' && output[1]=='\0');
     assert(musa_dwg1032_text_utf16le_take(
         &record,0u,output,sizeof(output),&written));
-    assert(record.bit_position==80u && written==0u && output[0]=='\\0');
+    assert(record.bit_position==80u && written==0u && output[0]=='\0');
     assert(!musa_dwg1032_text_utf16le_take(
         &record,2u,output,sizeof(output),&written));
     assert(record.bit_position==80u && written==0u);
@@ -177,7 +177,7 @@ static void cursor_large_text_late_failure(void) {
     assert(musa_dwg1032_text_utf16le_take(
         &record,sizeof(input),output,sizeof(output),&written));
     assert(written==N*3u && record.bit_position==sizeof(input)*8u);
-    assert(output[written]=='\\0');
+    assert(output[written]=='\0');
     input[2u*(N-1u)+1u]=0xd8u;
     assert(musa_dwg1032_cursor_init(&record,input,sizeof(input)));
     assert(!musa_dwg1032_text_utf16le_take(
