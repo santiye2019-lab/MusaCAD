@@ -61,6 +61,26 @@ static void encode(uint32_t cp, uint8_t *out, size_t *at) {
     }
 }
 
+/* Exact allocation preflight, independent of any on-disk text framing.
+ * The output length is published only after all scalars validate. */
+int musa_dwg1032_text_utf16le_measure(
+    const uint8_t *utf16le, size_t byte_count, size_t *required) {
+    if (!required || (byte_count && !utf16le) || (byte_count&1u) ||
+        byte_count>PTRDIFF_MAX ||
+        overlaps(utf16le,byte_count,required,sizeof(*required)))
+        return 0;
+    size_t length=0u, at=0u;
+    while (at<byte_count) {
+        uint32_t cp=0u;
+        if (!scalar(utf16le,byte_count,&at,&cp)) return 0;
+        const size_t width=utf8_width(cp);
+        if (width>PTRDIFF_MAX-1u-length) return 0;
+        length+=width;
+    }
+    *required=length+1u;
+    return 1;
+}
+
 int musa_dwg1032_text_utf16le_to_utf8(
     const uint8_t *utf16le, size_t byte_count,
     char *utf8, size_t capacity, size_t *written) {

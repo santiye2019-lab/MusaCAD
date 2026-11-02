@@ -194,7 +194,58 @@ static void cursor_large_text_late_failure(void) {
     assert((unsigned char)output[0]==0xe2u);
     assert((unsigned char)output[N*3u-1u]==0xacu);
 }
+static void exact_capacity_preflight(void) {
+    const uint8_t sample[]={'A',0,0x3d,0xd8,0x00,0xde,0xac,0x20};
+    const uint8_t malformed[]={'A',0,0x3d,0xd8,'B',0};
+    const uint8_t embedded_nul[]={'A',0,0,0};
+    size_t required=777u;
+    assert(musa_dwg1032_text_utf16le_measure(
+        sample,sizeof(sample),&required));
+    assert(required==9u); /* ASCII(1) + emoji(4) + euro(3) + NUL. */
+    char output[9];
+    size_t written=0u;
+    assert(musa_dwg1032_text_utf16le_to_utf8(
+        sample,sizeof(sample),output,required,&written));
+    assert(written+1u==required && output[written]=='\\0');
+    assert(musa_dwg1032_text_utf16le_measure(NULL,0u,&required));
+    assert(required==1u);
+    required=777u;
+    assert(!musa_dwg1032_text_utf16le_measure(
+        malformed,sizeof(malformed),&required));
+    assert(!musa_dwg1032_text_utf16le_measure(
+        embedded_nul,sizeof(embedded_nul),&required));
+    assert(!musa_dwg1032_text_utf16le_measure(
+        sample,sizeof(sample)-1u,&required));
+    assert(!musa_dwg1032_text_utf16le_measure(NULL,2u,&required));
+    assert(!musa_dwg1032_text_utf16le_measure(
+        sample,SIZE_MAX,&required));
+    assert(!musa_dwg1032_text_utf16le_measure(
+        sample,sizeof(sample),NULL));
+    assert(required==777u);
+    _Alignas(size_t) uint8_t aliased[sizeof(size_t)+2u]={0};
+    assert(!musa_dwg1032_text_utf16le_measure(
+        aliased,sizeof(aliased),(size_t *)(void *)aliased));
+}
+static void large_capacity_preflight(void) {
+    enum { N=20000 };
+    static uint8_t input[2u*N];
+    for (size_t i=0;i<N;++i) {
+        input[2u*i]=0xacu;
+        input[2u*i+1u]=0x20u;
+    }
+    size_t required=0u;
+    assert(musa_dwg1032_text_utf16le_measure(
+        input,sizeof(input),&required));
+    assert(required==3u*N+1u);
+    input[2u*(N-1u)+1u]=0xd8u;
+    assert(!musa_dwg1032_text_utf16le_measure(
+        input,sizeof(input),&required));
+    assert(required==3u*N+1u);
+}
+
 int main(void) {
+    exact_capacity_preflight();
+    large_capacity_preflight();
     multilingual_and_terminator();
     reject_malformed_without_publication();
     large_text_and_late_failure();

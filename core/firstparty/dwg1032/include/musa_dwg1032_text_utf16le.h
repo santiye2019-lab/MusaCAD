@@ -18,6 +18,14 @@ extern "C" {
  * On failure output and *written remain unchanged. The full destination
  * capacity must not overlap input or written. No allocation; O(n) time,
  * O(1) auxiliary memory. Does not parse or authenticate DWG text records. */
+/* Preflight a caller-authenticated UTF-16LE field before allocating text
+ * storage. On success *required includes the trailing UTF-8 NUL byte;
+ * empty input requires one byte. Rejects invalid Unicode, embedded NUL,
+ * odd sizes, aliasing and arithmetic overflow without changing *required.
+ * Does not infer a DWG text schema or own any memory. */
+int musa_dwg1032_text_utf16le_measure(
+    const uint8_t *utf16le, size_t byte_count, size_t *required);
+
 int musa_dwg1032_text_utf16le_to_utf8(
     const uint8_t *utf16le, size_t byte_count,
     char *utf8, size_t capacity, size_t *written);
