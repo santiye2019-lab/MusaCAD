@@ -140,3 +140,41 @@ int musa_scene2d_utf16le_counted_to_utf8(const uint8_t *record,
     *consumed=field_bytes;
     return 1;
 }
+
+/* The enclosing object parser, not this adapter, must authenticate the
+ * field's offset and UTF-16 code-unit count. Check the ENTIRE record for
+ * aliasing: output into a prefix/suffix would otherwise mutate a later
+ * field even though the selected UTF-16 span is disjoint. */
+int musa_scene2d_utf16le_counted_at_to_utf8(const uint8_t *record,
+                                            size_t record_bytes,
+                                            size_t byte_offset,
+                                            size_t code_units,
+                                            uint8_t *utf8,
+                                            size_t utf8_capacity,
+                                            size_t *written,
+                                            size_t *consumed) {
+    if (!written || !consumed ||
+        (record_bytes && !record) ||
+        record_bytes>PTRDIFF_MAX ||
+        byte_offset>record_bytes ||
+        code_units>(record_bytes-byte_offset)/2u ||
+        code_units>PTRDIFF_MAX/2u ||
+        utf8_capacity>PTRDIFF_MAX ||
+        ((utf8==NULL)!=(utf8_capacity==0)) ||
+        overlaps(record,record_bytes,utf8,utf8_capacity) ||
+        overlaps(record,record_bytes,written,sizeof(*written)) ||
+        overlaps(record,record_bytes,consumed,sizeof(*consumed)) ||
+        overlaps(utf8,utf8_capacity,written,sizeof(*written)) ||
+        overlaps(utf8,utf8_capacity,consumed,sizeof(*consumed)) ||
+        overlaps(written,sizeof(*written),consumed,sizeof(*consumed)))
+        return 0;
+    size_t field_written=0u, field_consumed=0u;
+    const uint8_t *field=record ? record+byte_offset : NULL;
+    if (!musa_scene2d_utf16le_counted_to_utf8(
+            field,record_bytes-byte_offset,code_units,
+            utf8,utf8_capacity,&field_written,&field_consumed))
+        return 0;
+    *written=field_written;
+    *consumed=byte_offset+field_consumed;
+    return 1;
+}
