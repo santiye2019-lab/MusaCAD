@@ -16,19 +16,14 @@ static int valid(const MusaDwg1032Affine2 *t) {
     return isfinite(t->xx) && isfinite(t->xy) && isfinite(t->tx) &&
            isfinite(t->yx) && isfinite(t->yy) && isfinite(t->ty);
 }
-/* A finite affine result can be lost when the two products are added
- * before a large translation of the opposite sign. Keep the ordinary
- * fast path, then retry with fused multiply-add in both orders. */
+/* Fused multiply-add limits intermediate rounding and overflow.
+ * Try both accumulation orders because a finite result can depend on
+ * which product is combined with the translation first. */
 static double translated_pair(double a, double x, double b, double y,
                               double offset) {
-    /* Evaluate the fused form first: ordinary intermediate products may
-     * overflow even when the final translated coordinate is finite. */
     double result=fma(a,x,fma(b,y,offset));
-    if (!isfinite(result)) {
-        result=fma(a,x,fma(b,y,offset));
-        if (!isfinite(result))
-            result=fma(b,y,fma(a,x,offset));
-    }
+    if (!isfinite(result))
+        result=fma(b,y,fma(a,x,offset));
     return result;
 }
 static int mapped(const MusaDwg1032Affine2 *t,
