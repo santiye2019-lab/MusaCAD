@@ -249,6 +249,11 @@ static void block_bounds_and_viewport_culling(void) {
     assert(!musa_dwg1032_bounds2_intersects(&world,&negative_width,&visible));
     assert(visible==7u);
 
+    /* A rotated block outside the view must not be emitted. */
+    const MusaDwg1032Bounds2 distant_view={1000.0,1000.0,1100.0,1100.0};
+    assert(musa_dwg1032_bounds2_intersects(&world,&distant_view,&visible));
+    assert(visible==0u);
+
     const MusaDwg1032Bounds2 saved=world;
     const MusaDwg1032Bounds2 inverted={3.0,0.0,2.0,1.0};
     const MusaDwg1032Bounds2 invalid={0.0,NAN,2.0,3.0};
