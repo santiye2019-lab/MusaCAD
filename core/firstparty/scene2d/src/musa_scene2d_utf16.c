@@ -178,3 +178,38 @@ int musa_scene2d_utf16le_counted_at_to_utf8(const uint8_t *record,
     *consumed=byte_offset+field_consumed;
     return 1;
 }
+
+/* The caller authenticates the enclosing record and the field offset.
+ * Validate against the complete record before delegating to the existing
+ * strict terminated-field decoder; never write into another record field. */
+int musa_scene2d_utf16le_cstr_at_to_utf8(const uint8_t *record,
+                                         size_t record_bytes,
+                                         size_t byte_offset,
+                                         size_t max_field_bytes,
+                                         uint8_t *utf8,
+                                         size_t utf8_capacity,
+                                         size_t *written,
+                                         size_t *consumed) {
+    if (!record || !written || !consumed ||
+        record_bytes>PTRDIFF_MAX || byte_offset>record_bytes ||
+        utf8_capacity>PTRDIFF_MAX ||
+        ((utf8==NULL)!=(utf8_capacity==0)) ||
+        overlaps(record,record_bytes,utf8,utf8_capacity) ||
+        overlaps(record,record_bytes,written,sizeof(*written)) ||
+        overlaps(record,record_bytes,consumed,sizeof(*consumed)) ||
+        overlaps(utf8,utf8_capacity,written,sizeof(*written)) ||
+        overlaps(utf8,utf8_capacity,consumed,sizeof(*consumed)) ||
+        overlaps(written,sizeof(*written),consumed,sizeof(*consumed)))
+        return 0;
+    const size_t remaining=record_bytes-byte_offset;
+    const size_t bound=max_field_bytes<remaining?max_field_bytes:remaining;
+    if (bound<2u) return 0;
+    size_t field_written=0u, field_consumed=0u;
+    if (!musa_scene2d_utf16le_cstr_to_utf8(
+            record+byte_offset,bound,utf8,utf8_capacity,
+            &field_written,&field_consumed))
+        return 0;
+    *written=field_written;
+    *consumed=byte_offset+field_consumed;
+    return 1;
+}
