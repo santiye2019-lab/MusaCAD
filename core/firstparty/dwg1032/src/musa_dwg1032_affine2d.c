@@ -80,7 +80,7 @@ int musa_dwg1032_affine2_apply(const MusaDwg1032Affine2 *transform,
     }
     for (size_t i=0;i<count;++i) {
         MusaDwg1032Point2 trial;
-        (void)mapped(transform,points[i],&trial);
+        if (!mapped(transform,points[i],&trial)) return 0;
         out[i]=trial;
     }
     return 1;
