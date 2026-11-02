@@ -46,6 +46,24 @@ int musa_dwg1032_affine2_apply(const MusaDwg1032Affine2 *transform,
 int musa_dwg1032_affine2_apply_scratch(const MusaDwg1032Affine2 *transform,
     const MusaDwg1032Point2 *points, size_t count, MusaDwg1032Point2 *out,
     MusaDwg1032Point2 *scratch, size_t scratch_capacity);
+/* Axis-aligned bounds for already-decoded 2D geometry. Degenerate
+ * (point/line) bounds are valid. This does not parse DWG extents. */
+typedef struct MusaDwg1032Bounds2 {
+    double min_x, min_y, max_x, max_y;
+} MusaDwg1032Bounds2;
+
+/* Transform all four corners, enclosing rotated/sheared/mirrored INSERTs.
+ * Reject inverted/nonfinite bounds, invalid maps, and unrepresentable
+ * coordinates without changing output. Inputs/output must not overlap.
+ * O(1) time, O(1) memory; no allocation. */
+int musa_dwg1032_affine2_bounds(const MusaDwg1032Affine2 *transform,
+    const MusaDwg1032Bounds2 *local, MusaDwg1032Bounds2 *world);
+
+/* Inclusive intersection for caller-validated world and viewport bounds:
+ * touching edges remain visible, preventing false-negative culling.
+ * Reject malformed bounds and aliased output without changing *visible. */
+int musa_dwg1032_bounds2_intersects(const MusaDwg1032Bounds2 *world,
+    const MusaDwg1032Bounds2 *viewport, unsigned char *visible);
 #ifdef __cplusplus
 }
 #endif
