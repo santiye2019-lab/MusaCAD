@@ -46,6 +46,27 @@ static void small_windows(void) {
         file,sizeof(file),pages,3,9,2,out,5,scratch,sizeof(scratch)));
     for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5);
     pages[2].logical_offset=6;
+    /* A short single-page read must reject damaged immediate physical
+     * neighbors, just like the older two-pass window reader. */
+    pages[0].file_offset=9; /* Previous page is outside the file. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3,9,4,out,1));
+    assert(!musa_dwg1032_section_read_window_scratch(
+        file,sizeof(file),pages,3,9,4,out,1,scratch,sizeof(scratch)));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5);
+    pages[0].file_offset=3;
+    pages[2].file_offset=9; /* Next page is outside the file. */
+    assert(!musa_dwg1032_section_read_window(
+        file,sizeof(file),pages,3,9,4,out,1));
+    assert(!musa_dwg1032_section_read_window_scratch(
+        file,sizeof(file),pages,3,9,4,out,1,scratch,sizeof(scratch)));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5);
+    pages[2].file_offset=0;
+    pages[2].byte_count=4; /* Next page crosses section end. */
+    assert(!musa_dwg1032_section_read_window_scratch(
+        file,sizeof(file),pages,3,9,4,out,1,scratch,sizeof(scratch)));
+    for (size_t i=0;i<sizeof(out);++i) assert(out[i]==0xA5);
+    pages[2].byte_count=3;
     pages[0].byte_count=2;
     pages[1].logical_offset=4; /* Gap before the first touched page. */
     assert(!musa_dwg1032_section_read_window_scratch(
