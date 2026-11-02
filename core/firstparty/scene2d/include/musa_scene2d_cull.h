@@ -25,8 +25,10 @@ int musa_scene2d_collect_visible(
 /* Caller-scratch variant for large predecoded scenes. Evaluate each
  * candidate exactly once, storing selected indices in caller-owned scratch,
  * then publish the completed list only after every node validates.
- * scratch_capacity >= count; scratch, output, inputs and written must be
- * pairwise disjoint where writes can occur. Scratch may be modified on
+ * scratch_capacity >= min(count, capacity): only accepted hits need
+ * scratch storage, so a small viewport over a large sheet can use a small
+ * buffer. Scratch, output, inputs and written must be pairwise disjoint
+ * where writes can occur. Scratch may be modified on
  * failure, but indices and *written remain unchanged. O(count) time,
  * O(count) caller-owned scratch; no allocation or DWG byte decoding.
  * A zero-node call succeeds with written=0 and no arrays required. */

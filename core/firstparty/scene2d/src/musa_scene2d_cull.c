@@ -118,15 +118,18 @@ int musa_scene2d_collect_visible_scratch(
     const MusaScene2dBox *local_bounds, size_t count, MusaScene2dBox viewport,
     size_t *indices, size_t capacity, size_t *written,
     size_t *scratch, size_t scratch_capacity) {
+    /* Only selected hits are stored in scratch. A sparse viewport over
+     * a large sheet must not require a drawing-sized scratch allocation. */
+    const size_t scratch_needed = capacity < count ? capacity : count;
     if (!written || !valid_box(viewport) ||
         count > SIZE_MAX / sizeof(*nodes) ||
         count > SIZE_MAX / sizeof(*resolved) ||
         count > SIZE_MAX / sizeof(*local_bounds) ||
         capacity > SIZE_MAX / sizeof(*indices) ||
         scratch_capacity > SIZE_MAX / sizeof(*scratch) ||
-        scratch_capacity < count ||
-        (count && (!nodes || !resolved || !local_bounds ||
-                   !indices || !scratch)))
+        scratch_capacity < scratch_needed ||
+        (count && (!nodes || !resolved || !local_bounds || !indices)) ||
+        (scratch_needed && !scratch))
         return 0;
     const size_t nodes_bytes = count * sizeof(*nodes);
     const size_t resolved_bytes = count * sizeof(*resolved);

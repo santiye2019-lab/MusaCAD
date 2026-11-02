@@ -94,6 +94,33 @@ static void large_sheet_differential(void) {
         nodes,resolved,boxes,N,viewport,out,baseline_count-1u,
         &written,scratch,N));
     assert(written==77 && !memcmp(out,snapshot,sizeof out));
+    /* A sparse viewport over 20,000 objects needs only a 16-entry
+     * scratch buffer, with identical source-order hits to the baseline. */
+    const MusaScene2dBox narrow={100,-1,125,2};
+    size_t small_expected[16], small_out[16], small_scratch[16];
+    size_t small_count=77, expected_count=77;
+    for (size_t i=0;i<16u;++i) small_out[i]=SIZE_MAX;
+    assert(musa_scene2d_collect_visible(
+        nodes,resolved,boxes,N,narrow,small_expected,16,&expected_count));
+    assert(expected_count>0u && expected_count<16u);
+    assert(musa_scene2d_collect_visible_scratch(
+        nodes,resolved,boxes,N,narrow,small_out,16,
+        &small_count,small_scratch,16));
+    assert(small_count==expected_count &&
+           !memcmp(small_out,small_expected,small_count*sizeof(*small_out)));
+    size_t small_saved[16];
+    memcpy(small_saved,small_out,sizeof small_out);
+    small_count=77;
+    assert(!musa_scene2d_collect_visible_scratch(
+        nodes,resolved,boxes,N,narrow,small_out,16,
+        &small_count,small_scratch,15));
+    assert(small_count==77 && !memcmp(small_out,small_saved,sizeof small_out));
+    /* No candidate means no scratch entries, even on a large source. */
+    const MusaScene2dBox empty={1000000,0,1000001,1};
+    assert(musa_scene2d_collect_visible_scratch(
+        nodes,resolved,boxes,N,empty,small_out,0,
+        &small_count,NULL,0));
+    assert(small_count==0 && !memcmp(small_out,small_saved,sizeof small_out));
     /* A zero-hit viewport accepts zero output capacity. */
     const MusaScene2dBox far={1000000,0,1000001,1};
     assert(musa_scene2d_collect_visible_scratch(
