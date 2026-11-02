@@ -250,3 +250,29 @@ int musa_dwg1032_viewport_local_visibility_scratch(
     memcpy(local_visible,scratch,entity_count);
     return 1;
 }
+
+/* Independent bounded paging adapter. Full-array overlap checks matter:
+ * publishing a page into a future input page would otherwise silently
+ * corrupt the next batch even if the selected input slice is disjoint. */
+int musa_dwg1032_viewport_local_visibility_page(
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible, size_t total_count,
+    size_t first, size_t page_count,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *page_visible) {
+    if (!entity_layer_handles || !entity_visible || !page_visible ||
+        !page_count || first>total_count ||
+        page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*entity_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*entity_visible) ||
+        page_count>PTRDIFF_MAX)
+        return 0;
+    if (overlaps(page_visible,page_count,entity_layer_handles,
+                 total_count*sizeof(*entity_layer_handles)) ||
+        overlaps(page_visible,page_count,entity_visible,total_count))
+        return 0;
+    return musa_dwg1032_viewport_local_visibility(
+        entity_layer_handles+first,entity_visible+first,page_count,
+        layers,layer_count,overrides,override_count,page_visible);
+}

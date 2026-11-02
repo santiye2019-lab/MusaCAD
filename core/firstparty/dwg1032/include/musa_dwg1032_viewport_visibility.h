@@ -79,6 +79,21 @@ int musa_dwg1032_viewport_local_visibility_scratch(
     const MusaDwg1032LayerState *layers, size_t layer_count,
     const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
     uint8_t *local_visible, uint8_t *scratch, size_t scratch_capacity);
+/* Resolve only [first, first+page_count) from a caller-authenticated
+ * full decoded entity array. Useful for bounded-memory 2D viewport paging.
+ * Every output byte is committed only after the whole page validates;
+ * an invalid later page does not corrupt earlier published pages.
+ * Rejects output aliasing with ANY part of either complete source array,
+ * not just the selected page. Does not parse DWG or authorize rendering.
+ * Empty pages are rejected. O(page_count log layers + page_count log
+ * overrides + layer_count + override_count), no allocation. */
+int musa_dwg1032_viewport_local_visibility_page(
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible, size_t total_count,
+    size_t first, size_t page_count,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *page_visible);
 #ifdef __cplusplus
 }
 #endif
