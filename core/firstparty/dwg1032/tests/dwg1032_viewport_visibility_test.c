@@ -350,6 +350,56 @@ static void large_viewport_insert_differential(void) {
     assert(!memcmp(saved,out,sizeof(out)));
 }
 
+/* Page a large block definition through one INSERT without publishing an
+ * invalid later page or overwriting future input records. */
+static void paged_insert_children(void) {
+    enum { N=20000, PAGE=127 };
+    static uint64_t handles[N];
+    static uint8_t owners[N],whole[N],page[PAGE];
+    const MusaDwg1032LayerState layers[]={
+        {10,0,0},{20,1,1},{30,1,1}
+    };
+    const MusaDwg1032ViewportFreeze vp[]={{30,1}};
+    for (size_t i=0u;i<N;++i) {
+        handles[i]=(i%3u==0u)?10u:((i%3u==1u)?20u:30u);
+        owners[i]=(uint8_t)(i%17u!=0u);
+    }
+    assert(musa_dwg1032_viewport_insert_visibility(
+        handles,owners,N,10u,1u,layers,3u,vp,1u,whole));
+    for (size_t first=0u;first<N;first+=PAGE) {
+        const size_t n=N-first<PAGE?N-first:PAGE;
+        memset(page,0xa5,sizeof(page));
+        assert(musa_dwg1032_viewport_insert_visibility_page(
+            handles,owners,N,first,n,10u,1u,layers,3u,vp,1u,page));
+        assert(!memcmp(page,whole+first,n));
+        if (n<PAGE) assert(page[n]==0xa5);
+    }
+    memset(page,0x5a,sizeof(page));
+    handles[N-1u]=UINT64_MAX;
+    assert(!musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,N-PAGE,PAGE,10u,1u,layers,3u,vp,1u,page));
+    for (size_t i=0u;i<PAGE;++i) assert(page[i]==0x5a);
+    /* An earlier page remains independently valid. */
+    assert(musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,0u,PAGE,10u,1u,layers,3u,vp,1u,page));
+    assert(!memcmp(page,whole,PAGE));
+    handles[N-1u]=30u;
+    assert(!musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,0u,0u,10u,1u,layers,3u,vp,1u,page));
+    assert(!musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,N+1u,1u,10u,1u,layers,3u,vp,1u,page));
+    assert(!musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,N-1u,2u,10u,1u,layers,3u,vp,1u,page));
+    /* Even a disjoint selected page may not overwrite future inputs. */
+    assert(!musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,0u,4u,10u,1u,layers,3u,vp,1u,owners+N-4u));
+    assert(!musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,0u,4u,10u,1u,layers,3u,vp,1u,
+        (uint8_t *)(void *)(handles+N-4u)));
+    assert(musa_dwg1032_viewport_insert_visibility_page(
+        handles,owners,N,0u,PAGE,10u,0u,layers,3u,vp,1u,page));
+    for (size_t i=0u;i<PAGE;++i) assert(page[i]==0u);
+}
 int main(void) {
     viewport_contexts();
     large_viewport_differential();
@@ -357,6 +407,7 @@ int main(void) {
     large_viewport_owner_chain();
     viewport_insert_instances();
     large_viewport_insert_differential();
+    paged_insert_children();
     return 0;
 }
 
