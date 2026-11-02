@@ -155,6 +155,19 @@ static void bit64_boundaries(void) {
     assert(value==UINT64_C(0x000123456789abcd));
     assert(cursor.bit_position==64u);
 }
+static void bit64_prefixes(void) {
+    const uint8_t bytes[]={0x80,0x01,0x23,0x45,0x67,0x89,0xab,0xcd};
+    for (unsigned bits=1u;bits<=64u;++bits) {
+        MusaDwg1032Cursor cursor;
+        uint64_t value=0u, expected=0u;
+        assert(musa_dwg1032_cursor_init(&cursor,bytes,sizeof bytes));
+        assert(musa_dwg1032_cursor_read_bits64(&cursor,bits,&value));
+        for (unsigned i=0u;i<bits;++i)
+            expected=(expected<<1u)|
+                (uint64_t)((bytes[i/8u]>>(7u-i%8u))&1u);
+        assert(value==expected && cursor.bit_position==bits);
+    }
+}
 static void framed_take_atomicity(void) {
     const uint8_t data[]={2,0,0,0,0xa5,0x5a,3,0,0,0,0x81};
     MusaDwg1032Cursor parent, child;
@@ -190,6 +203,6 @@ static void reject_overlapping_take_without_mutation(void) {
 int main(void) {
     bit_fields(); byte_fields(); raw_byte_reads(); slices_and_bad_state();
     exhaustive_small_buffers(); reject_overlapping_take_without_mutation();
-    framed_take_atomicity(); bit64_boundaries();
+    framed_take_atomicity(); bit64_boundaries(); bit64_prefixes();
     return 0;
 }
