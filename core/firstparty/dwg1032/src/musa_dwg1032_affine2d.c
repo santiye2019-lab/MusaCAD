@@ -115,13 +115,20 @@ int musa_dwg1032_affine2_inverse(const MusaDwg1032Affine2 *forward,
     if (!forward || !inverse || !valid(forward) ||
         overlaps(forward,sizeof(*forward),inverse,sizeof(*inverse)))
         return 0;
-    const double determinant=fma(forward->xx,forward->yy,
-                                -forward->xy*forward->yx);
+    /* Normalize each row independently. Computing the raw determinant
+     * first can overflow (large scales) or underflow (small scales) even
+     * when all four inverse coefficients are representable. */
+    const double row_x=fmax(fabs(forward->xx),fabs(forward->xy));
+    const double row_y=fmax(fabs(forward->yx),fabs(forward->yy));
+    if (row_x==0.0 || row_y==0.0) return 0;
+    const double a=forward->xx/row_x, b=forward->xy/row_x;
+    const double c=forward->yx/row_y, d=forward->yy/row_y;
+    const double determinant=fma(a,d,-b*c);
     if (!isfinite(determinant) || determinant==0.0) return 0;
-    const double xx=forward->yy/determinant;
-    const double xy=-forward->xy/determinant;
-    const double yx=-forward->yx/determinant;
-    const double yy=forward->xx/determinant;
+    const double xx=(d/determinant)/row_x;
+    const double xy=(-b/determinant)/row_y;
+    const double yx=(-c/determinant)/row_x;
+    const double yy=(a/determinant)/row_y;
     const MusaDwg1032Affine2 trial={
         xx,xy,translated_pair(-xx,forward->tx,-xy,forward->ty,0.0),
         yx,yy,translated_pair(-yx,forward->tx,-yy,forward->ty,0.0)
