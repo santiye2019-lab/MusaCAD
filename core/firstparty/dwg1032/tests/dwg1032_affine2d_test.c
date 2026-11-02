@@ -141,11 +141,39 @@ static void scratch_batch_and_atomicity(void) {
         &overflow,&extreme,1u,&result,&temp,1u));
     assert(result.x==1e308 && result.y==1e308);
 }
+static void reverse_insert_mapping(void) {
+    const MusaDwg1032Point2 at={100.0,-50.0};
+    MusaDwg1032Affine2 forward,reverse,original;
+    assert(musa_dwg1032_affine2_insert(
+        &at,-2.0,3.0,acos(-1.0)/3.0,&forward));
+    assert(musa_dwg1032_affine2_inverse(&forward,&reverse));
+    const MusaDwg1032Point2 local[3]={
+        {0.0,0.0},{4.5,-2.0},{-100.0,75.0}};
+    MusaDwg1032Point2 world[3],roundtrip[3];
+    assert(musa_dwg1032_affine2_apply(&forward,local,3,world));
+    assert(musa_dwg1032_affine2_apply(&reverse,world,3,roundtrip));
+    for (size_t i=0;i<3u;++i) {
+        assert(near(local[i].x,roundtrip[i].x));
+        assert(near(local[i].y,roundtrip[i].y));
+    }
+    original=reverse;
+    const MusaDwg1032Affine2 singular={1.0,2.0,0.0,2.0,4.0,0.0};
+    assert(!musa_dwg1032_affine2_inverse(&singular,&reverse));
+    assert(memcmp(&original,&reverse,sizeof reverse)==0);
+    const MusaDwg1032Affine2 invalid={1.0,0.0,NAN,0.0,1.0,0.0};
+    assert(!musa_dwg1032_affine2_inverse(&invalid,&reverse));
+    assert(!musa_dwg1032_affine2_inverse(&forward,&forward));
+    assert(memcmp(&original,&reverse,sizeof reverse)==0);
+    const MusaDwg1032Affine2 tiny={1e-300,0.0,0.0,0.0,1e-300,0.0};
+    assert(!musa_dwg1032_affine2_inverse(&tiny,&reverse));
+    assert(memcmp(&original,&reverse,sizeof reverse)==0);
+}
 int main(void) {
     instance_and_nested();
     reject_bad_and_atomic();
     large_sheet();
     finite_translation_cancellation();
     scratch_batch_and_atomicity();
+    reverse_insert_mapping();
     return 0;
 }
