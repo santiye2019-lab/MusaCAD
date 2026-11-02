@@ -136,7 +136,8 @@ static void raw_byte_reads(void) {
     assert(!musa_dwg1032_cursor_read_u8(&c,&v));
 }
 static void reject_overlapping_take_without_mutation(void) {
-    uint8_t storage[sizeof(MusaDwg1032Cursor)+8u]={0};
+    /* Align the byte buffer before casting it to a cursor destination. */
+    _Alignas(MusaDwg1032Cursor) uint8_t storage[sizeof(MusaDwg1032Cursor)+8u]={0};
     MusaDwg1032Cursor parent, child, snapshot;
     assert(musa_dwg1032_cursor_init(&parent,storage,sizeof storage));
     snapshot=parent;
