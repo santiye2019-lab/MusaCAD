@@ -57,7 +57,10 @@ int musa_dwg1032_section_read_window_scratch(
             (uint64_t)previous.byte_count>
                 section_bytes-previous.logical_offset ||
             previous.logical_offset+(uint64_t)previous.byte_count!=
-                current.logical_offset) return 0;
+                current.logical_offset ||
+            previous.file_offset>(uint64_t)file_size ||
+            (uint64_t)previous.byte_count>
+                (uint64_t)file_size-previous.file_offset) return 0;
     }
     /* Scratch may be partially modified by a late corrupt page. Public
      * destination is committed only when the entire window is validated. */
@@ -74,9 +77,17 @@ int musa_dwg1032_section_read_window_scratch(
             p.file_offset>(uint64_t)file_size ||
             (uint64_t)p.byte_count>(uint64_t)file_size-p.file_offset)
             return 0;
-        if (i+1u<page_count &&
-            p.logical_offset+(uint64_t)p.byte_count!=
-                validated_pages[i+1u].logical_offset) return 0;
+        if (i+1u<page_count) {
+            const MusaDwg1032FilePage next=validated_pages[i+1u];
+            if (!next.byte_count || next.logical_offset>section_bytes ||
+                (uint64_t)next.byte_count>
+                    section_bytes-next.logical_offset ||
+                p.logical_offset+(uint64_t)p.byte_count!=
+                    next.logical_offset ||
+                next.file_offset>(uint64_t)file_size ||
+                (uint64_t)next.byte_count>
+                    (uint64_t)file_size-next.file_offset) return 0;
+        }
         const size_t within=(size_t)(position-p.logical_offset);
         const size_t available=p.byte_count-within;
         const size_t take=remaining<available?remaining:available;
