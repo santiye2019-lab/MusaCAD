@@ -135,6 +135,18 @@ static void raw_byte_reads(void) {
     assert(musa_dwg1032_cursor_read_bytes(&c,NULL,0));
     assert(!musa_dwg1032_cursor_read_u8(&c,&v));
 }
+static void bit64_boundaries(void) {
+    const uint8_t data[]={0x80,0x01,0x23,0x45,0x67,0x89,0xab,0xcd};
+    MusaDwg1032Cursor cursor;
+    uint64_t value=0;
+    assert(musa_dwg1032_cursor_init(&cursor,data,sizeof data));
+    assert(musa_dwg1032_cursor_read_bits64(&cursor,64u,&value));
+    assert(value==UINT64_C(0x800123456789abcd));
+    assert(cursor.bit_position==64u);
+    value=17u;
+    assert(!musa_dwg1032_cursor_read_bits64(&cursor,1u,&value));
+    assert(value==17u && cursor.bit_position==64u);
+}
 static void framed_take_atomicity(void) {
     const uint8_t data[]={2,0,0,0,0xa5,0x5a,3,0,0,0,0x81};
     MusaDwg1032Cursor parent, child;
@@ -170,6 +182,6 @@ static void reject_overlapping_take_without_mutation(void) {
 int main(void) {
     bit_fields(); byte_fields(); raw_byte_reads(); slices_and_bad_state();
     exhaustive_small_buffers(); reject_overlapping_take_without_mutation();
-    framed_take_atomicity();
+    framed_take_atomicity(); bit64_boundaries();
     return 0;
 }
