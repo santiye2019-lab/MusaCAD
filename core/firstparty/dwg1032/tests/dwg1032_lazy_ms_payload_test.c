@@ -96,6 +96,58 @@ static void small_reordered_pages(void) {
     assert(memcmp(&saved_index,&index,sizeof(index))==0);
     assert(memcmp(saved_pages,pages,sizeof(pages))==0);
     assert(length==77 && out[0]==0xa5);
+    /* Scratch-backed payload: cross-page read, ordinal/handle equivalence,
+     * and transactional rejection of aliases or insufficient workspace. */
+    uint8_t scratch[8]={0};
+    uint8_t scratch_out[8];
+    uint64_t scratch_length=99;
+    memset(scratch_out,0xa5,sizeof(scratch_out));
+    assert(musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&scratch_length,scratch,sizeof(scratch)));
+    assert(scratch_length==4 && scratch_out[0]==2 &&
+           scratch_out[1]==3 && scratch_out[2]==4);
+    memset(scratch_out,0xa5,sizeof(scratch_out));
+    scratch_length=99;
+    assert(musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+        file,sizeof(file),pages,3,&index,0,1,4,
+        scratch_out,3,&scratch_length,scratch,sizeof(scratch)));
+    assert(scratch_length==4 && scratch_out[0]==2 &&
+           scratch_out[1]==3 && scratch_out[2]==4);
+    scratch_length=99;
+    memset(scratch_out,0xa5,sizeof(scratch_out));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&scratch_length,scratch,2));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&scratch_length,scratch_out,3));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&scratch_length,(uint8_t *)(void *)pages,sizeof(pages)));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&scratch_length,scratch_out+1,7));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,999,1,4,
+        scratch_out,3,&scratch_length,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+        file,sizeof(file),pages,3,&index,2,0,4,
+        scratch_out,3,&scratch_length,scratch,sizeof(scratch)));
+    assert(scratch_length==99);
+    for (size_t i=0;i<sizeof(scratch_out);++i)
+        assert(scratch_out[i]==0xa5);
+    assert(musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,4,4,
+        NULL,0,&scratch_length,NULL,0));
+    assert(scratch_length==4);
+    scratch_length=99;
+    pages[1].file_offset=sizeof(file);
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&scratch_length,scratch,sizeof(scratch)));
+    assert(scratch_length==99 && scratch_out[0]==0xa5);
+    pages[1].file_offset=0;
     file[8]=7; /* Claimed record exceeds its candidate span. */
     assert(!musa_dwg1032_object_ms_payload_read_window(
         file,sizeof(file),pages,3,&index,10,0,8,out,1,&length));
@@ -136,6 +188,22 @@ static void extended_prefix_across_pages(void) {
     assert(out[2]==0xa5 && out[3]==0xa5);
     assert(musa_dwg1032_object_ms_payload_read_window(
         file,BYTES,pages,2,&index,33,PAYLOAD,PAYLOAD,NULL,0,&length));
+    uint8_t scratch[4]={0};
+    uint8_t scratch_out[4]={0xa5,0xa5,0xa5,0xa5};
+    uint64_t scratch_length=99;
+    assert(musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,BYTES,pages,2,&index,33,32768,PAYLOAD,
+        scratch_out,2,&scratch_length,scratch,sizeof(scratch)));
+    assert(scratch_length==PAYLOAD &&
+           scratch_out[0]==(uint8_t)(32768u*17u) &&
+           scratch_out[1]==(uint8_t)(32769u*17u));
+    assert(scratch_out[2]==0xa5 && scratch_out[3]==0xa5);
+    scratch_length=99;
+    scratch_out[0]=0xa5;scratch_out[1]=0xa5;
+    assert(musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+        file,BYTES,pages,2,&index,0,PAYLOAD,PAYLOAD,
+        NULL,0,&scratch_length,NULL,0));
+    assert(scratch_length==PAYLOAD);
     out[0]=0xa5;out[1]=0xa5;length=99;
     file[3]=0x80; /* Second MS word may not have its high bit set. */
     assert(!musa_dwg1032_object_ms_payload_read_window(
@@ -199,6 +267,13 @@ static void large_reverse_physical(void) {
             ordinal_out,2,&ordinal_length));
         assert(ordinal_length==length &&
                memcmp(out,ordinal_out,sizeof(out))==0);
+        uint8_t scratch[2]={0};
+        uint8_t scratch_out[2]={0xa5,0xa5};
+        uint64_t scratch_length=99;
+        assert(musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+            file,N*STRIDE,pages,N,&index,at,0,2,
+            scratch_out,2,&scratch_length,scratch,sizeof(scratch)));
+        assert(scratch_length==2 && memcmp(out,scratch_out,2)==0);
 
     }
     free(order);free(entries);free(pages);free(file);
