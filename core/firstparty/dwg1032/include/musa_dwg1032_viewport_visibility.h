@@ -94,6 +94,20 @@ int musa_dwg1032_viewport_local_visibility_page(
     const MusaDwg1032LayerState *layers, size_t layer_count,
     const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
     uint8_t *page_visible);
+/* Resolve a bounded page of one verified INSERT's children. The complete
+ * source ranges are checked for aliasing, including children outside the
+ * requested page, so output cannot corrupt a later page. A failure leaves
+ * page_visible untouched. As with the full-array API, this is post-decode
+ * evidence only; it does not establish DWG ownership or render permission.
+ * Empty pages are rejected. No heap allocations. */
+int musa_dwg1032_viewport_insert_visibility_page(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible, size_t total_count,
+    size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *page_visible);
 #ifdef __cplusplus
 }
 #endif
