@@ -82,6 +82,21 @@ int musa_dwg1032_affine2_cull_page(
     const uint8_t *effective_visible, size_t total_count,
     size_t first, size_t page_count,
     const MusaDwg1032Bounds2 *viewport, uint8_t *page_visible);
+/* Single-transform-pass viewport culling for large, already-decoded
+ * INSERT occurrence pages. Each transformed AABB is evaluated once into
+ * caller-owned scratch, then the whole mask is committed atomically.
+ * All source arrays (including unrequested entries), the viewport, output,
+ * and the ENTIRE scratch capacity must be pairwise disjoint wherever
+ * writing is possible. Reject malformed hidden entries as well.
+ * Scratch can change on failure; page_visible must remain unchanged.
+ * No DWG decoding, owner validation, or allocation occurs here. */
+int musa_dwg1032_affine2_cull_page_scratch(
+    const MusaDwg1032Affine2 *transforms,
+    const MusaDwg1032Bounds2 *local_bounds,
+    const uint8_t *effective_visible, size_t total_count,
+    size_t first, size_t page_count,
+    const MusaDwg1032Bounds2 *viewport, uint8_t *page_visible,
+    uint8_t *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif
