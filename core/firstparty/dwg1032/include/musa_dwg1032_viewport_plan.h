@@ -40,6 +40,21 @@ int musa_dwg1032_viewport_plan_page(
     const uint64_t *entity_layer_handles,
     const uint8_t *entity_visible, size_t total_count,
     size_t first, size_t page_count, uint8_t *page_visible);
+/* Single-lookup bounded page variant for large 2D drawings. Computes each
+ * mask byte into caller scratch, then publishes the whole page only after
+ * all handles and Boolean flags validate. Unlike plan_page, it performs
+ * only one layer/override lookup per entity. The ENTIRE scratch capacity
+ * must be disjoint from the full source arrays, metadata, plan and output.
+ * Scratch may change on failure; page_visible never does. Requires an
+ * immutable plan initialized by viewport_plan_init. No heap, no parsing,
+ * no owner/INSERT authorization. O(page_count log layers + page_count log
+ * overrides + page_count), with no repeated metadata scan. */
+int musa_dwg1032_viewport_plan_page_scratch(
+    const MusaDwg1032ViewportPlan *plan,
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible, size_t total_count,
+    size_t first, size_t page_count, uint8_t *page_visible,
+    uint8_t *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif
