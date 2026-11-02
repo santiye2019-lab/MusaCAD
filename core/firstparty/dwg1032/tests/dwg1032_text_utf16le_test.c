@@ -139,6 +139,14 @@ static void cursor_field_transaction(void) {
     assert(!musa_dwg1032_text_utf16le_take(
         &record,8u,output,sizeof(output),&written));
     assert(record.bit_position==1u && written==91u && output[0]=='Z');
+    /* A forged cursor borrowing its own metadata is not a valid source. */
+    record.bytes=(const uint8_t *)(const void *)&record;
+    record.byte_count=sizeof(record);
+    record.bit_position=0u;
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,2u,output,sizeof(output),&written));
+    assert(record.bytes==(const uint8_t *)(const void *)&record &&
+           record.bit_position==0u && written==91u && output[0]=='Z');
     assert(musa_dwg1032_cursor_init(&record,input,sizeof(input)));
     assert(musa_dwg1032_text_utf16le_take(
         &record,8u,output,sizeof(output),&written));
