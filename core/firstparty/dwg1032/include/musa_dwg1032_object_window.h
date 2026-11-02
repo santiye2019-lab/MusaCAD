@@ -72,6 +72,29 @@ int musa_dwg1032_object_ms_payload_read_window_at_position(
     size_t position, uint64_t payload_offset, size_t max_payload_bytes,
     uint8_t *destination, size_t byte_count, uint64_t *payload_length);
 
+
+/* One-pass, caller-scratch variant for large viewport batches. The entire
+ * scratch capacity must be disjoint from source, index, page metadata,
+ * destination and candidate_length. The directory and index must already
+ * be validated and immutable. On failure the public outputs are unchanged;
+ * scratch is disposable. No decompression or DWG entity decoding. */
+int musa_dwg1032_object_candidate_read_window_scratch_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    size_t position, uint64_t candidate_offset,
+    uint8_t *destination, size_t byte_count, uint64_t *candidate_length,
+    uint8_t *scratch, size_t scratch_capacity);
+
+/* Handle-based equivalent of the ordinal scratch read. */
+int musa_dwg1032_object_candidate_read_window_scratch(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    uint64_t handle, uint64_t candidate_offset,
+    uint8_t *destination, size_t byte_count, uint64_t *candidate_length,
+    uint8_t *scratch, size_t scratch_capacity);
+
 #ifdef __cplusplus
 }
 #endif
