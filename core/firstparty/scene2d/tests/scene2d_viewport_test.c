@@ -117,8 +117,47 @@ static void test_rejection_is_atomic(void) {
                                          mask,NULL,0,&written));
     assert(written == 0);
 }
+static void test_redundant_global_freezes(void) {
+    /* Layer 30 is globally hidden. A viewport freeze of only that layer
+     * must be observationally identical to the all-visible mask. */
+    const uint8_t all[] = {1,1,1,1};
+    const uint8_t redundant[] = {1,1,1,0};
+    const uint8_t real_freeze[] = {1,0,1,1};
+    const uint8_t mixed_freeze[] = {1,0,1,0};
+    MusaScene2dResolved baseline[7], redundant_out[7];
+    MusaScene2dResolved frozen[7], mixed[7];
+    size_t count=99, other=99;
+    assert(musa_scene2d_resolve_viewport(
+        nodes,7,layers,4,all,baseline,7,&count));
+    assert(count==7);
+    assert(musa_scene2d_resolve_viewport(
+        nodes,7,layers,4,redundant,redundant_out,7,&other));
+    assert(other==count);
+    for (size_t i=0;i<count;++i) {
+        assert(redundant_out[i].handle==baseline[i].handle);
+        assert(redundant_out[i].effective_layer==baseline[i].effective_layer);
+        assert(redundant_out[i].rgba==baseline[i].rgba);
+        assert(redundant_out[i].visible==baseline[i].visible);
+        for (size_t j=0;j<6u;++j)
+            assert(redundant_out[i].world[j]==baseline[i].world[j]);
+    }
+    assert(musa_scene2d_resolve_viewport(
+        nodes,7,layers,4,real_freeze,frozen,7,&count));
+    assert(musa_scene2d_resolve_viewport(
+        nodes,7,layers,4,mixed_freeze,mixed,7,&other));
+    assert(count==other && !frozen[0].visible && !mixed[0].visible);
+    for (size_t i=0;i<count;++i) {
+        assert(frozen[i].handle==mixed[i].handle);
+        assert(frozen[i].effective_layer==mixed[i].effective_layer);
+        assert(frozen[i].rgba==mixed[i].rgba);
+        assert(frozen[i].visible==mixed[i].visible);
+        for (size_t j=0;j<6u;++j)
+            assert(frozen[i].world[j]==mixed[i].world[j]);
+    }
+}
 int main(void) {
     test_viewport_inheritance();
+    test_redundant_global_freezes();
     test_rejection_is_atomic();
     return 0;
 }
