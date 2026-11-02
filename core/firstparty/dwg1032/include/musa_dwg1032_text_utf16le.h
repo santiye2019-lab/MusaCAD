@@ -22,6 +22,20 @@ int musa_dwg1032_text_utf16le_to_utf8(
     const uint8_t *utf16le, size_t byte_count,
     char *utf8, size_t capacity, size_t *written);
 
+/* Consume exactly byte_count bytes of a caller-verified UTF-16LE field
+ * from a byte-aligned, bounded record cursor and decode to UTF-8.
+ * This bridges already-decoded record payloads to display text; it does NOT
+ * discover AC1032 text lengths, encoding flags or entity types.
+ * A failed conversion (including malformed surrogate pairs, odd byte count,
+ * truncated input or inadequate output capacity) leaves cursor, output and
+ * *written untouched. The entire source cursor buffer, cursor metadata and
+ * output storage must be disjoint. Zero-length text produces an empty string.
+ * No allocation, O(byte_count), and no intermediate UTF-16 copy. */
+#include "musa_dwg1032_cursor.h"
+int musa_dwg1032_text_utf16le_take(
+    MusaDwg1032Cursor *record, size_t byte_count,
+    char *utf8, size_t capacity, size_t *written);
+
 #ifdef __cplusplus
 }
 #endif
