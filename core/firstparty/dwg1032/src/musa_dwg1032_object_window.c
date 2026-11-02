@@ -281,11 +281,14 @@ int musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
         (uint64_t)byte_count>(uint64_t)length-payload_offset)
         return 0;
 
-    uint64_t checked_length=0;
+    /* Pass the public length pointer through the transactional candidate
+     * guard: it must not alias scratch, source, metadata or destination.
+     * The successful candidate length is immediately replaced by the
+     * validated MS payload length; failures leave it untouched. */
     if (!musa_dwg1032_object_candidate_read_window_scratch_at_position(
             file_bytes,file_size,pages,page_count,index,position,
             (uint64_t)prefix_size+payload_offset,
-            destination,byte_count,&checked_length,scratch,scratch_capacity))
+            destination,byte_count,payload_length,scratch,scratch_capacity))
         return 0;
     *payload_length=(uint64_t)length;
     return 1;
