@@ -276,3 +276,31 @@ int musa_dwg1032_viewport_local_visibility_page(
         entity_layer_handles+first,entity_visible+first,page_count,
         layers,layer_count,overrides,override_count,page_visible);
 }
+
+/* Process a bounded INSERT child page without allocating a full-size
+ * visibility mask. Reject output aliasing with all future input pages. */
+int musa_dwg1032_viewport_insert_visibility_page(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible, size_t total_count,
+    size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *page_visible) {
+    if (!source_layer_handles || !definition_owner_visible || !page_visible ||
+        !page_count || first>total_count ||
+        page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_owner_visible) ||
+        page_count>PTRDIFF_MAX)
+        return 0;
+    if (overlaps(page_visible,page_count,source_layer_handles,
+                 total_count*sizeof(*source_layer_handles)) ||
+        overlaps(page_visible,page_count,definition_owner_visible,
+                 total_count*sizeof(*definition_owner_visible)))
+        return 0;
+    return musa_dwg1032_viewport_insert_visibility(
+        source_layer_handles+first,definition_owner_visible+first,
+        page_count,layer_zero_handle,insert_visible,layers,layer_count,
+        overrides,override_count,page_visible);
+}
