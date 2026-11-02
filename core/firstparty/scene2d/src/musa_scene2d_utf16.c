@@ -108,3 +108,35 @@ int musa_scene2d_utf16le_cstr_to_utf8(const uint8_t *record,
     }
     return 0;
 }
+
+/* A length supplied by a verified enclosing record is an explicit byte
+ * boundary, not a guessed DWG string framing. Reuse the strict scalar
+ * decoder so surrogate pairs and embedded NULs share one policy. */
+int musa_scene2d_utf16le_counted_to_utf8(const uint8_t *record,
+                                         size_t record_bytes,
+                                         size_t code_units,
+                                         uint8_t *utf8,
+                                         size_t utf8_capacity,
+                                         size_t *written,
+                                         size_t *consumed) {
+    if (!written || !consumed ||
+        (record_bytes && !record) ||
+        record_bytes>PTRDIFF_MAX ||
+        code_units>record_bytes/2u ||
+        code_units>PTRDIFF_MAX/2u ||
+        utf8_capacity>PTRDIFF_MAX ||
+        ((utf8==NULL)!=(utf8_capacity==0)) ||
+        overlaps(record,record_bytes,utf8,utf8_capacity) ||
+        overlaps(record,record_bytes,written,sizeof(*written)) ||
+        overlaps(record,record_bytes,consumed,sizeof(*consumed)) ||
+        overlaps(utf8,utf8_capacity,written,sizeof(*written)) ||
+        overlaps(utf8,utf8_capacity,consumed,sizeof(*consumed)) ||
+        overlaps(written,sizeof(*written),consumed,sizeof(*consumed)))
+        return 0;
+    const size_t field_bytes=code_units*2u;
+    if (!musa_scene2d_utf16le_to_utf8(record,field_bytes,
+                                      utf8,utf8_capacity,written))
+        return 0;
+    *consumed=field_bytes;
+    return 1;
+}
