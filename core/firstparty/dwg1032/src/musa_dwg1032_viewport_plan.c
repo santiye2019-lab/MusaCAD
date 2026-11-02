@@ -4,6 +4,7 @@
 #include "musa_dwg1032_viewport_plan.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
@@ -110,5 +111,58 @@ int musa_dwg1032_viewport_plan_page(
         page_visible[i]=(uint8_t)(entity_visible[at] &&
             plan->layers[layer].on && plan->layers[layer].thawed && !frozen);
     }
+    return 1;
+}
+
+/* Caller-scratch, single-lookup alternative to the two-pass page resolver.
+ * No partial page publication, including when the last record is corrupt.
+ * The complete source and scratch capacities are checked for aliasing. */
+int musa_dwg1032_viewport_plan_page_scratch(
+    const MusaDwg1032ViewportPlan *plan,
+    const uint64_t *entity_layer_handles,
+    const uint8_t *entity_visible, size_t total_count,
+    size_t first, size_t page_count, uint8_t *page_visible,
+    uint8_t *scratch, size_t scratch_capacity) {
+    if (!plan || !plan->layers || !plan->layer_count ||
+        (plan->override_count && !plan->overrides) ||
+        !entity_layer_handles || !entity_visible || !page_visible ||
+        !scratch || !page_count || first>total_count ||
+        page_count>total_count-first || scratch_capacity<page_count ||
+        total_count>PTRDIFF_MAX/sizeof(*entity_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*entity_visible) ||
+        page_count>PTRDIFF_MAX || scratch_capacity>PTRDIFF_MAX ||
+        plan->layer_count>PTRDIFF_MAX/sizeof(*plan->layers) ||
+        plan->override_count>PTRDIFF_MAX/sizeof(*plan->overrides))
+        return 0;
+    const size_t handles_bytes=total_count*sizeof(*entity_layer_handles);
+    const size_t layers_bytes=plan->layer_count*sizeof(*plan->layers);
+    const size_t overrides_bytes=
+        plan->override_count*sizeof(*plan->overrides);
+    const void *inputs[]={plan,entity_layer_handles,entity_visible,
+                          plan->layers,plan->overrides};
+    const size_t input_bytes[]={sizeof(*plan),handles_bytes,total_count,
+                                layers_bytes,overrides_bytes};
+    if (overlaps(page_visible,page_count,scratch,scratch_capacity))
+        return 0;
+    for (size_t i=0u;i<5u;++i)
+        if (overlaps(page_visible,page_count,inputs[i],input_bytes[i]) ||
+            overlaps(scratch,scratch_capacity,inputs[i],input_bytes[i]))
+            return 0;
+    for (size_t i=0u;i<page_count;++i) {
+        const size_t at=first+i;
+        const uint64_t handle=entity_layer_handles[at];
+        if (!handle || entity_visible[at]>1u) return 0;
+        const size_t layer=find_layer(plan->layers,plan->layer_count,handle);
+        if (layer==plan->layer_count ||
+            plan->layers[layer].handle!=handle) return 0;
+        const size_t ov=find_override(plan->overrides,
+                                      plan->override_count,handle);
+        const int frozen=ov<plan->override_count &&
+            plan->overrides[ov].layer_handle==handle &&
+            plan->overrides[ov].frozen;
+        scratch[i]=(uint8_t)(entity_visible[at] &&
+            plan->layers[layer].on && plan->layers[layer].thawed && !frozen);
+    }
+    memcpy(page_visible,scratch,page_count);
     return 1;
 }
