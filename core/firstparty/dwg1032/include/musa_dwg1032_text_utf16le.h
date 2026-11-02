@@ -51,6 +51,23 @@ int musa_dwg1032_text_utf16le_take(
 int musa_dwg1032_text_utf16le_peek_measure(
     const MusaDwg1032Cursor *record, size_t byte_count, size_t *required);
 
+
+/* Scan only a caller-authenticated, byte-aligned UTF-16LE NUL-terminated
+ * field. max_field_bytes limits the scan, including the two-byte terminator.
+ * A terminator must occur on a UTF-16 code-unit boundary. On success,
+ * *required includes the UTF-8 NUL and *consumed includes the UTF-16 NUL.
+ * Neither result is published on failure. This does not infer a DWG string
+ * schema, encoding flag, or object type. */
+int musa_dwg1032_text_utf16le_peek_cstr(
+    const MusaDwg1032Cursor *record, size_t max_field_bytes,
+    size_t *required, size_t *consumed);
+
+/* Atomically decode and consume the same authenticated terminated field.
+ * On failure, cursor, output and *written are unchanged. */
+int musa_dwg1032_text_utf16le_take_cstr(
+    MusaDwg1032Cursor *record, size_t max_field_bytes,
+    char *utf8, size_t capacity, size_t *written);
+
 #ifdef __cplusplus
 }
 #endif
