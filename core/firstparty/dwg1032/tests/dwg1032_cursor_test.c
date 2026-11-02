@@ -146,6 +146,14 @@ static void bit64_boundaries(void) {
     value=17u;
     assert(!musa_dwg1032_cursor_read_bits64(&cursor,1u,&value));
     assert(value==17u && cursor.bit_position==64u);
+    assert(musa_dwg1032_cursor_init(&cursor,data,sizeof data));
+    assert(musa_dwg1032_cursor_skip_bits(&cursor,1u));
+    value=99u;
+    assert(!musa_dwg1032_cursor_read_bits64(&cursor,64u,&value));
+    assert(value==99u && cursor.bit_position==1u);
+    assert(musa_dwg1032_cursor_read_bits64(&cursor,63u,&value));
+    assert(value==UINT64_C(0x0002468acf13579a));
+    assert(cursor.bit_position==64u);
 }
 static void framed_take_atomicity(void) {
     const uint8_t data[]={2,0,0,0,0xa5,0x5a,3,0,0,0,0x81};
