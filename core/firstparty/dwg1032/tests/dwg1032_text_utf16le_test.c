@@ -108,9 +108,89 @@ static void large_text_and_late_failure(void) {
     assert((unsigned char)output[0]==0xe2u);
     assert((unsigned char)output[3u*(N-1u)+2u]==0xacu);
 }
+/* Record field lengths here are synthetic, explicitly supplied by caller;
+ * no real AC1032 entity text length or schema is assumed. */
+static void cursor_field_transaction(void) {
+    const uint8_t input[]={
+        'A',0,0xe7,0,0x3d,0xd8,0x00,0xde,'B',0
+    };
+    const char expected[]="A\\xc3\\xa7\\xf0\\x9f\\x98\\x80";
+    MusaDwg1032Cursor record;
+    char output[32];
+    size_t written=91u;
+    memset(output,0x5a,sizeof(output));
+    assert(musa_dwg1032_cursor_init(&record,input,sizeof(input)));
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,8u,output,sizeof(expected)-1u,&written));
+    assert(record.bit_position==0u && written==91u && output[0]=='Z');
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,7u,output,sizeof(output),&written));
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,sizeof(input)+2u,output,sizeof(output),&written));
+    assert(record.bit_position==0u && written==91u && output[0]=='Z');
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,8u,(char *)(void *)input,sizeof(input),&written));
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,8u,(char *)(void *)&record,sizeof(record),&written));
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,8u,output,sizeof(output),&record.bit_position));
+    assert(record.bit_position==0u && written==91u && output[0]=='Z');
+    assert(musa_dwg1032_cursor_skip_bits(&record,1u));
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,8u,output,sizeof(output),&written));
+    assert(record.bit_position==1u && written==91u && output[0]=='Z');
+    assert(musa_dwg1032_cursor_init(&record,input,sizeof(input)));
+    assert(musa_dwg1032_text_utf16le_take(
+        &record,8u,output,sizeof(output),&written));
+    assert(record.bit_position==64u && written==sizeof(expected)-1u);
+    assert(memcmp(output,expected,sizeof(expected))==0);
+    assert(musa_dwg1032_text_utf16le_take(
+        &record,2u,output,sizeof(output),&written));
+    assert(record.bit_position==80u && written==1u &&
+           output[0]=='B' && output[1]=='\\0');
+    assert(musa_dwg1032_text_utf16le_take(
+        &record,0u,output,sizeof(output),&written));
+    assert(record.bit_position==80u && written==0u && output[0]=='\\0');
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,2u,output,sizeof(output),&written));
+    assert(record.bit_position==80u && written==0u);
+    const uint8_t malformed[]={'A',0,0,0};
+    assert(musa_dwg1032_cursor_init(&record,malformed,sizeof(malformed)));
+    memset(output,0x5a,sizeof(output));
+    written=19u;
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,sizeof(malformed),output,sizeof(output),&written));
+    assert(record.bit_position==0u && written==19u && output[0]=='Z');
+}
+
+static void cursor_large_text_late_failure(void) {
+    enum { N=20000 };
+    static uint8_t input[N*2u];
+    static char output[N*3u+1u];
+    for (size_t i=0;i<N;++i) {
+        input[2u*i]=0xacu;
+        input[2u*i+1u]=0x20u;
+    }
+    MusaDwg1032Cursor record;
+    size_t written=0u;
+    assert(musa_dwg1032_cursor_init(&record,input,sizeof(input)));
+    assert(musa_dwg1032_text_utf16le_take(
+        &record,sizeof(input),output,sizeof(output),&written));
+    assert(written==N*3u && record.bit_position==sizeof(input)*8u);
+    assert(output[written]=='\\0');
+    input[2u*(N-1u)+1u]=0xd8u;
+    assert(musa_dwg1032_cursor_init(&record,input,sizeof(input)));
+    assert(!musa_dwg1032_text_utf16le_take(
+        &record,sizeof(input),output,sizeof(output),&written));
+    assert(record.bit_position==0u && written==N*3u);
+    assert((unsigned char)output[0]==0xe2u);
+    assert((unsigned char)output[N*3u-1u]==0xacu);
+}
 int main(void) {
     multilingual_and_terminator();
     reject_malformed_without_publication();
     large_text_and_late_failure();
+    cursor_field_transaction();
+    cursor_large_text_late_failure();
     return 0;
 }
