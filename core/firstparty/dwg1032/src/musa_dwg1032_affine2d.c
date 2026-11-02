@@ -106,3 +106,27 @@ int musa_dwg1032_affine2_apply_scratch(const MusaDwg1032Affine2 *transform,
     memcpy(out,scratch,bytes);
     return 1;
 }
+
+/* Invert a caller-verified planar transform for reverse INSERT mapping.
+ * Reject singular or unrepresentable inverses without touching output.
+ * Extreme ill-conditioned matrices may be conservatively rejected. */
+int musa_dwg1032_affine2_inverse(const MusaDwg1032Affine2 *forward,
+                                MusaDwg1032Affine2 *inverse) {
+    if (!forward || !inverse || !valid(forward) ||
+        overlaps(forward,sizeof(*forward),inverse,sizeof(*inverse)))
+        return 0;
+    const double determinant=fma(forward->xx,forward->yy,
+                                -forward->xy*forward->yx);
+    if (!isfinite(determinant) || determinant==0.0) return 0;
+    const double xx=forward->yy/determinant;
+    const double xy=-forward->xy/determinant;
+    const double yx=-forward->yx/determinant;
+    const double yy=forward->xx/determinant;
+    const MusaDwg1032Affine2 trial={
+        xx,xy,translated_pair(-xx,forward->tx,-xy,forward->ty,0.0),
+        yx,yy,translated_pair(-yx,forward->tx,-yy,forward->ty,0.0)
+    };
+    if (!valid(&trial)) return 0;
+    *inverse=trial;
+    return 1;
+}
