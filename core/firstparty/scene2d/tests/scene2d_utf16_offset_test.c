@@ -110,8 +110,92 @@ static void large_bounded_field(void) {
     free(record);
 }
 
+/* Terminator search must be relative to an independently verified
+ * odd-byte offset, bounded by the field limit, not the full object. */
+static void terminated_offset_and_rollback(void) {
+    const uint8_t record[]={0x9au,0x9bu,0x9cu,
+        'A',0u,0x3du,0xd8u,0u,0xdeu,0u,0u,0xffu};
+    const uint8_t expected[]={'A',0xf0u,0x9fu,0x98u,0x80u};
+    uint8_t out[24];
+    memset(out,0xa5,sizeof out);
+    size_t written=111u, consumed=222u;
+    assert(musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,8u,NULL,0u,&written,&consumed));
+    assert(written==sizeof expected && consumed==11u);
+    written=111u; consumed=222u;
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,7u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,8u,out,sizeof expected,&written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,13u,8u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,sizeof record,8u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,SIZE_MAX,3u,8u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,8u,(uint8_t *)(void *)record,
+        sizeof record,&written,&consumed));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,8u,out,sizeof out,&written,&written));
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,8u,out,sizeof out,NULL,&consumed));
+    assert(written==111u && consumed==222u);
+    for (size_t i=0;i<sizeof out;++i) assert(out[i]==0xa5u);
+    assert(musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,3u,SIZE_MAX,out,sizeof out,&written,&consumed));
+    assert(written==sizeof expected && consumed==11u &&
+           !memcmp(out,expected,sizeof expected) && out[written]==0u &&
+           out[written+1u]==0xa5u);
+    const uint8_t invalid[]={0x99u,'A',0u,0x3du,0xd8u,0u,0u};
+    size_t saved_written=written, saved_consumed=consumed;
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        invalid,sizeof invalid,1u,6u,out,sizeof out,&written,&consumed));
+    assert(written==saved_written && consumed==saved_consumed &&
+           !memcmp(out,expected,sizeof expected));
+    const uint8_t empty[]={0x7fu,0u,0u,0xabu};
+    assert(musa_scene2d_utf16le_cstr_at_to_utf8(
+        empty,sizeof empty,1u,2u,out,sizeof out,&written,&consumed));
+    assert(written==0u && consumed==3u && out[0]==0u);
+}
+
+/* Large authenticated text must not be truncated at a premature limit,
+ * nor publish partial output when a late surrogate is malformed. */
+static void terminated_offset_20k(void) {
+    enum { N=20000, PREFIX=3 };
+    static uint8_t record[PREFIX+N*2u+3u];
+    static uint8_t output[N*3u+1u];
+    memset(record,0xa5,PREFIX);
+    for (size_t i=0;i<N;++i) {
+        record[PREFIX+2u*i]=0xacu;
+        record[PREFIX+2u*i+1u]=0x20u;
+    }
+    record[PREFIX+2u*N]=0u;
+    record[PREFIX+2u*N+1u]=0u;
+    record[PREFIX+2u*N+2u]=0xffu;
+    size_t written=17u, consumed=19u;
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,PREFIX,N*2u+1u,output,sizeof output,
+        &written,&consumed));
+    assert(written==17u && consumed==19u);
+    assert(musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,PREFIX,N*2u+2u,output,sizeof output,
+        &written,&consumed));
+    assert(written==N*3u && consumed==PREFIX+N*2u+2u &&
+           output[0]==0xe2u && output[written-1u]==0xacu &&
+           output[written]==0u);
+    record[PREFIX+2u*N-1u]=0xd8u;
+    assert(!musa_scene2d_utf16le_cstr_at_to_utf8(
+        record,sizeof record,PREFIX,N*2u+2u,output,sizeof output,
+        &written,&consumed));
+    assert(written==N*3u && consumed==PREFIX+N*2u+2u &&
+           output[0]==0xe2u && output[written]==0u);
+}
+
 int main(void) {
     offset_and_surrogate();
     large_bounded_field();
+    terminated_offset_and_rollback();
+    terminated_offset_20k();
     return 0;
 }
