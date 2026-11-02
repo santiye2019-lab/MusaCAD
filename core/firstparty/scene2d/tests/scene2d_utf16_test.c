@@ -104,7 +104,82 @@ static void terminated_fields(void) {
                                                 (size_t *)(void *)output));
     assert(written==123 && consumed==456);
 }
+
+static void counted_fields(void) {
+    /* The caller has verified three UTF-16 code units, not three scalars.
+     * The following unrelated odd byte must never be decoded. */
+    const uint8_t record[]={0x41,0,0x3d,0xd8,0,0xde,0x55};
+    const uint8_t expected[]={0x41,0xf0,0x9f,0x98,0x80};
+    uint8_t out[16];
+    size_t written=91u, consumed=92u;
+    assert(musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,NULL,0,&written,&consumed));
+    assert(written==sizeof expected && consumed==6u);
+    memset(out,0xa5,sizeof out);
+    written=91u; consumed=92u;
+    assert(musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,out,sizeof out,&written,&consumed));
+    assert(written==sizeof expected && consumed==6u &&
+           !memcmp(out,expected,sizeof expected) && out[written]==0 &&
+           out[written+1u]==0xa5);
+    memset(out,0xa5,sizeof out);
+    written=91u; consumed=92u;
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,out,sizeof expected,&written,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,2u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,4u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,SIZE_MAX,3u,out,sizeof out,&written,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,out,SIZE_MAX,&written,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,(uint8_t *)(void *)record,
+        sizeof record,&written,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,out,sizeof out,&written,&written));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,out,sizeof out,
+        (size_t *)(void *)record,&consumed));
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        record,sizeof record,3u,out,sizeof out,
+        &written,(size_t *)(void *)out));
+    const uint8_t embedded_nul[]={0x41,0,0,0};
+    assert(!musa_scene2d_utf16le_counted_to_utf8(
+        embedded_nul,sizeof embedded_nul,2u,out,sizeof out,
+        &written,&consumed));
+    assert(written==91u && consumed==92u);
+    for (size_t i=0;i<sizeof out;++i) assert(out[i]==0xa5);
+    assert(musa_scene2d_utf16le_counted_to_utf8(
+        NULL,0,0,NULL,0,&written,&consumed));
+    assert(written==0u && consumed==0u);
+    written=91u; consumed=92u;
+    assert(musa_scene2d_utf16le_counted_to_utf8(
+        NULL,0,0,out,sizeof out,&written,&consumed));
+    assert(written==0u && consumed==0u && out[0]==0u);
+    /* Large verified text field: bounded read with a trailing odd byte. */
+    const size_t units=20000u;
+    uint8_t *big=(uint8_t *)malloc(units*2u+1u);
+    uint8_t *utf8=(uint8_t *)malloc(units*3u+1u);
+    assert(big && utf8);
+    for (size_t i=0;i<units;++i) {
+        big[2u*i]=0xacu; big[2u*i+1u]=0x20u;
+    }
+    big[units*2u]=0xffu;
+    assert(musa_scene2d_utf16le_counted_to_utf8(
+        big,units*2u+1u,units,utf8,units*3u+1u,
+        &written,&consumed));
+    assert(written==units*3u && consumed==units*2u &&
+           utf8[written]==0u);
+    size_t codepoints=0;
+    assert(musa_scene2d_utf8_count(utf8,written,&codepoints) &&
+           codepoints==units);
+    free(big); free(utf8);
+}
+
 int main(void) {
+    counted_fields();
     boundary_scalars();
     terminated_fields();
     /* A, c-cedilla, euro, CJK, supplementary smile, combining acute. */
