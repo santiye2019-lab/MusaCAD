@@ -166,3 +166,68 @@ int musa_dwg1032_viewport_plan_page_scratch(
     memcpy(page_visible,scratch,page_count);
     return 1;
 }
+
+/* Per-INSERT viewport paging. A definition's layer-zero state is never
+ * substituted for its concrete instance's authenticated visibility. */
+int musa_dwg1032_viewport_plan_insert_page_scratch(
+    const MusaDwg1032ViewportPlan *plan,
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible, size_t total_count,
+    size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *page_visible, uint8_t *scratch, size_t scratch_capacity) {
+    if (!plan || !plan->layers || !plan->layer_count ||
+        (plan->override_count && !plan->overrides) ||
+        !source_layer_handles || !definition_owner_visible ||
+        !page_visible || !scratch || !layer_zero_handle ||
+        insert_visible>1u || !page_count || first>total_count ||
+        page_count>total_count-first || scratch_capacity<page_count ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_owner_visible) ||
+        page_count>PTRDIFF_MAX || scratch_capacity>PTRDIFF_MAX ||
+        plan->layer_count>PTRDIFF_MAX/sizeof(*plan->layers) ||
+        plan->override_count>PTRDIFF_MAX/sizeof(*plan->overrides))
+        return 0;
+    const size_t zero_at=find_layer(plan->layers,plan->layer_count,
+                                    layer_zero_handle);
+    if (zero_at==plan->layer_count ||
+        plan->layers[zero_at].handle!=layer_zero_handle) return 0;
+    const size_t handles_bytes=total_count*sizeof(*source_layer_handles);
+    const size_t layers_bytes=plan->layer_count*sizeof(*plan->layers);
+    const size_t overrides_bytes=
+        plan->override_count*sizeof(*plan->overrides);
+    const void *inputs[]={plan,source_layer_handles,
+                          definition_owner_visible,plan->layers,
+                          plan->overrides};
+    const size_t input_bytes[]={sizeof(*plan),handles_bytes,total_count,
+                                layers_bytes,overrides_bytes};
+    if (overlaps(page_visible,page_count,scratch,scratch_capacity))
+        return 0;
+    for (size_t i=0u;i<5u;++i)
+        if (overlaps(page_visible,page_count,inputs[i],input_bytes[i]) ||
+            overlaps(scratch,scratch_capacity,inputs[i],input_bytes[i]))
+            return 0;
+    /* Only scratch can change until every child in this page is proven. */
+    for (size_t i=0u;i<page_count;++i) {
+        const size_t at=first+i;
+        const uint64_t handle=source_layer_handles[at];
+        if (!handle || definition_owner_visible[at]>1u) return 0;
+        const size_t layer=find_layer(plan->layers,plan->layer_count,handle);
+        if (layer==plan->layer_count ||
+            plan->layers[layer].handle!=handle) return 0;
+        uint8_t visible=(uint8_t)(insert_visible &&
+                                  definition_owner_visible[at]);
+        if (handle!=layer_zero_handle) {
+            const size_t ov=find_override(plan->overrides,
+                                          plan->override_count,handle);
+            const int frozen=ov<plan->override_count &&
+                plan->overrides[ov].layer_handle==handle &&
+                plan->overrides[ov].frozen;
+            visible=(uint8_t)(visible && plan->layers[layer].on &&
+                              plan->layers[layer].thawed && !frozen);
+        }
+        scratch[i]=visible;
+    }
+    memcpy(page_visible,scratch,page_count);
+    return 1;
+}
