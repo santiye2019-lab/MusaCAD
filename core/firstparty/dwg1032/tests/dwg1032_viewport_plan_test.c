@@ -192,11 +192,110 @@ static void compare_scratch_pages(void) {
         &plan,handles,flags,N,N-257u,257u,page,scratch,sizeof(scratch)));
     assert(memcmp(page,expected+N-257u,257u)==0);
 }
+
+/* Cross-check 20k per-instance block children against the independently
+ * implemented full-array INSERT resolver. Definition layer zero is off,
+ * thawed=false and viewport-frozen, yet a visible INSERT must inherit
+ * its instance visibility instead of those definition-layer settings. */
+static void compare_insert_scratch_pages(void) {
+    setup();
+    MusaDwg1032ViewportPlan plan;
+    uint8_t scratch[513];
+    assert(musa_dwg1032_viewport_plan_init(
+        &plan,layers,L,overrides,V));
+    assert(!layers[0].on && !layers[0].thawed &&
+           overrides[0].layer_handle==1u && overrides[0].frozen);
+    const size_t sizes[]={1u,7u,257u,513u};
+    for (uint8_t insert_visible=0u;insert_visible<=1u;
+         ++insert_visible) {
+        assert(musa_dwg1032_viewport_insert_visibility(
+            handles,flags,N,1u,insert_visible,layers,L,overrides,V,
+            expected));
+        for (size_t k=0u;k<sizeof(sizes)/sizeof(sizes[0]);++k) {
+            memset(actual,0xa5,sizeof(actual));
+            for (size_t first=0u;first<N;) {
+                const size_t left=N-first;
+                const size_t count=sizes[k]<left?sizes[k]:left;
+                assert(musa_dwg1032_viewport_plan_insert_page_scratch(
+                    &plan,handles,flags,N,first,count,1u,
+                    insert_visible,actual+first,scratch,sizeof(scratch)));
+                first+=count;
+            }
+            assert(memcmp(actual,expected,N)==0);
+        }
+    }
+    /* Reinitialize the plan after changing viewport freeze metadata. */
+    for (size_t i=0u;i<V;++i)
+        overrides[i].frozen=(uint8_t)(i%5u==0u);
+    assert(musa_dwg1032_viewport_plan_init(
+        &plan,layers,L,overrides,V));
+    assert(musa_dwg1032_viewport_insert_visibility(
+        handles,flags,N,1u,1u,layers,L,overrides,V,expected));
+    for (size_t first=0u;first<N;first+=257u) {
+        const size_t count=N-first<257u?N-first:257u;
+        assert(musa_dwg1032_viewport_plan_insert_page_scratch(
+            &plan,handles,flags,N,first,count,1u,1u,
+            actual+first,scratch,sizeof(scratch)));
+    }
+    assert(memcmp(actual,expected,N)==0);
+    uint8_t page[257];
+    memset(page,0xa5,sizeof(page));
+    flags[N-1u]=2u;
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,N-257u,257u,1u,1u,
+        page,scratch,sizeof(scratch)));
+    flags[N-1u]=(uint8_t)((N-1u)%19u!=0u);
+    handles[N-1u]=UINT64_MAX;
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,N-257u,257u,1u,1u,
+        page,scratch,sizeof(scratch)));
+    handles[N-1u]=(uint64_t)(((N-1u)*53u)%L)+1u;
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,0u,1u,
+        page,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,UINT64_MAX,1u,
+        page,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,2u,
+        page,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,N,1u,1u,1u,
+        page,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        page,scratch,256u));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        page,page,sizeof(page)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        page,flags+1000u,513u));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        flags+1000u,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        page,(uint8_t *)(void *)(handles+1000u),513u));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        (uint8_t *)(void *)layers,scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,0u,257u,1u,1u,
+        page,scratch,SIZE_MAX));
+    for (size_t i=0u;i<sizeof(page);++i) assert(page[i]==0xa5u);
+    assert(musa_dwg1032_viewport_plan_insert_page_scratch(
+        &plan,handles,flags,N,N-257u,257u,1u,1u,
+        page,scratch,sizeof(scratch)));
+    assert(memcmp(page,expected+N-257u,257u)==0);
+}
+
 int main(void) {
     setup();
     compare_pages();
     reject_invalid_metadata_atomically();
     reject_invalid_page_atomically();
     compare_scratch_pages();
+    compare_insert_scratch_pages();
     return 0;
 }
