@@ -294,3 +294,24 @@
   the existing two-pass window reader.
 - Not wired into Android JNI or existing 3D. No real-file compatibility
   or measured speedup claim. No GPL/AGPL/LGPL source or linkage imported.
+
+## 2026-11-02 — bounded UTF-16LE text field extraction
+
+- Added `musa_dwg1032_text_utf16le_take` to the independent MIT C11 text
+  module. It consumes a **caller-supplied, already validated** UTF-16LE field
+  length from a bounded byte-aligned record cursor, validates and converts
+  Unicode without allocating or copying an intermediate UTF-16 buffer, and
+  advances the cursor only after the complete conversion succeeds. On failure
+  cursor, UTF-8 output and written-length output remain unchanged.
+- Synthetic regressions cover Turkish Unicode and surrogate pairs, adjacent
+  fields, byte alignment, truncated and odd-length fields, alias rejection,
+  empty fields, malformed input, and 20,000-code-unit late corruption.
+- **Source origin:** Independently authored using the existing first-party MIT
+  cursor and UTF-16LE conversion APIs plus standard C11 arithmetic. No
+  GPL/AGPL/LGPL, LibreDWG, legacy native CAD, third-party decoder or
+  uncertain-origin source was copied, adapted or linked.
+- **Not yet implemented:** Determining genuine AC1032 TEXT/MTEXT record types,
+  encoding flags and text lengths; authentic section/page decompression,
+  independent real-DWG fixture tests, and Android display integration. No
+  existing 3D, production JNI, `MusaCAD2/` or `main` changes. GitHub CI
+  must be checked on the exact final commit.
