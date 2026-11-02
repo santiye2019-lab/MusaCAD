@@ -152,3 +152,62 @@ int musa_dwg1032_text_utf16le_take(
     *record=trial;
     return 1;
 }
+
+
+/* Terminator discovery is bounded to a verified cursor frame. The scan is
+ * strictly over aligned UTF-16 code units and cannot cross max_field_bytes. */
+int musa_dwg1032_text_utf16le_peek_cstr(
+    const MusaDwg1032Cursor *record, size_t max_field_bytes,
+    size_t *required, size_t *consumed) {
+    if (!record || !required || !consumed ||
+        overlaps(record,sizeof(*record),required,sizeof(*required)) ||
+        overlaps(record,sizeof(*record),consumed,sizeof(*consumed)) ||
+        overlaps(record->bytes,record->byte_count,required,sizeof(*required)) ||
+        overlaps(record->bytes,record->byte_count,consumed,sizeof(*consumed)) ||
+        overlaps(required,sizeof(*required),consumed,sizeof(*consumed)))
+        return 0;
+    MusaDwg1032Cursor trial=*record, empty;
+    if (!musa_dwg1032_cursor_take_bytes(&trial,0u,&empty)) return 0;
+    const size_t remaining=record->byte_count-record->bit_position/8u;
+    const size_t bound=max_field_bytes<remaining?max_field_bytes:remaining;
+    const uint8_t *start=record->bytes
+        ? record->bytes+record->bit_position/8u : NULL;
+    for (size_t unit=0u; unit<bound/2u; ++unit) {
+        const size_t offset=unit*2u;
+        if (start[offset]==0u && start[offset+1u]==0u) {
+            size_t needed=0u;
+            if (!musa_dwg1032_text_utf16le_measure(
+                    start,offset,&needed)) return 0;
+            *required=needed;
+            *consumed=offset+2u;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int musa_dwg1032_text_utf16le_take_cstr(
+    MusaDwg1032Cursor *record, size_t max_field_bytes,
+    char *utf8, size_t capacity, size_t *written) {
+    if (!record || !utf8 || !written || !capacity ||
+        capacity>PTRDIFF_MAX ||
+        overlaps(record,sizeof(*record),record->bytes,record->byte_count) ||
+        overlaps(record,sizeof(*record),utf8,capacity) ||
+        overlaps(record,sizeof(*record),written,sizeof(*written)) ||
+        overlaps(record->bytes,record->byte_count,utf8,capacity) ||
+        overlaps(record->bytes,record->byte_count,written,sizeof(*written)) ||
+        overlaps(utf8,capacity,written,sizeof(*written)))
+        return 0;
+    size_t required=0u, consumed=0u;
+    if (!musa_dwg1032_text_utf16le_peek_cstr(
+            record,max_field_bytes,&required,&consumed) ||
+        required>capacity)
+        return 0;
+    MusaDwg1032Cursor trial=*record, field;
+    if (!musa_dwg1032_cursor_take_bytes(&trial,consumed,&field) ||
+        !musa_dwg1032_text_utf16le_to_utf8(
+            field.bytes,consumed-2u,utf8,capacity,written))
+        return 0;
+    *record=trial;
+    return 1;
+}
