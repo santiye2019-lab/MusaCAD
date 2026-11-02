@@ -40,7 +40,10 @@ int musa_scene2d_resolve_viewport(
     for (size_t i = 0; i < layer_count; ++i) {
         if (viewport_layer_visible[i] > 1 || layers[i].visible > 1)
             return 0;
-        if (!viewport_layer_visible[i]) mask_unchanged = 0;
+        /* Freezing a layer already globally hidden changes no result.
+         * Avoid a full temporary layer-table copy for such viewports. */
+        if (!viewport_layer_visible[i] && layers[i].visible)
+            mask_unchanged = 0;
     }
 
     /* Most model-space views do not override any layer visibility.
