@@ -315,3 +315,27 @@
   independent real-DWG fixture tests, and Android display integration. No
   existing 3D, production JNI, `MusaCAD2/` or `main` changes. GitHub CI
   must be checked on the exact final commit.
+
+## 2026-11-02 — 2D INSERT world bounds and viewport culling
+
+- Independently authored `MusaDwg1032Bounds2`,
+  `musa_dwg1032_affine2_bounds` and `musa_dwg1032_bounds2_intersects`
+  in the existing first-party MIT C11 affine module. A four-corner
+  transform encloses rotated, mirrored and sheared already-decoded 2D
+  block instances; inclusive viewport intersection preserves objects
+  touching the viewport boundary. Both functions use O(1) auxiliary
+  memory and leave output unchanged on invalid input.
+- Synthetic regression covers rotation, reflection, shear, point bounds,
+  boundary touching, invalid/overflowed extents, output aliasing, and
+  20,000 translated block occurrences. It does **not** measure GPU or
+  Android rendering performance.
+- **Source provenance:** new implementation uses only existing
+  first-party MIT affine helpers and standard C11/math facilities.
+  No GPL/AGPL/LGPL, LibreDWG, legacy CAD implementation, third-party
+  geometry code or source of uncertain provenance was copied, adapted
+  or linked.
+- **Scope:** callers must first authenticate and decode actual AC1032
+  sections, entities, INSERT transforms and extents. No decompression,
+  TEXT/MTEXT schema decoding, OCS/UCS extrusion inference, real-DWG
+  fixture coverage or Android JNI activation is claimed. Existing 3D,
+  `MusaCAD2/` and `main` remain untouched. The PR stays unmerged.
