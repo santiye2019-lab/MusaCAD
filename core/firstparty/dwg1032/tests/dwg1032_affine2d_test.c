@@ -221,6 +221,15 @@ static void block_bounds_and_viewport_culling(void) {
     assert(near(world.min_x,14.0) && near(world.max_x,14.0));
     assert(near(world.min_y,0.0) && near(world.max_y,0.0));
 
+    /* Degenerate line extents must remain visible when they touch a view. */
+    const MusaDwg1032Bounds2 vertical={4.0,-3.0,4.0,7.0};
+    const MusaDwg1032Bounds2 line_view={4.0,0.0,9.0,2.0};
+    assert(musa_dwg1032_bounds2_intersects(&vertical,&line_view,&visible));
+    assert(visible==1u);
+    const MusaDwg1032Bounds2 separated={4.001,0.0,9.0,2.0};
+    assert(musa_dwg1032_bounds2_intersects(&vertical,&separated,&visible));
+    assert(visible==0u);
+
     const MusaDwg1032Bounds2 saved=world;
     const MusaDwg1032Bounds2 inverted={3.0,0.0,2.0,1.0};
     const MusaDwg1032Bounds2 invalid={0.0,NAN,2.0,3.0};
