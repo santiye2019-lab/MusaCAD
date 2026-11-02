@@ -18,3 +18,24 @@ flags, font resolution, SHX, MTEXT formatting, text placement, or JNI
 rendering. Synthetic tests (including a 20,000-character buffer) are
 not evidence of real DWG-file compatibility. Integration must wait for
 a separately verified, independently authored record decoder.
+
+
+## Bounded terminated-field adapter (2026-11-03)
+
+The independent C11 `peek_cstr` and `take_cstr` functions extend the
+previously authenticated cursor/UTF-16LE adapter. They scan only complete
+two-byte UTF-16 code units, stop at the first aligned zero code unit, enforce
+a caller-supplied maximum field size, and reject missing terminators,
+malformed surrogate pairs, aliasing and insufficient UTF-8 capacity without
+publishing partial output or advancing the cursor. The read-only preflight
+reports exact UTF-8 allocation and source consumption sizes. A separate
+20,000-code-unit regression exercises large-field bounds and late failures.
+
+All code and synthetic tests in this extension were written specifically
+for MusaCAD from elementary Unicode rules and existing first-party cursor
+interfaces; no GPL, AGPL, LGPL or uncertain-origin CAD code was imported.
+
+**Scope restriction:** These routines are safe adapters for a string whose
+containing record and encoding have already been independently verified.
+They do not discover DWG strings or establish authentic AC1032 text
+compatibility. No JNI reader or 3D implementation is changed.
