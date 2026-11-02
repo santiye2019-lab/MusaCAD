@@ -139,10 +139,64 @@ static void reject_invalid_page_atomically(void) {
         &plan,handles,flags,N,N-257u,257u,page));
     assert(memcmp(page,expected+N-257u,257u)==0);
 }
+/* Exercise the new single-lookup path against the independent two-pass
+ * page API over all 20k synthetic objects and varied page boundaries. */
+static void compare_scratch_pages(void) {
+    setup();
+    MusaDwg1032ViewportPlan plan;
+    uint8_t scratch[513];
+    assert(musa_dwg1032_viewport_plan_init(
+        &plan,layers,L,overrides,V));
+    const size_t sizes[]={1u,7u,257u,513u};
+    for (size_t k=0u;k<sizeof(sizes)/sizeof(sizes[0]);++k) {
+        memset(actual,0xa5,sizeof(actual));
+        memset(expected,0xa5,sizeof(expected));
+        for (size_t first=0u;first<N;) {
+            const size_t remaining=N-first;
+            const size_t count=sizes[k]<remaining?sizes[k]:remaining;
+            assert(musa_dwg1032_viewport_plan_page(
+                &plan,handles,flags,N,first,count,expected+first));
+            assert(musa_dwg1032_viewport_plan_page_scratch(
+                &plan,handles,flags,N,first,count,actual+first,
+                scratch,sizeof(scratch)));
+            first+=count;
+        }
+        assert(memcmp(actual,expected,N)==0);
+    }
+    /* A bad final entity must never expose a partial page. */
+    uint8_t page[257];
+    memset(page,0xa5,sizeof(page));
+    flags[N-1u]=2u;
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,N-257u,257u,page,scratch,sizeof(scratch)));
+    flags[N-1u]=(uint8_t)((N-1u)%19u!=0u);
+    handles[N-1u]=UINT64_MAX;
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,N-257u,257u,page,scratch,sizeof(scratch)));
+    handles[N-1u]=(uint64_t)(((N-1u)*53u)%L)+1u;
+    for (size_t i=0u;i<sizeof(page);++i) assert(page[i]==0xa5u);
+    /* Full source aliasing, including future pages and unused scratch
+     * capacity, must be rejected before modifying the public page. */
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,0u,257u,page,flags+1000u,513u));
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,0u,257u,page,page,257u));
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,0u,257u,page,scratch,256u));
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,0u,257u,page,scratch,SIZE_MAX));
+    assert(!musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,N,1u,page,scratch,sizeof(scratch)));
+    for (size_t i=0u;i<sizeof(page);++i) assert(page[i]==0xa5u);
+    assert(musa_dwg1032_viewport_plan_page_scratch(
+        &plan,handles,flags,N,N-257u,257u,page,scratch,sizeof(scratch)));
+    assert(memcmp(page,expected+N-257u,257u)==0);
+}
 int main(void) {
     setup();
     compare_pages();
     reject_invalid_metadata_atomically();
     reject_invalid_page_atomically();
+    compare_scratch_pages();
     return 0;
 }
