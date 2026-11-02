@@ -92,6 +92,27 @@ static void atomic_rejections(void) {
     assert(!musa_dwg1032_viewport_local_visibility_page(
         handles,flags,N,0u,257u,layers,L,overrides,V,
         (uint8_t *)(void *)(handles+1000u)));
+    /* Reject overlapping viewport metadata, even when source entity
+     * arrays are disjoint. Do not leak partial masks on bad metadata. */
+    assert(!musa_dwg1032_viewport_local_visibility_page(
+        handles,flags,N,0u,257u,layers,L,overrides,V,
+        (uint8_t *)(void *)layers));
+    assert(!musa_dwg1032_viewport_local_visibility_page(
+        handles,flags,N,0u,257u,layers,L,overrides,V,
+        (uint8_t *)(void *)overrides));
+    assert(!musa_dwg1032_viewport_local_visibility_page(
+        handles,flags,N,N-1u,2u,layers,L,overrides,V,page));
+    assert(!musa_dwg1032_viewport_local_visibility_page(
+        handles,flags,N,0u,SIZE_MAX,layers,L,overrides,V,page));
+    assert(!musa_dwg1032_viewport_local_visibility_page(
+        handles,flags,N,0u,257u,layers,L,overrides,V,NULL));
+    /* No viewport override is a valid independent view of base layers. */
+    uint8_t no_override[257], no_override_reference[257];
+    assert(musa_dwg1032_viewport_local_visibility(
+        handles,flags,257u,layers,L,NULL,0u,no_override_reference));
+    assert(musa_dwg1032_viewport_local_visibility_page(
+        handles,flags,N,0u,257u,layers,L,NULL,0u,no_override));
+    assert(memcmp(no_override,no_override_reference,257u)==0);
     for (size_t i=0;i<sizeof(page);++i) assert(page[i]==0xa5u);
     assert(musa_dwg1032_viewport_local_visibility_page(
         handles,flags,N,N-257u,257u,layers,L,overrides,V,page));
