@@ -4,6 +4,7 @@
 #include "musa_dwg1032_object_window.h"
 #include "musa_dwg1032_modular.h"
 #include "musa_dwg1032_cursor.h"
+#include "musa_dwg1032_section_window_scratch.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -165,4 +166,79 @@ int musa_dwg1032_object_ms_payload_read_window(
     return musa_dwg1032_object_ms_payload_read_window_at_position(
         file_bytes,file_size,pages,page_count,index,position,payload_offset,
         max_payload_bytes,destination,byte_count,payload_length);
+}
+
+/* Reuse the immutable ordinal index without a second page-copy validation
+ * pass. The scratch reader commits destination only after every touched page
+ * has passed its physical and logical boundary checks. */
+int musa_dwg1032_object_candidate_read_window_scratch_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *index,
+    size_t position, uint64_t candidate_offset,
+    uint8_t *destination, size_t byte_count, uint64_t *candidate_length,
+    uint8_t *scratch, size_t scratch_capacity) {
+    if (!index || !candidate_length || position>=index->count ||
+        index->count>SIZE_MAX/sizeof(*index->entries) ||
+        page_count>SIZE_MAX/sizeof(*pages) ||
+        file_size>PTRDIFF_MAX || byte_count>PTRDIFF_MAX ||
+        scratch_capacity>PTRDIFF_MAX ||
+        (file_size && !file_bytes) ||
+        (index->count && !index->entries) ||
+        (page_count && !pages) ||
+        (byte_count && (!destination || !scratch)) ||
+        (scratch_capacity && !scratch) ||
+        byte_count>scratch_capacity)
+        return 0;
+    const size_t entries_bytes=index->count*sizeof(*index->entries);
+    const size_t pages_bytes=page_count*sizeof(*pages);
+    if (overlaps(candidate_length,sizeof(*candidate_length),
+                 destination,byte_count) ||
+        overlaps(candidate_length,sizeof(*candidate_length),
+                 scratch,scratch_capacity) ||
+        overlaps(candidate_length,sizeof(*candidate_length),
+                 index,sizeof(*index)) ||
+        overlaps(candidate_length,sizeof(*candidate_length),
+                 index->entries,entries_bytes) ||
+        overlaps(candidate_length,sizeof(*candidate_length),
+                 pages,pages_bytes) ||
+        overlaps(candidate_length,sizeof(*candidate_length),
+                 file_bytes,file_size) ||
+        overlaps(destination,byte_count,index,sizeof(*index)) ||
+        overlaps(destination,byte_count,index->entries,entries_bytes) ||
+        overlaps(destination,byte_count,pages,pages_bytes) ||
+        overlaps(destination,byte_count,file_bytes,file_size) ||
+        overlaps(scratch,scratch_capacity,index,sizeof(*index)) ||
+        overlaps(scratch,scratch_capacity,index->entries,entries_bytes))
+        return 0;
+
+    if (!musa_dwg1032_object_index_neighborhood_valid(index,position))
+        return 0;
+    const MusaDwg1032ObjectLocation entry=index->entries[position];
+    if (candidate_offset>entry.length ||
+        (uint64_t)byte_count>entry.length-candidate_offset)
+        return 0;
+    if (!musa_dwg1032_section_read_window_scratch(
+            file_bytes,file_size,pages,page_count,index->section_bytes,
+            entry.offset+candidate_offset,destination,byte_count,
+            scratch,scratch_capacity))
+        return 0;
+    *candidate_length=entry.length;
+    return 1;
+}
+
+int musa_dwg1032_object_candidate_read_window_scratch(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *index,
+    uint64_t handle, uint64_t candidate_offset,
+    uint8_t *destination, size_t byte_count, uint64_t *candidate_length,
+    uint8_t *scratch, size_t scratch_capacity) {
+    size_t position=0;
+    if (!musa_dwg1032_object_index_find(index,handle,&position))
+        return 0;
+    return musa_dwg1032_object_candidate_read_window_scratch_at_position(
+        file_bytes,file_size,pages,page_count,index,position,
+        candidate_offset,destination,byte_count,candidate_length,
+        scratch,scratch_capacity);
 }
