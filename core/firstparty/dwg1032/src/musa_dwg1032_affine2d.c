@@ -21,7 +21,9 @@ static int valid(const MusaDwg1032Affine2 *t) {
  * fast path, then retry with fused multiply-add in both orders. */
 static double translated_pair(double a, double x, double b, double y,
                               double offset) {
-    double result=a*x+b*y+offset;
+    /* Evaluate the fused form first: ordinary intermediate products may
+     * overflow even when the final translated coordinate is finite. */
+    double result=fma(a,x,fma(b,y,offset));
     if (!isfinite(result)) {
         result=fma(a,x,fma(b,y,offset));
         if (!isfinite(result))
