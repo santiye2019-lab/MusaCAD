@@ -128,6 +128,21 @@ static void small_reordered_pages(void) {
     assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
         file,sizeof(file),pages,3,&index,10,1,4,
         scratch_out,3,&scratch_length,scratch_out+1,7));
+    uint64_t alias_length=99;
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,&alias_length,(uint8_t *)(void *)&alias_length,
+        sizeof(alias_length)));
+    assert(alias_length==99);
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,(uint64_t *)(void *)pages,
+        scratch,sizeof(scratch)));
+    assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
+        file,sizeof(file),pages,3,&index,10,1,4,
+        scratch_out,3,(uint64_t *)(void *)&index,
+        scratch,sizeof(scratch)));
+
     assert(!musa_dwg1032_object_ms_payload_read_window_scratch(
         file,sizeof(file),pages,3,&index,999,1,4,
         scratch_out,3,&scratch_length,scratch,sizeof(scratch)));
