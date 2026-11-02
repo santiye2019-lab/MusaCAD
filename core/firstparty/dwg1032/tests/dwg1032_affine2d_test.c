@@ -58,6 +58,8 @@ static void reject_bad_and_atomic(void) {
     p[2].x=5;
     assert(!musa_dwg1032_affine2_apply(&t,p,3,p));
     assert(!musa_dwg1032_affine2_apply(&t,p,SIZE_MAX,out));
+    assert(!musa_dwg1032_affine2_apply(&t,p,0,out));
+    assert(!musa_dwg1032_affine2_apply(&t,p,3,NULL));
     assert(memcmp(out,before,sizeof(out))==0);
     assert(musa_dwg1032_affine2_apply(&t,p,3,out));
     assert(near(out[2].x,6) && near(out[2].y,8));
