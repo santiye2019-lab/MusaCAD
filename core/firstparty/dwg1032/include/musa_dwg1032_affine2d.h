@@ -5,6 +5,7 @@
 #define MUSA_DWG1032_AFFINE2D_H
 #include "musa_dwg1032_point.h"
 #include <stddef.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -64,6 +65,23 @@ int musa_dwg1032_affine2_bounds(const MusaDwg1032Affine2 *transform,
  * Reject malformed bounds and aliased output without changing *visible. */
 int musa_dwg1032_bounds2_intersects(const MusaDwg1032Bounds2 *world,
     const MusaDwg1032Bounds2 *viewport, unsigned char *visible);
+/* Viewport culling for a page of caller-authenticated, already-decoded
+ * INSERT occurrences. Every occurrence has its own affine transform and
+ * local bounds; effective_visible MUST already include validated owner,
+ * layer, viewport and INSERT visibility. This routine does not infer them.
+ *
+ * Validate the ENTIRE requested page (including hidden entries) before
+ * publishing any mask byte. Reject nonfinite or unrepresentable transformed
+ * bounds, malformed viewport, invalid flags, overflow and all output aliasing
+ * with complete source arrays (including future pages). Edge contact counts
+ * as visible. No allocation; O(page_count) time and O(1) workspace.
+ * Neither this nor any other post-decode helper opens AC1032 DWG bytes. */
+int musa_dwg1032_affine2_cull_page(
+    const MusaDwg1032Affine2 *transforms,
+    const MusaDwg1032Bounds2 *local_bounds,
+    const uint8_t *effective_visible, size_t total_count,
+    size_t first, size_t page_count,
+    const MusaDwg1032Bounds2 *viewport, uint8_t *page_visible);
 #ifdef __cplusplus
 }
 #endif
