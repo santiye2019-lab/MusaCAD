@@ -35,6 +35,20 @@ int musa_scene2d_utf16le_cstr_to_utf8(const uint8_t *record,
                                       size_t utf8_capacity,
                                       size_t *written,
                                       size_t *consumed);
+/* Convert an externally length-verified UTF-16LE field inside a bounded
+ * record. code_units counts UTF-16 code units (not Unicode scalars), and
+ * *consumed reports exactly code_units * 2 bytes; trailing record bytes
+ * remain untouched. No length prefix or DWG string layout is inferred.
+ * Empty fields are valid. Size-query mode uses utf8=NULL/capacity=0.
+ * On failure output, *written and *consumed remain unchanged. All input
+ * record bytes, output and count storage must be nonoverlapping. */
+int musa_scene2d_utf16le_counted_to_utf8(const uint8_t *record,
+                                         size_t record_bytes,
+                                         size_t code_units,
+                                         uint8_t *utf8,
+                                         size_t utf8_capacity,
+                                         size_t *written,
+                                         size_t *consumed);
 #ifdef __cplusplus
 }
 #endif
