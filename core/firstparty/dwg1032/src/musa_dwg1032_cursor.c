@@ -143,6 +143,8 @@ int musa_dwg1032_cursor_take_bytes(MusaDwg1032Cursor *parent,
                                    size_t span_bytes,
                                    MusaDwg1032Cursor *child) {
     if (!valid(parent) || !child || (parent->bit_position%8u) ||
+        overlaps(parent,sizeof(*parent),child,sizeof(*child)) ||
+        overlaps(parent->bytes,parent->byte_count,child,sizeof(*child)) ||
         span_bytes>parent->byte_count-parent->bit_position/8u) return 0;
     if (!musa_dwg1032_cursor_slice(parent,parent->bit_position/8u,
                                    span_bytes,child)) return 0;
