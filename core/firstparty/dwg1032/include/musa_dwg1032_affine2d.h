@@ -23,6 +23,12 @@ int musa_dwg1032_affine2_insert(const MusaDwg1032Point2 *insertion,
  * The output must not alias either input; fail atomically. */
 int musa_dwg1032_affine2_compose(const MusaDwg1032Affine2 *outer,
     const MusaDwg1032Affine2 *inner, MusaDwg1032Affine2 *out);
+/* Reverse a caller-verified planar transform for viewport hit testing and
+ * nested INSERT coordinate mapping. Reject singular, nonfinite and
+ * unrepresentable inverses. Inputs/output must not overlap; output is
+ * unchanged on failure. No DWG parsing or OCS/UCS inference. */
+int musa_dwg1032_affine2_inverse(const MusaDwg1032Affine2 *forward,
+                                MusaDwg1032Affine2 *inverse);
 /* Transform a batch without allocation. Input/output must be disjoint from
  * one another and the transform. Reject nonfinite input or output, overflow,
  * and invalid transforms. Preflight all points before writing ANY result.
