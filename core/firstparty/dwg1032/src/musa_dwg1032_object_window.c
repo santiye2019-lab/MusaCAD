@@ -242,3 +242,67 @@ int musa_dwg1032_object_candidate_read_window_scratch(
         candidate_offset,destination,byte_count,candidate_length,
         scratch,scratch_capacity);
 }
+
+/* Scratch-backed counterpart to the MS candidate payload window reader.
+ * The prefix is parsed from a bounded, immutable RAW candidate before any
+ * public output is written. The payload copy uses the transactional scratch
+ * page reader; the scratch region is caller-owned and disposable. */
+int musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *index,
+    size_t position, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length,
+    uint8_t *scratch, size_t scratch_capacity) {
+    if (!index || !payload_length || !max_payload_bytes ||
+        position>=index->count)
+        return 0;
+    uint8_t prefix[4]={0};
+    uint64_t candidate_length=0;
+    if (!musa_dwg1032_object_candidate_read_window_at_position(
+            file_bytes,file_size,pages,page_count,index,position,0,
+            prefix,2u,&candidate_length))
+        return 0;
+    const size_t prefix_size=(prefix[1]&0x80u)?4u:2u;
+    if ((uint64_t)prefix_size>candidate_length) return 0;
+    if (prefix_size==4u &&
+        !musa_dwg1032_object_candidate_read_window_at_position(
+            file_bytes,file_size,pages,page_count,index,position,2u,
+            prefix+2u,2u,&candidate_length))
+        return 0;
+
+    MusaDwg1032Cursor cursor;
+    uint32_t length=0;
+    if (!musa_dwg1032_cursor_init(&cursor,prefix,prefix_size) ||
+        !musa_dwg1032_modular_short(&cursor,&length) ||
+        !length || (size_t)length>max_payload_bytes ||
+        (uint64_t)length>candidate_length-(uint64_t)prefix_size ||
+        payload_offset>(uint64_t)length ||
+        (uint64_t)byte_count>(uint64_t)length-payload_offset)
+        return 0;
+
+    uint64_t checked_length=0;
+    if (!musa_dwg1032_object_candidate_read_window_scratch_at_position(
+            file_bytes,file_size,pages,page_count,index,position,
+            (uint64_t)prefix_size+payload_offset,
+            destination,byte_count,&checked_length,scratch,scratch_capacity))
+        return 0;
+    *payload_length=(uint64_t)length;
+    return 1;
+}
+
+int musa_dwg1032_object_ms_payload_read_window_scratch(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *index,
+    uint64_t handle, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length,
+    uint8_t *scratch, size_t scratch_capacity) {
+    size_t position=0;
+    if (!musa_dwg1032_object_index_find(index,handle,&position))
+        return 0;
+    return musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+        file_bytes,file_size,pages,page_count,index,position,
+        payload_offset,max_payload_bytes,destination,byte_count,
+        payload_length,scratch,scratch_capacity);
+}
