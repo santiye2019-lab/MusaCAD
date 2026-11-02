@@ -185,3 +185,50 @@ int musa_dwg1032_bounds2_intersects(const MusaDwg1032Bounds2 *world,
         viewport->max_y>=world->min_y);
     return 1;
 }
+
+/* Fail-closed viewport culling on already-authenticated per-occurrence
+ * bounds and transforms. A complete first pass prevents a late malformed
+ * object from publishing an earlier, misleading viewport mask. */
+int musa_dwg1032_affine2_cull_page(
+    const MusaDwg1032Affine2 *transforms,
+    const MusaDwg1032Bounds2 *local_bounds,
+    const uint8_t *effective_visible, size_t total_count,
+    size_t first, size_t page_count,
+    const MusaDwg1032Bounds2 *viewport, uint8_t *page_visible) {
+    if (!transforms || !local_bounds || !effective_visible || !viewport ||
+        !page_visible || !valid_bounds(viewport) || !page_count ||
+        first>total_count || page_count>total_count-first ||
+        total_count>SIZE_MAX/sizeof(*transforms) ||
+        total_count>SIZE_MAX/sizeof(*local_bounds))
+        return 0;
+    if (overlaps(page_visible,page_count,transforms,
+                 total_count*sizeof(*transforms)) ||
+        overlaps(page_visible,page_count,local_bounds,
+                 total_count*sizeof(*local_bounds)) ||
+        overlaps(page_visible,page_count,effective_visible,total_count) ||
+        overlaps(page_visible,page_count,viewport,sizeof(*viewport)))
+        return 0;
+
+    for (size_t i=0;i<page_count;++i) {
+        const size_t at=first+i;
+        MusaDwg1032Bounds2 world;
+        if (effective_visible[at]>1u ||
+            !musa_dwg1032_affine2_bounds(&transforms[at],
+                                        &local_bounds[at],&world))
+            return 0;
+    }
+    for (size_t i=0;i<page_count;++i) {
+        const size_t at=first+i;
+        MusaDwg1032Bounds2 world;
+        /* The preflight guarantees these operations succeed while inputs
+         * remain immutable for the duration of the call. */
+        (void)musa_dwg1032_affine2_bounds(&transforms[at],
+                                         &local_bounds[at],&world);
+        page_visible[i]=(uint8_t)(effective_visible[at] &&
+            world.max_x>=viewport->min_x &&
+            viewport->max_x>=world.min_x &&
+            world.max_y>=viewport->min_y &&
+            viewport->max_y>=world.min_y);
+    }
+    return 1;
+}
