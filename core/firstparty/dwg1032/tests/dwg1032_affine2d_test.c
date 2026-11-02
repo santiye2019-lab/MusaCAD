@@ -230,6 +230,16 @@ static void block_bounds_and_viewport_culling(void) {
     assert(musa_dwg1032_bounds2_intersects(&vertical,&separated,&visible));
     assert(visible==0u);
 
+    /* A reflection must preserve finite bounds and touch semantics. */
+    const MusaDwg1032Affine2 mirror={-1.0,0.0,20.0,0.0,1.0,-10.0};
+    const MusaDwg1032Bounds2 source={2.0,3.0,6.0,9.0};
+    assert(musa_dwg1032_affine2_bounds(&mirror,&source,&world));
+    assert(near(world.min_x,14.0) && near(world.max_x,18.0));
+    assert(near(world.min_y,-7.0) && near(world.max_y,-1.0));
+    const MusaDwg1032Bounds2 mirror_view={18.0,-7.0,22.0,-1.0};
+    assert(musa_dwg1032_bounds2_intersects(&world,&mirror_view,&visible));
+    assert(visible==1u);
+
     const MusaDwg1032Bounds2 saved=world;
     const MusaDwg1032Bounds2 inverted={3.0,0.0,2.0,1.0};
     const MusaDwg1032Bounds2 invalid={0.0,NAN,2.0,3.0};
