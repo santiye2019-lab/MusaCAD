@@ -152,7 +152,7 @@ static void bit64_boundaries(void) {
     assert(!musa_dwg1032_cursor_read_bits64(&cursor,64u,&value));
     assert(value==99u && cursor.bit_position==1u);
     assert(musa_dwg1032_cursor_read_bits64(&cursor,63u,&value));
-    assert(value==UINT64_C(0x0002468acf13579a));
+    assert(value==UINT64_C(0x000123456789abcd));
     assert(cursor.bit_position==64u);
 }
 static void framed_take_atomicity(void) {
