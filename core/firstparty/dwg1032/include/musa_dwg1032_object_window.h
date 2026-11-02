@@ -95,6 +95,29 @@ int musa_dwg1032_object_candidate_read_window_scratch(
     uint8_t *destination, size_t byte_count, uint64_t *candidate_length,
     uint8_t *scratch, size_t scratch_capacity);
 
+
+/* Transactional scratch-backed MS payload reads from caller-verified RAW
+ * candidate spans. The 2/4-byte MS prefix is checked before publication.
+ * On failure destination and *payload_length are unchanged; scratch is
+ * disposable. Scratch must be disjoint from source, page/index metadata,
+ * destination and length output. A zero-byte end read is permitted.
+ * These APIs do not decompress or authenticate AC1032 pages. */
+int musa_dwg1032_object_ms_payload_read_window_scratch_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    size_t position, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length,
+    uint8_t *scratch, size_t scratch_capacity);
+
+int musa_dwg1032_object_ms_payload_read_window_scratch(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index,
+    uint64_t handle, uint64_t payload_offset, size_t max_payload_bytes,
+    uint8_t *destination, size_t byte_count, uint64_t *payload_length,
+    uint8_t *scratch, size_t scratch_capacity);
+
 #ifdef __cplusplus
 }
 #endif
