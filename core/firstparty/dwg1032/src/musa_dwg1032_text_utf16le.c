@@ -115,6 +115,22 @@ int musa_dwg1032_text_utf16le_to_utf8(
     return 1;
 }
 
+/* Measure a bounded record field without consuming the cursor. The
+ * temporary cursor validates the complete source span and alignment. */
+int musa_dwg1032_text_utf16le_peek_measure(
+    const MusaDwg1032Cursor *record, size_t byte_count, size_t *required) {
+    if (!record || !required ||
+        overlaps(record,sizeof(*record),required,sizeof(*required)) ||
+        overlaps(record->bytes,record->byte_count,required,sizeof(*required)))
+        return 0;
+    MusaDwg1032Cursor trial=*record;
+    MusaDwg1032Cursor field;
+    if (!musa_dwg1032_cursor_take_bytes(&trial,byte_count,&field))
+        return 0;
+    return musa_dwg1032_text_utf16le_measure(
+        field.bytes,field.byte_count,required);
+}
+
 /* The text length is supplied by an independently validated record schema.
  * No on-disk DWG text layout or encoding choice is inferred here. */
 int musa_dwg1032_text_utf16le_take(

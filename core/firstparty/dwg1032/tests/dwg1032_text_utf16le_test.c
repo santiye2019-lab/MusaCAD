@@ -243,7 +243,54 @@ static void large_capacity_preflight(void) {
     assert(required==3u*N+1u);
 }
 
+static void cursor_nonconsuming_measure(void) {
+    const uint8_t input[]={'A',0,0x3d,0xd8,0x00,0xde,'B',0};
+    MusaDwg1032Cursor cursor;
+    assert(musa_dwg1032_cursor_init(&cursor,input,sizeof(input)));
+    size_t required=77u;
+    assert(musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,6u,&required));
+    assert(required==6u && cursor.bit_position==0u);
+    char output[6];
+    size_t written=0u;
+    assert(musa_dwg1032_text_utf16le_take(
+        &cursor,6u,output,sizeof(output),&written));
+    assert(written+1u==required && cursor.bit_position==48u);
+    assert(musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,2u,&required));
+    assert(required==2u && cursor.bit_position==48u);
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,3u,&required));
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,4u,&required));
+    assert(required==2u && cursor.bit_position==48u);
+    assert(musa_dwg1032_cursor_skip_bits(&cursor,1u));
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,0u,&required));
+    assert(required==2u && cursor.bit_position==49u);
+    assert(musa_dwg1032_cursor_init(&cursor,input,sizeof(input)));
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,6u,&cursor.bit_position));
+    assert(cursor.bit_position==0u);
+    _Alignas(size_t) uint8_t aligned[sizeof(size_t)+2u]={0};
+    assert(musa_dwg1032_cursor_init(&cursor,aligned,sizeof(aligned)));
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,2u,(size_t *)(void *)aligned));
+    assert(cursor.bit_position==0u);
+    assert(!musa_dwg1032_text_utf16le_peek_measure(NULL,0u,&required));
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,0u,NULL));
+    assert(required==2u);
+    const uint8_t malformed[]={'A',0,0x3d,0xd8};
+    assert(musa_dwg1032_cursor_init(
+        &cursor,malformed,sizeof(malformed)));
+    assert(!musa_dwg1032_text_utf16le_peek_measure(
+        &cursor,sizeof(malformed),&required));
+    assert(required==2u && cursor.bit_position==0u);
+}
+
 int main(void) {
+    cursor_nonconsuming_measure();
     exact_capacity_preflight();
     large_capacity_preflight();
     multilingual_and_terminator();

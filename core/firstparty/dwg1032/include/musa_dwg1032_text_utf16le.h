@@ -44,6 +44,13 @@ int musa_dwg1032_text_utf16le_take(
     MusaDwg1032Cursor *record, size_t byte_count,
     char *utf8, size_t capacity, size_t *written);
 
+/* Read-only sizing query for a byte-aligned, caller-authenticated record
+ * field. Does not advance the cursor or publish required bytes on failure.
+ * The entire source cursor storage and metadata must be disjoint from
+ * required. No heap, no schema inference, O(byte_count) time. */
+int musa_dwg1032_text_utf16le_peek_measure(
+    const MusaDwg1032Cursor *record, size_t byte_count, size_t *required);
+
 #ifdef __cplusplus
 }
 #endif
