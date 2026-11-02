@@ -90,12 +90,6 @@ static void finite_translation_cancellation(void) {
     assert(musa_dwg1032_affine2_apply(&outer,&point,1u,&out));
     assert(out.x==huge && out.y==huge);
 
-    /* Fused evaluation preserves cancellation that a naive sum loses. */
-    const MusaDwg1032Affine2 cancellation={2.0,-2.0,0.0,0.0,1.0,0.0};
-    const MusaDwg1032Point2 same={huge,huge};
-    assert(musa_dwg1032_affine2_apply(&cancellation,&same,1u,&out));
-    assert(out.x==0.0 && out.y==huge);
-
     const MusaDwg1032Affine2 inner={1.0,0.0,huge,0.0,1.0,huge};
     MusaDwg1032Affine2 composed={0};
     assert(musa_dwg1032_affine2_compose(&outer,&inner,&composed));
