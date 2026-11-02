@@ -65,6 +65,22 @@ int musa_scene2d_utf16le_counted_at_to_utf8(const uint8_t *record,
                                             size_t utf8_capacity,
                                             size_t *written,
                                             size_t *consumed);
+/* Decode a verified NUL-terminated UTF-16LE field starting at an explicit
+ * byte offset in a complete, immutable record. The terminator must fit
+ * within max_field_bytes AND the remaining record bytes. An odd prefix is
+ * permitted; UTF-16 alignment is relative to byte_offset. On success,
+ * consumed is the absolute position after the two-byte terminator.
+ * Rejects malformed Unicode and aliasing against the ENTIRE record;
+ * no partial output publication on failure. Size-query mode is supported.
+ * No DWG record-layout or encoding-flag inference. */
+int musa_scene2d_utf16le_cstr_at_to_utf8(const uint8_t *record,
+                                         size_t record_bytes,
+                                         size_t byte_offset,
+                                         size_t max_field_bytes,
+                                         uint8_t *utf8,
+                                         size_t utf8_capacity,
+                                         size_t *written,
+                                         size_t *consumed);
 #ifdef __cplusplus
 }
 #endif
