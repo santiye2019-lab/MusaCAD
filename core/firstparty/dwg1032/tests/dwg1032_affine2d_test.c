@@ -164,8 +164,20 @@ static void reverse_insert_mapping(void) {
     assert(!musa_dwg1032_affine2_inverse(&invalid,&reverse));
     assert(!musa_dwg1032_affine2_inverse(&forward,&forward));
     assert(memcmp(&original,&reverse,sizeof reverse)==0);
+    /* The raw determinant underflows/overflows for these invertible
+     * scales. Row-normalized inversion must preserve both directions. */
     const MusaDwg1032Affine2 tiny={1e-300,0.0,0.0,0.0,1e-300,0.0};
-    assert(!musa_dwg1032_affine2_inverse(&tiny,&reverse));
+    assert(musa_dwg1032_affine2_inverse(&tiny,&reverse));
+    assert(near(reverse.xx/1e300,1.0) && near(reverse.yy/1e300,1.0));
+    const MusaDwg1032Affine2 huge={1e300,0.0,0.0,0.0,1e300,0.0};
+    assert(musa_dwg1032_affine2_inverse(&huge,&reverse));
+    assert(near(reverse.xx*1e300,1.0) && near(reverse.yy*1e300,1.0));
+    const MusaDwg1032Affine2 mixed={1e-300,0.0,0.0,0.0,1e300,0.0};
+    assert(musa_dwg1032_affine2_inverse(&mixed,&reverse));
+    assert(near(reverse.xx/1e300,1.0) && near(reverse.yy*1e300,1.0));
+    const MusaDwg1032Affine2 zero_row={0.0,0.0,0.0,0.0,1.0,0.0};
+    original=reverse;
+    assert(!musa_dwg1032_affine2_inverse(&zero_row,&reverse));
     assert(memcmp(&original,&reverse,sizeof reverse)==0);
 }
 int main(void) {
