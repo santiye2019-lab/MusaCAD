@@ -55,6 +55,26 @@ int musa_dwg1032_viewport_plan_page_scratch(
     const uint8_t *entity_visible, size_t total_count,
     size_t first, size_t page_count, uint8_t *page_visible,
     uint8_t *scratch, size_t scratch_capacity);
+
+/* Resolve a bounded page of children for ONE authenticated INSERT instance.
+ * Layer-zero children inherit the already-verified INSERT visibility, not
+ * the block definition's layer-zero on/thaw/viewport state. Nonzero layers
+ * retain their own validated layer and viewport freeze rules.
+ * definition_owner_visible contains owner-only Boolean evidence. The caller
+ * authenticates the INSERT/owner relationship and applies this once per
+ * instance, including nested INSERTs; this is not a DWG parser or final
+ * rendering authorization. Requires an immutable validated plan and a
+ * present layer-zero handle. Full source ranges and ENTIRE scratch capacity
+ * must be disjoint from metadata, plan, output, and one another. Output
+ * remains unchanged on failure. O(page_count log layers + page_count log
+ * overrides), no heap, no repeated table validation per page. */
+int musa_dwg1032_viewport_plan_insert_page_scratch(
+    const MusaDwg1032ViewportPlan *plan,
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible, size_t total_count,
+    size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *page_visible, uint8_t *scratch, size_t scratch_capacity);
 #ifdef __cplusplus
 }
 #endif
