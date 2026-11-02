@@ -1,0 +1,8 @@
+# Scratch-backed lazy object-window reads — 2026-11-02
+
+- Scope: original MusaCAD, `core/firstparty/dwg1032/`; no changes to `MusaCAD2/`, `main`, existing 3D or production Android/JNI.
+- Origin: independently authored MIT C11 using basic bounds arithmetic, binary-search index lookup and caller-owned scratch buffers. No GPL/AGPL/LGPL, LibreDWG, historical MusaCAD CAD implementation or unverified-origin source was copied, adapted or linked.
+- Contract: page directory and object index must already be verified, refer to the same RAW logical section and remain immutable. Caller scratch is fully disjoint from source, index, pages, destination and length output. Failed reads preserve destination and candidate length; scratch contents are disposable.
+- Performance intent: for cross-page object windows, copy touched pages once into scratch, then publish the complete window. This avoids the existing multi-page reader's two traversal passes. It adds caller-provided scratch storage and a final contiguous copy; **no measured speedup is claimed**.
+- Regression: synthetic reversed-physical pages, cross-page candidate, zero-byte reads, 20,000-page differential windows, invalid handle/offset, insufficient scratch, alias rejection and late-page corruption rollback. The CTest target is `firstparty_dwg1032_scratch_object_windows_20k`. Verify CI on the exact commit; no unrun test is considered passing.
+- Limitation: this only reads already-verified, uncompressed RAW page ranges. AC1032 page-map authentication, compressed-page recovery, real-file licensed fixtures, DWG entity TEXT/MTEXT/block/layer decoding and Android full-fidelity rendering are **not established**. Do not activate it as a production DWG importer.
