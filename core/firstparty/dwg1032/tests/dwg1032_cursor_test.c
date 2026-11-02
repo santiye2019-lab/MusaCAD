@@ -170,6 +170,9 @@ static void bit64_unaligned_boundaries(void) {
                 (uint64_t)((data[at/8u]>>(7u-at%8u))&1u);
         }
         assert(value==expected && cursor.bit_position==64u);
+        value=UINT64_MAX;
+        assert(!musa_dwg1032_cursor_read_bits64(&cursor,1u,&value));
+        assert(value==UINT64_MAX && cursor.bit_position==64u);
     }
 }
 static void bit64_prefixes(void) {
