@@ -4332,6 +4332,61 @@ public class MainActivity extends AppCompatActivity {
                 final String openedDwgFormat=inputFormat;
                 runOnUiThread(()->{if(activeLoad==task&&task.dialog!=null&&task.dialog.isShowing())
                     task.progress.setText("DWG hızlı görünüm hazırlanıyor"+openedDwgFormat+"…");});
+                // First-party AC1032 acceptance: open authentic source geometry in
+                // the normal file picker, even while editable DWG export is unavailable.
+                // This is a read-only, explicitly incomplete project, never a DXF model.
+                if(loaded.file.length()<=64L*1024L*1024L){
+                    boolean originalAc1032=false;
+                    try(java.io.FileInputStream signature=new java.io.FileInputStream(loaded.file)){
+                        byte[] magic=new byte[6];
+                        originalAc1032=signature.read(magic)==6&&
+                            magic[0]=='A'&&magic[1]=='C'&&magic[2]=='1'&&
+                            magic[3]=='0'&&magic[4]=='3'&&magic[5]=='2';
+                    }
+                    if(originalAc1032){
+                        FirstPartyDwgPreview.Result actual=
+                            FirstPartyDwgPreview.read(loaded.file,2*1024*1024);
+                        FileTransfer.checkCancelled();
+                        final NativeScene realScene=actual.scene;
+                        final FirstPartyDwgPreview.Readiness audit=actual.readiness;
+                        runOnUiThread(()->{
+                            if(activeLoad!=task||isFinishing()||isDestroyed()){
+                                loaded.dispose();return;
+                            }
+                            ProjectSession project=new ProjectSession();
+                            project.sourceUri=loaded.sourceUri;
+                            project.file=loaded.file;
+                            project.name=loaded.name;
+                            project.dxf=false;
+                            project.nativeScene=realScene;
+                            project.lastAccessMs=System.currentTimeMillis();
+                            project.persistedImages.addAll(loaded.imageOverlays);
+                            loaded.nativeScene=realScene;
+                            loaded.project=project;
+                            loaded.handedOff=true;
+                            projects.add(project);
+                            activeLoad=null;
+                            if(task.dialog!=null)task.dialog.dismiss();
+                            activateProject(project);
+                            project.preparingEditor=false;
+                            updateEditorEnabled(false);
+                            updateLayerButtons(false);
+                            String report="GERÇEK AC1032 • SALT OKUNUR • EKSİK SAHNE"+
+                                " • çizilen: "+realScene.primitiveCount+
+                                " • indeksli kayıt: "+audit.indexed+
+                                " • önizlemeye alınan: "+audit.previewAdmittedRecords+
+                                " • reddedilen aday: "+audit.previewRejectedCandidates+
+                                " • diğer kayıt: "+audit.previewOtherIndexedRecords+
+                                " • çözümlenmeyen blok/INSERT: "+
+                                (audit.undecodedBlockMarkers+audit.undecodedInsertMinsert);
+                            result.setText(report);
+                            project.prepareError=report;
+                            android.util.Log.i("MusaCAD-RealDWGAudit",report);
+                            scheduleRecentMetadataRecord(uri,loaded.name);
+                        });
+                        return;
+                    }
+                }
                 try(NativeCadEngine engine=NativeCadEngine.open(loaded.file)){
                     openTrace.mark(CadOpenTrace.Phase.NATIVE_OPEN);
                     FileTransfer.checkCancelled();
