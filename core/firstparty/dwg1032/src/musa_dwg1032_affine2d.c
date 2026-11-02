@@ -137,3 +137,54 @@ int musa_dwg1032_affine2_inverse(const MusaDwg1032Affine2 *forward,
     *inverse=trial;
     return 1;
 }
+
+/* Transform the four actual corners. A two-corner shortcut is incorrect for
+ * rotated, reflected and sheared INSERTs and can hide visible geometry. */
+static int valid_bounds(const MusaDwg1032Bounds2 *b) {
+    return b && isfinite(b->min_x) && isfinite(b->min_y) &&
+           isfinite(b->max_x) && isfinite(b->max_y) &&
+           b->min_x<=b->max_x && b->min_y<=b->max_y;
+}
+
+int musa_dwg1032_affine2_bounds(const MusaDwg1032Affine2 *transform,
+    const MusaDwg1032Bounds2 *local, MusaDwg1032Bounds2 *world) {
+    if (!transform || !valid(transform) || !valid_bounds(local) || !world ||
+        overlaps(transform,sizeof(*transform),world,sizeof(*world)) ||
+        overlaps(local,sizeof(*local),world,sizeof(*world)))
+        return 0;
+    const MusaDwg1032Point2 corners[4]={
+        {local->min_x,local->min_y},
+        {local->min_x,local->max_y},
+        {local->max_x,local->min_y},
+        {local->max_x,local->max_y}
+    };
+    MusaDwg1032Bounds2 result={0.0,0.0,0.0,0.0};
+    for (size_t i=0;i<4u;++i) {
+        MusaDwg1032Point2 point;
+        if (!mapped(transform,corners[i],&point)) return 0;
+        if (!i) {
+            result.min_x=result.max_x=point.x;
+            result.min_y=result.max_y=point.y;
+        } else {
+            result.min_x=fmin(result.min_x,point.x);
+            result.min_y=fmin(result.min_y,point.y);
+            result.max_x=fmax(result.max_x,point.x);
+            result.max_y=fmax(result.max_y,point.y);
+        }
+    }
+    *world=result;
+    return 1;
+}
+
+int musa_dwg1032_bounds2_intersects(const MusaDwg1032Bounds2 *world,
+    const MusaDwg1032Bounds2 *viewport, unsigned char *visible) {
+    if (!valid_bounds(world) || !valid_bounds(viewport) || !visible ||
+        overlaps(world,sizeof(*world),visible,sizeof(*visible)) ||
+        overlaps(viewport,sizeof(*viewport),visible,sizeof(*visible)))
+        return 0;
+    *visible=(unsigned char)(world->max_x>=viewport->min_x &&
+        viewport->max_x>=world->min_x &&
+        world->max_y>=viewport->min_y &&
+        viewport->max_y>=world->min_y);
+    return 1;
+}
