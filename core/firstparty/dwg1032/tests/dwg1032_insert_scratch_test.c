@@ -92,7 +92,7 @@ static void fail_closed(void) {
     assert(musa_dwg1032_insert_visibility_scratch(
         NULL,NULL,0u,1u,1u,layers,L,freeze,V,NULL,NULL,0u));
     assert(!musa_dwg1032_insert_visibility_scratch(
-        NULL,NULL,0u,999u,1u,layers,L,freeze,V,NULL,NULL,0u));
+        NULL,NULL,0u,UINT64_MAX,1u,layers,L,freeze,V,NULL,NULL,0u));
 }
 int main(void) {
     prepare();
