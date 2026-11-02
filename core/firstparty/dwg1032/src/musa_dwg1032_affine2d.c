@@ -232,3 +232,49 @@ int musa_dwg1032_affine2_cull_page(
     }
     return 1;
 }
+
+/* The caller owns scratch, so transformed bounds are computed only once.
+ * Reject every invalid occurrence (even if hidden) before publishing the
+ * complete viewport mask. Source arrays and viewport must stay immutable
+ * for the duration of this call. */
+int musa_dwg1032_affine2_cull_page_scratch(
+    const MusaDwg1032Affine2 *transforms,
+    const MusaDwg1032Bounds2 *local_bounds,
+    const uint8_t *effective_visible, size_t total_count,
+    size_t first, size_t page_count,
+    const MusaDwg1032Bounds2 *viewport, uint8_t *page_visible,
+    uint8_t *scratch, size_t scratch_capacity) {
+    if (!transforms || !local_bounds || !effective_visible || !viewport ||
+        !page_visible || !scratch || !valid_bounds(viewport) ||
+        !page_count || first>total_count || page_count>total_count-first ||
+        scratch_capacity<page_count || scratch_capacity>PTRDIFF_MAX ||
+        total_count>SIZE_MAX/sizeof(*transforms) ||
+        total_count>SIZE_MAX/sizeof(*local_bounds))
+        return 0;
+    const size_t transform_bytes=total_count*sizeof(*transforms);
+    const size_t bounds_bytes=total_count*sizeof(*local_bounds);
+    const void *sources[]={transforms,local_bounds,effective_visible,viewport};
+    const size_t source_bytes[]={transform_bytes,bounds_bytes,
+                                 total_count,sizeof(*viewport)};
+    if (overlaps(page_visible,page_count,scratch,scratch_capacity))
+        return 0;
+    for (size_t i=0u;i<4u;++i)
+        if (overlaps(page_visible,page_count,sources[i],source_bytes[i]) ||
+            overlaps(scratch,scratch_capacity,sources[i],source_bytes[i]))
+            return 0;
+    for (size_t i=0u;i<page_count;++i) {
+        const size_t at=first+i;
+        MusaDwg1032Bounds2 world;
+        if (effective_visible[at]>1u ||
+            !musa_dwg1032_affine2_bounds(&transforms[at],
+                                        &local_bounds[at],&world))
+            return 0;
+        scratch[i]=(uint8_t)(effective_visible[at] &&
+            world.max_x>=viewport->min_x &&
+            viewport->max_x>=world.min_x &&
+            world.max_y>=viewport->min_y &&
+            viewport->max_y>=world.min_y);
+    }
+    memcpy(page_visible,scratch,page_count);
+    return 1;
+}
