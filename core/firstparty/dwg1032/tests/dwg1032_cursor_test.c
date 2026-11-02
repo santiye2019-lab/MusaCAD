@@ -135,8 +135,24 @@ static void raw_byte_reads(void) {
     assert(musa_dwg1032_cursor_read_bytes(&c,NULL,0));
     assert(!musa_dwg1032_cursor_read_u8(&c,&v));
 }
+static void reject_overlapping_take_without_mutation(void) {
+    uint8_t storage[sizeof(MusaDwg1032Cursor)+8u]={0};
+    MusaDwg1032Cursor parent, child, snapshot;
+    assert(musa_dwg1032_cursor_init(&parent,storage,sizeof storage));
+    snapshot=parent;
+    /* Child destination aliases the input bytes: reject before any writes. */
+    assert(!musa_dwg1032_cursor_take_bytes(
+        &parent,1u,(MusaDwg1032Cursor *)(void *)storage));
+    assert(parent.bytes==snapshot.bytes &&
+           parent.byte_count==snapshot.byte_count &&
+           parent.bit_position==snapshot.bit_position);
+    assert(!musa_dwg1032_cursor_take_bytes(&parent,1u,&parent));
+    assert(parent.bit_position==0);
+    assert(musa_dwg1032_cursor_take_bytes(&parent,1u,&child));
+    assert(parent.bit_position==8 && child.bytes==storage);
+}
 int main(void) {
     bit_fields(); byte_fields(); raw_byte_reads(); slices_and_bad_state();
-    exhaustive_small_buffers();
+    exhaustive_small_buffers(); reject_overlapping_take_without_mutation();
     return 0;
 }
