@@ -49,6 +49,22 @@ int musa_scene2d_utf16le_counted_to_utf8(const uint8_t *record,
                                          size_t utf8_capacity,
                                          size_t *written,
                                          size_t *consumed);
+/* Decode a caller-verified counted UTF-16LE field starting at byte_offset
+ * inside the complete record. The byte offset may be odd (for example
+ * after a packed prefix); the field itself is always UTF-16LE.
+ * On success, *consumed is the absolute byte offset immediately AFTER the
+ * field, not the field length. No DWG framing or length-prefix interpretation.
+ * The entire record must be disjoint from output and count storage, even
+ * bytes before/after the selected field. Size queries and empty fields work.
+ * Failure preserves output, *written and *consumed. */
+int musa_scene2d_utf16le_counted_at_to_utf8(const uint8_t *record,
+                                            size_t record_bytes,
+                                            size_t byte_offset,
+                                            size_t code_units,
+                                            uint8_t *utf8,
+                                            size_t utf8_capacity,
+                                            size_t *written,
+                                            size_t *consumed);
 #ifdef __cplusplus
 }
 #endif
