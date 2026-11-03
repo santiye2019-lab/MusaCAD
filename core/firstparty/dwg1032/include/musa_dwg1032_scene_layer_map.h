@@ -15,7 +15,7 @@ typedef struct MusaDwg1032SceneLayerMap {
  * IDs and ambiguous zero designation. This is not layer-table parsing. */
 static inline int musa_dwg1032_scene_layer_map_valid(
     const MusaDwg1032SceneLayerMap *maps, size_t count) {
-    if (!maps || !count) return 0;
+    if (!maps || !count || count > SIZE_MAX / sizeof(*maps)) return 0;
     uint64_t previous = 0;
     unsigned zero_count = 0;
     for (size_t i = 0; i < count; ++i) {
@@ -37,6 +37,13 @@ static inline int musa_dwg1032_scene_layer_map_find(
     uint64_t source_handle, uint64_t *scene_layer) {
     if (!scene_layer || !source_handle ||
         !musa_dwg1032_scene_layer_map_valid(maps, count)) return 0;
+    /* Never allow a successful lookup to overwrite the source map. */
+    const uintptr_t source = (uintptr_t)maps;
+    const uintptr_t destination = (uintptr_t)scene_layer;
+    const size_t source_bytes = count * sizeof(*maps);
+    if (source <= destination
+            ? destination - source < source_bytes
+            : source - destination < sizeof(*scene_layer)) return 0;
     size_t lo = 0, hi = count;
     while (lo < hi) {
         size_t mid = lo + (hi - lo) / 2;
