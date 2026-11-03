@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "musa_dwg1032_scene_layer_map.h"
+/* Keep all assertions live in Release CI builds as well. */
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
