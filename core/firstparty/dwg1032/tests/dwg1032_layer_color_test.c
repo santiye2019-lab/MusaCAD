@@ -467,7 +467,57 @@ static void paged_color_large_pafta_and_rollback(void) {
                out[i].color.truecolor_rgb==reference[i].color.truecolor_rgb);
 }
 
+/* Reject pointer spans which fit size_t but cannot be indexed by C
+ * pointer differences. These fabricated counts must never dereference the
+ * single-entry backing arrays or modify public output. */
+static void reject_nonrepresentable_color_spans(void) {
+    const MusaDwg1032ObjectLocation entry={1u,0u,1u};
+    MusaDwg1032ObjectIndex index={&entry,1u,1u};
+    const uint64_t layer_handle=1u;
+    const MusaDwg1032CadColor raw={3u,0u,0u};
+    const MusaDwg1032LayerColor layer={1u,{4u,0u,0u}};
+    const MusaDwg1032ResolvedColor insert={{2u,0u,0u},0u};
+    MusaDwg1032ResolvedColor output={{7u,0u,0u},0u};
+    MusaDwg1032ResolvedColor scratch={{0u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor saved=output;
+
+    index.count=(size_t)(PTRDIFF_MAX/sizeof(entry))+1u;
+    assert(!musa_dwg1032_layer_color_select(
+        &index,&layer_handle,&raw,&layer,1u,&output));
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,&layer_handle,&raw,&layer,1u,&output,&scratch,1u));
+    index.count=1u;
+
+    const size_t oversized_layers=
+        (size_t)(PTRDIFF_MAX/sizeof(layer))+1u;
+    assert(!musa_dwg1032_layer_color_select(
+        &index,&layer_handle,&raw,&layer,oversized_layers,&output));
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,&layer_handle,&raw,&layer,oversized_layers,
+        &output,&scratch,1u));
+
+    const size_t oversized_scratch=
+        (size_t)(PTRDIFF_MAX/sizeof(scratch))+1u;
+    assert(!musa_dwg1032_layer_color_select_scratch(
+        &index,&layer_handle,&raw,&layer,1u,
+        &output,&scratch,oversized_scratch));
+
+    const size_t oversized_colors=
+        (size_t)(PTRDIFF_MAX/sizeof(output))+1u;
+    assert(!musa_dwg1032_layer_color_apply_insert(
+        &insert,oversized_colors,&insert,&output));
+    assert(!musa_dwg1032_layer_color_apply_insert_context(
+        &insert,&raw,&layer_handle,oversized_colors,1u,
+        &insert,&insert,&output));
+    assert(memcmp(&output,&saved,sizeof(output))==0);
+
+    assert(musa_dwg1032_layer_color_select(
+        &index,&layer_handle,&raw,&layer,1u,&output));
+    assert(output.byblock==0u && output.color.aci==3u);
+}
+
 int main(void) {
+    reject_nonrepresentable_color_spans();
     paged_color_large_pafta_and_rollback();
     scratch_color_large_pafta();
     large_layer_zero_instance_atomicity();
