@@ -41,6 +41,21 @@ public final class CadOpenTrace {
         maxHeapBytes=Math.max(maxHeapBytes,runtime.totalMemory()-runtime.freeMemory());
     }
 
+    /** Only generic stage identity and elapsed time, never source drawing data. */
+    public synchronized long totalMs(){
+        return Math.max(0L,(clock.getAsLong()-started)/1_000_000L);
+    }
+
+    public synchronized String latestStage(){
+        if(seen[Phase.VIEW_HANDOFF.ordinal()])return "VIEW_HANDOFF";
+        if(seen[Phase.FINAL_DXF_PARSE.ordinal()])return "DXF_PARSE";
+        if(seen[Phase.DXF_EXPORT.ordinal()])return "DXF_EXPORT";
+        if(seen[Phase.NATIVE_SCENE_READY.ordinal()])return "NATIVE_SCENE";
+        if(seen[Phase.NATIVE_OPEN.ordinal()])return "NATIVE_OPEN";
+        if(seen[Phase.COPY_DONE.ordinal()])return "COPY";
+        return "UNKNOWN";
+    }
+
     public synchronized String safeSummary(long inputBytes,int parsedEntities){
         StringBuilder s=new StringBuilder("inputMiB=");
         s.append(String.format(Locale.ROOT,"%.1f",Math.max(0L,inputBytes)/1048576d));
