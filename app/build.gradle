@@ -10,6 +10,7 @@ def musaPlayProductId = System.getenv('MUSACAD_PLAY_YEARLY_PRODUCT_ID') ?: 'musa
 def musaPlayVerifyUrl = System.getenv('MUSACAD_PLAY_VERIFY_URL') ?: ''
 def musaAiApiUrl = System.getenv('MUSACAD_AI_API_URL') ?: ''
 def musaAiSessionUrl = System.getenv('MUSACAD_AI_SESSION_URL') ?: ''
+def musaReportsApiUrl = System.getenv('MUSACAD_REPORTS_API_URL') ?: ''
 def hasReleaseSigning = musaKeystore && musaStorePassword && musaKeyAlias && musaKeyPassword
 def productionRelease = ((project.findProperty('musacadProductionRelease')
     ?: System.getenv('MUSACAD_PRODUCTION_RELEASE')
@@ -32,6 +33,9 @@ def verifyCommonProductionRelease = {
     }
     if (musaAiApiUrl && (!musaAiApiUrl.startsWith('https://') || !musaAiSessionUrl.startsWith('https://'))) {
         throw new GradleException('MusaCAD AI endpoints must use HTTPS')
+    }
+    if (musaReportsApiUrl && !musaReportsApiUrl.startsWith('https://')) {
+        throw new GradleException('MusaCAD diagnostic reports endpoint must use HTTPS')
     }
     File paidPublicKey = file('src/main/assets/MUSACAD-LICENSE-PUBLIC.pem')
     if (!paidPublicKey.isFile() || !paidPublicKey.text.contains('-----BEGIN PUBLIC KEY-----')) {
@@ -110,6 +114,7 @@ android {
         buildConfigField "String", "PLAY_VERIFY_URL", groovy.json.JsonOutput.toJson(musaPlayVerifyUrl)
         buildConfigField "String", "AI_API_URL", groovy.json.JsonOutput.toJson(musaAiApiUrl)
         buildConfigField "String", "AI_SESSION_URL", groovy.json.JsonOutput.toJson(musaAiSessionUrl)
+        buildConfigField "String", "REPORTS_API_URL", groovy.json.JsonOutput.toJson(musaReportsApiUrl)
         buildConfigField "boolean", "ALLOW_LEGACY_SHORT_LICENSE", productionRelease ? "false" : "true"
     }
 
