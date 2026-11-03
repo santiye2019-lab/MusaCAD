@@ -14,6 +14,8 @@
 #include "musacad_dwg_ac1032_layer.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1147,6 +1149,71 @@ static inline int musa_dwg_ac1032_scene_index_source_block_circle_batch(
     if(!local.circle_count)return 0;
     local.original_circle_sources_verified=1u;
     *out=local;
+    return 1;
+}
+/* Multiple original INSERT -> CIRCLE sources, preserving the original
+ * handle/layer and the conservative WCS bounds for each child. This is
+ * source evidence only: incomplete sibling inventories remain unresolved.
+ * The caller selects INSERT handles; no model-space membership, nested
+ * transform, viewport or final color/visibility/paint is asserted.
+ * All source packets and capacity are checked before caller output is
+ * committed, including on an allocation or second-pass failure. */
+typedef struct MusaDwgAc1032CircleSceneItem {
+    uint64_t insert_handle,block_header_handle,circle_handle,layer_handle;
+    double bounds[4];
+} MusaDwgAc1032CircleSceneItem;
+static inline int musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+    const MusaDwgAc1032SceneIndex *index,const uint64_t *insert_handles,
+    size_t insert_count,MusaDwgAc1032CircleSceneItem *items,
+    size_t capacity,size_t *out_count,size_t *out_unsupported_siblings){
+    if(!index||!insert_handles||!insert_count||!out_count||
+       !out_unsupported_siblings||(!items&&capacity))return 0;
+    size_t required=0u,unresolved=0u;
+    for(size_t i=0u;i<insert_count;i++){
+        if(!insert_handles[i])return 0;
+        for(size_t j=0u;j<i;j++)
+            if(insert_handles[i]==insert_handles[j])return 0;
+        MusaDwgAc1032InsertBlockCircleBoundsBatch batch={0};
+        if(!musa_dwg_ac1032_scene_index_source_block_circle_batch(
+               index,insert_handles[i],&batch)||
+           !batch.original_circle_sources_verified||
+           batch.final_visibility_color_and_paint_accepted||
+           batch.circle_count>capacity-required||
+           batch.unsupported_sibling_count>SIZE_MAX-unresolved)return 0;
+        required+=batch.circle_count;
+        unresolved+=batch.unsupported_sibling_count;
+    }
+    if(required>SIZE_MAX/sizeof(MusaDwgAc1032CircleSceneItem))return 0;
+    MusaDwgAc1032CircleSceneItem *staged=
+        (MusaDwgAc1032CircleSceneItem*)malloc(
+            required*sizeof(MusaDwgAc1032CircleSceneItem));
+    if(!staged)return 0;
+    size_t at=0u;
+    for(size_t i=0u;i<insert_count;i++){
+        MusaDwgAc1032InsertBlockCircleBoundsBatch batch={0};
+        if(!musa_dwg_ac1032_scene_index_source_block_circle_batch(
+               index,insert_handles[i],&batch)||
+           !batch.original_circle_sources_verified||
+           batch.final_visibility_color_and_paint_accepted||
+           batch.circle_count>required-at){
+            free(staged);
+            return 0;
+        }
+        for(uint32_t k=0u;k<batch.circle_count;k++){
+            MusaDwgAc1032CircleSceneItem *dst=&staged[at++];
+            dst->insert_handle=batch.insert_handle;
+            dst->block_header_handle=batch.block_header_handle;
+            dst->circle_handle=batch.circle_handles[k];
+            dst->layer_handle=batch.layer_handles[k];
+            for(unsigned q=0u;q<4u;q++)
+                dst->bounds[q]=batch.bounds[k][q];
+        }
+    }
+    if(at!=required){free(staged);return 0;}
+    memcpy(items,staged,required*sizeof(*items));
+    free(staged);
+    *out_count=required;
+    *out_unsupported_siblings=unresolved;
     return 1;
 }
 /* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
