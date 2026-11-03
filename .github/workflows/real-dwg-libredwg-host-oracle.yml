@@ -1,0 +1,105 @@
+name: MusaCAD DWG LibreDWG observable host oracle (isolated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Pilot Karagumruk DWG or all public corpus DWGs'
+        required: true
+        default: pilot
+        type: choice
+        options:
+          - pilot
+          - all
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tests/real_dwg_reference_compare.py'
+      - 'tests/test_real_dwg_reference_compare.py'
+      - '.github/workflows/real-dwg-libredwg-host-oracle.yml'
+      - 'docs/DWG_LIBREDWG_HOST_ORACLE.md'
+      - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/real_dwg_native_stage_matrix.py'
+      - 'core/native/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musacad-observable-oracle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  read-only-oracle:
+    name: LibreDWG only as separate host CLI; no runtime link
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout own first-party engine and public DWG corpus
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Unit-test independent count extractor before processing DWGs
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_real_dwg_reference_compare.py' -v
+
+      - name: Checkout pinned upstream LibreDWG for CI host tool ONLY
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: reference-tools/libredwg
+          persist-credentials: false
+
+      - name: Build separate reference dwgread executable (not a MusaCAD dependency)
+        run: |
+          set -euo pipefail
+          cmake -S reference-tools/libredwg -B "$RUNNER_TEMP/reference-build" \
+            -DCMAKE_BUILD_TYPE=Release -DDISABLE_WERROR=ON -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/reference-build" --target dwgread --parallel 2
+          "$RUNNER_TEMP/reference-build/dwgread" --version
+          test -x "$RUNNER_TEMP/reference-build/dwgread"
+
+      - name: Hydrate real drawings without altering originals
+        run: |
+          set -euo pipefail
+          git lfs pull
+          git lfs ls-files
+
+      - name: Compile existing native first-party core and read-stage probe
+        run: |
+          set -euo pipefail
+          cmake -S core/native -B "$RUNNER_TEMP/native-build" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build "$RUNNER_TEMP/native-build" --parallel 2
+          cc -std=c11 -Wall -Wextra -Werror -Icore/native/include \
+            tests/real_dwg_native_stage_probe.c \
+            "$RUNNER_TEMP/native-build/libmusacad_core.a" -lm \
+            -o "$RUNNER_TEMP/musacad-stage-probe"
+
+      - name: Read SAME public DWG with both executables and report honest evidence
+        env:
+          TARGET_SCOPE: ${{ inputs.scope || 'pilot' }}
+        run: |
+          set -euo pipefail
+          arguments=()
+          if [ "$TARGET_SCOPE" = all ]; then arguments+=(--all); fi
+          python3 tests/real_dwg_reference_compare.py \
+            --repository . \
+            --dwgread "$RUNNER_TEMP/reference-build/dwgread" \
+            --probe "$RUNNER_TEMP/musacad-stage-probe" \
+            --timeout-seconds 90 \
+            --report "$RUNNER_TEMP/dwg-observable-oracle.json" \
+            "${arguments[@]}"
+
+      - name: Upload counts, source digests and stage verdicts ONLY
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: musacad-dwg-observable-oracle-not-entity-parity
+          path: ${{ runner.temp }}/dwg-observable-oracle.json
+          if-no-files-found: ignore
+          retention-days: 14
