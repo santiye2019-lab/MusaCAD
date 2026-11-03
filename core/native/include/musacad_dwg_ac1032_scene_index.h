@@ -1244,6 +1244,116 @@ static inline int musa_dwg_ac1032_scene_index_build_circle_scene_packet(
     *out_unsupported_siblings=unresolved;
     return 1;
 }
+/* Combine bounded, independently authenticated original R2018 LINE and
+ * CIRCLE source evidence under explicitly supplied INSERT handle lists.
+ * A LINE stores original WCS endpoints; a CIRCLE stores only conservative
+ * WCS min/max bounds (NOT a paintable circle or a viewport admission).
+ * Preserve the H5/OT51 layer source, with unresolved partial-BLOCK
+ * siblings counted rather than silently omitted. No final paint,
+ * model-space discovery, color, visibility, nested INSERT or writer claim.
+ * All caller outputs and counts stay unchanged on any failure. */
+#define MUSACAD_AC1032_MIXED_SOURCE_INSERT_LIMIT 128u
+#define MUSACAD_AC1032_MIXED_SOURCE_ITEM_LIMIT \
+    (MUSACAD_AC1032_MIXED_SOURCE_INSERT_LIMIT*MUSACAD_AC1032_OT49_CHILD_LIMIT)
+typedef struct MusaDwgAc1032MixedSourceItem {
+    uint64_t insert_handle,block_header_handle,entity_handle,layer_handle;
+    uint16_t entity_type; /* authentic OT19 LINE or OT18 CIRCLE */
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+    double values[4]; /* LINE x1,y1,x2,y2; CIRCLE minx,miny,maxx,maxy */
+} MusaDwgAc1032MixedSourceItem;
+static inline int musa_dwg_ac1032_scene_index_build_mixed_source_packet(
+    const MusaDwgAc1032SceneIndex *index,
+    const uint64_t *line_inserts,size_t line_insert_count,
+    const uint64_t *circle_inserts,size_t circle_insert_count,
+    MusaDwgAc1032MixedSourceItem *items,size_t capacity,
+    size_t *out_count,size_t *out_line_count,size_t *out_circle_count,
+    size_t *out_unresolved_siblings){
+    if(!index||!line_inserts||!circle_inserts||
+       !line_insert_count||!circle_insert_count||!items||!capacity||
+       !out_count||!out_line_count||!out_circle_count||
+       !out_unresolved_siblings||
+       line_insert_count>MUSACAD_AC1032_MIXED_SOURCE_INSERT_LIMIT||
+       circle_insert_count>MUSACAD_AC1032_MIXED_SOURCE_INSERT_LIMIT||
+       capacity>MUSACAD_AC1032_MIXED_SOURCE_ITEM_LIMIT)return 0;
+    size_t line_cap=line_insert_count*MUSACAD_AC1032_OT49_CHILD_LIMIT;
+    size_t circle_cap=circle_insert_count*MUSACAD_AC1032_OT49_CHILD_LIMIT;
+    if(line_cap>capacity)line_cap=capacity;
+    if(circle_cap>capacity)circle_cap=capacity;
+    MusaDwgAc1032LineSceneItem *lines=(MusaDwgAc1032LineSceneItem*)
+        malloc(line_cap*sizeof(MusaDwgAc1032LineSceneItem));
+    if(!lines)return 0;
+    MusaDwgAc1032CircleSceneItem *circles=(MusaDwgAc1032CircleSceneItem*)
+        malloc(circle_cap*sizeof(MusaDwgAc1032CircleSceneItem));
+    if(!circles){free(lines);return 0;}
+    size_t nline=0u,ncircle=0u,unresolved=0u;
+    const int valid=
+        musa_dwg_ac1032_scene_index_build_line_scene_packet(
+            index,line_inserts,line_insert_count,lines,line_cap,&nline)&&
+        musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+            index,circle_inserts,circle_insert_count,circles,circle_cap,
+            &ncircle,&unresolved);
+    if(!valid||!nline||!ncircle||nline>capacity||
+       ncircle>capacity-nline){
+        free(circles);free(lines);return 0;
+    }
+    const size_t total=nline+ncircle;
+    MusaDwgAc1032MixedSourceItem *staged=
+        (MusaDwgAc1032MixedSourceItem*)
+        malloc(total*sizeof(MusaDwgAc1032MixedSourceItem));
+    if(!staged){free(circles);free(lines);return 0;}
+    int ok=1;
+    for(size_t i=0u;ok&&i<nline;i++){
+        const MusaDwgAc1032LineSceneItem *src=&lines[i];
+        MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+        if(!src->insert_handle||!src->block_header_handle||
+           !src->line_handle||
+           !musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+               index,src->line_handle,&edge)||
+           !musa_dwg_ac1032_block_child_owner_edge_matches(
+               &edge,src->line_handle,src->block_header_handle,19u)){
+            ok=0;break;
+        }
+        for(unsigned j=0u;j<4u;j++)
+            if(!isfinite(src->xy[j]))ok=0;
+        if(!ok)break;
+        MusaDwgAc1032MixedSourceItem *dst=&staged[i];
+        dst->insert_handle=src->insert_handle;
+        dst->block_header_handle=src->block_header_handle;
+        dst->entity_handle=src->line_handle;
+        dst->layer_handle=edge.layer_handle;
+        dst->entity_type=19u;
+        dst->final_visibility_color_and_paint_accepted=0u;
+        for(unsigned j=0u;j<4u;j++)dst->values[j]=src->xy[j];
+    }
+    for(size_t i=0u;ok&&i<ncircle;i++){
+        const MusaDwgAc1032CircleSceneItem *src=&circles[i];
+        if(!src->insert_handle||!src->block_header_handle||
+           !src->circle_handle||!src->layer_handle||
+           !isfinite(src->bounds[0])||!isfinite(src->bounds[1])||
+           !isfinite(src->bounds[2])||!isfinite(src->bounds[3])||
+           src->bounds[0]>src->bounds[2]||
+           src->bounds[1]>src->bounds[3]){
+            ok=0;break;
+        }
+        MusaDwgAc1032MixedSourceItem *dst=&staged[nline+i];
+        dst->insert_handle=src->insert_handle;
+        dst->block_header_handle=src->block_header_handle;
+        dst->entity_handle=src->circle_handle;
+        dst->layer_handle=src->layer_handle;
+        dst->entity_type=18u;
+        dst->final_visibility_color_and_paint_accepted=0u;
+        for(unsigned j=0u;j<4u;j++)dst->values[j]=src->bounds[j];
+    }
+    if(ok){
+        memcpy(items,staged,total*sizeof(*items));
+        *out_count=total;
+        *out_line_count=nline;
+        *out_circle_count=ncircle;
+        *out_unresolved_siblings=unresolved;
+    }
+    free(staged);free(circles);free(lines);
+    return ok;
+}
 /* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
 typedef struct MusaDwgAc1032LineHTailProbe {
     uint64_t indexed_handle,first_target,second_target;
