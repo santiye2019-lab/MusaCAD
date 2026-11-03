@@ -303,12 +303,12 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         invalid_ms, truncated, other, first_half = (
             hint[k] for k in special_fields)
         if measured:
-            if bounds_ok + bounds_failed != core_ok or
+            if (bounds_ok + bounds_failed != core_ok or
                     bounds_mismatch > bounds_ok or
-                    bounds_failed or bounds_mismatch:
+                    bounds_failed or bounds_mismatch):
                 raise ValueError("firstparty_ac1024_payload_bounds_mismatch")
-            if invalid_ms + truncated + other != mc_unreadable or
-                    first_half > mc_unreadable:
+            if (invalid_ms + truncated + other != mc_unreadable or
+                    first_half > mc_unreadable):
                 raise ValueError("incomplete_ac1024_special_record_triage")
         elif any(hint[k] for k in bounds_fields + special_fields):
             raise ValueError("unmeasured_ac1024_bounds_or_special_claim")
