@@ -88,3 +88,66 @@ int musa_dwg1032_instance_attributes(
     memcpy(visible_out,visibility_scratch,count);
     return 1;
 }
+
+
+/* A page must not publish into a future source page. The full-range alias
+ * check precedes slicing, then the existing two-phase composer validates
+ * the selected page and commits its color/mask outputs atomically. */
+int musa_dwg1032_instance_attributes_page(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    size_t total_count, size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    MusaDwg1032ResolvedColor *colors_page_out, uint8_t *visible_page_out,
+    MusaDwg1032ResolvedColor *colors_scratch, size_t color_scratch_capacity,
+    uint8_t *visibility_scratch, size_t visibility_scratch_capacity) {
+    if (!definition_colors || !source_colors || !source_layer_handles ||
+        !definition_owner_visible || !colors_page_out || !visible_page_out ||
+        !colors_scratch || !visibility_scratch || !page_count ||
+        first>total_count || page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_colors) ||
+        total_count>PTRDIFF_MAX/sizeof(*source_colors) ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_owner_visible) ||
+        page_count>PTRDIFF_MAX/sizeof(*colors_page_out) ||
+        color_scratch_capacity>PTRDIFF_MAX/sizeof(*colors_scratch) ||
+        visibility_scratch_capacity>PTRDIFF_MAX)
+        return 0;
+    const void *sources[]={
+        definition_colors,source_colors,source_layer_handles,
+        definition_owner_visible
+    };
+    const size_t source_bytes[]={
+        total_count*sizeof(*definition_colors),
+        total_count*sizeof(*source_colors),
+        total_count*sizeof(*source_layer_handles),
+        total_count*sizeof(*definition_owner_visible)
+    };
+    const void *destinations[]={
+        colors_page_out,visible_page_out,colors_scratch,visibility_scratch
+    };
+    const size_t destination_bytes[]={
+        page_count*sizeof(*colors_page_out),page_count,
+        color_scratch_capacity*sizeof(*colors_scratch),
+        visibility_scratch_capacity
+    };
+    for (size_t i=0u;i<4u;++i)
+        for (size_t j=0u;j<4u;++j)
+            if (overlaps(destinations[i],destination_bytes[i],
+                         sources[j],source_bytes[j]))
+                return 0;
+    return musa_dwg1032_instance_attributes(
+        definition_colors+first,source_colors+first,
+        source_layer_handles+first,definition_owner_visible+first,
+        page_count,layer_zero_handle,insert_visible,
+        insert_color,insert_layer_color,layers,layer_count,
+        overrides,override_count,colors_page_out,visible_page_out,
+        colors_scratch,color_scratch_capacity,
+        visibility_scratch,visibility_scratch_capacity);
+}
