@@ -1354,6 +1354,71 @@ static inline int musa_dwg_ac1032_scene_index_build_mixed_source_packet(
     free(staged);free(circles);free(lines);
     return ok;
 }
+/* Strict original R2018 layer metadata for ONE already extracted LINE /
+ * CIRCLE source. This is not a style resolver: raw OT51 numeric flags and
+ * UTF-8 TU layer name are evidence, NOT frozen/off/viewport semantics,
+ * BYLAYER/BYBLOCK/truecolor, final visibility or authorization to paint.
+ * A supplied packet row is independently re-joined to original H4/H12
+ * BLOCK owner, H5 layer and the primitive WCS evidence, including geometry.
+ * Every failure leaves caller output unchanged. */
+typedef struct MusaDwgAc1032MixedSourceLayerEvidence {
+    uint64_t insert_handle,block_header_handle,entity_handle,layer_handle;
+    uint16_t entity_type;
+    MusaDwgAc1032LayerName layer_name;
+    MusaDwgAc1032LayerFlagsEvidence raw_layer_flags;
+    uint8_t original_owner_layer_and_geometry_verified;
+    uint8_t final_visibility_color_and_paint_accepted; /* ALWAYS ZERO */
+} MusaDwgAc1032MixedSourceLayerEvidence;
+static inline int musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+    const MusaDwgAc1032SceneIndex *index,
+    const MusaDwgAc1032MixedSourceItem *source,
+    MusaDwgAc1032MixedSourceLayerEvidence *out){
+    if(!index||!source||!out||!source->insert_handle||
+       !source->block_header_handle||!source->entity_handle||
+       !source->layer_handle||
+       (source->entity_type!=18u&&source->entity_type!=19u)||
+       source->final_visibility_color_and_paint_accepted)return 0;
+    MusaDwgAc1032InsertBlockChildLayerSource layer={0};
+    if(!musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
+           index,source->insert_handle,source->entity_handle,&layer)||
+       !layer.original_owner_layer_and_name_verified||
+       layer.final_visibility_color_and_paint_accepted||
+       layer.insert_handle!=source->insert_handle||
+       layer.block_header_handle!=source->block_header_handle||
+       layer.child_handle!=source->entity_handle||
+       layer.layer_handle!=source->layer_handle||
+       layer.raw_child_type!=source->entity_type||
+       !layer.layer_name.original_record_crc_verified||
+       !layer.raw_layer_flags.source_crc_verified||
+       layer.layer_name.indexed_handle!=source->layer_handle||
+       layer.raw_layer_flags.indexed_handle!=source->layer_handle)
+        return 0;
+    double original_values[4]={0};
+    if(source->entity_type==19u){
+        if(!musa_dwg_ac1032_scene_index_verified_child_line_xy(
+               index,source->insert_handle,source->entity_handle,
+               original_values))return 0;
+    }else{
+        if(!musa_dwg_ac1032_scene_index_source_child_circle_bounds(
+               index,source->insert_handle,source->entity_handle,
+               original_values))return 0;
+    }
+    for(unsigned k=0u;k<4u;k++)
+        if(!isfinite(source->values[k])||
+           !isfinite(original_values[k])||
+           source->values[k]!=original_values[k])return 0;
+    MusaDwgAc1032MixedSourceLayerEvidence local={0};
+    local.insert_handle=source->insert_handle;
+    local.block_header_handle=source->block_header_handle;
+    local.entity_handle=source->entity_handle;
+    local.layer_handle=source->layer_handle;
+    local.entity_type=source->entity_type;
+    local.layer_name=layer.layer_name;
+    local.raw_layer_flags=layer.raw_layer_flags;
+    local.original_owner_layer_and_geometry_verified=1u;
+    *out=local;
+    return 1;
+}
 /* CRC-authenticated OT19 HANDLE-tail forensic observation only. */
 typedef struct MusaDwgAc1032LineHTailProbe {
     uint64_t indexed_handle,first_target,second_target;
