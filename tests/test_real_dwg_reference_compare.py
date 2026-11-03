@@ -85,12 +85,12 @@ class ObservableReferenceTest(unittest.TestCase):
             source.write_bytes(b"AC1024")
             reader = root / "fake-reader"
             reader.write_text(
-                "#!/usr/bin/env python3\\n"
-                "import sys\\n"
-                "if sys.argv[2] == 'JSON':\\n"
-                "    print('{ malformed reference')\\n"
-                "else:\\n"
-                "    print('{\\\"OBJECTS\\\":[{\\\"entity\\\":\\\"LINE\\\"}]}')\\n",
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "if sys.argv[2] == 'JSON':\n"
+                "    print('{ malformed reference')\n"
+                "else:\n"
+                "    print('{\"OBJECTS\":[{\"entity\":\"LINE\"}]}')\n",
                 encoding="utf-8",
             )
             reader.chmod(0o755)
@@ -105,7 +105,7 @@ class ObservableReferenceTest(unittest.TestCase):
             source = root / "fake.dwg"
             source.write_bytes(b"AC1024")
             reader = root / "fake-reader"
-            reader.write_text("#!/usr/bin/env python3\\nprint('{ malformed')\\n",
+            reader.write_text("#!/usr/bin/env python3\nprint('{ malformed')\n",
                               encoding="utf-8")
             reader.chmod(0o755)
             failure = reference_read(reader, source, 10)
