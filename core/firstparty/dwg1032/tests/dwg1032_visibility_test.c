@@ -450,7 +450,8 @@ static void insert_instance_single_record_invalid_flags(void) {
     assert(output==1u);
 }
 
-int main(void) {\n    insert_instance_single_record_invalid_flags();
+int main(void) {
+    insert_instance_single_record_invalid_flags();
     insert_instance_single_record_pages();
     insert_instance_paged_visibility();
     reject_nonrepresentable_owner_spans();
