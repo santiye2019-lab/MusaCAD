@@ -37,6 +37,25 @@ tek bir çizimdeki 2.000.000 nesne kayıt sınırıdır. CI testi özellikle
 128 MiB üzeri JSON ve iç içe sahte kayıtları doğrular. Bu değişiklik
 LibreDWG'yi sadece izole host testine ekler; MusaCAD çekirdeğine eklemez.
 
+## LibreDWG'nin geçersiz JSON çıktısına karşı doğrudan tür sayımı
+
+Karagümrük AC1024 dosyasında normal JSON (150,8 MB) ve minJSON
+(101,5 MB) geçersiz belirteç içerdiğinden, yalnızca JSON ayrıştırıcısı
+ile kesin referans envanteri çıkartılamıyordu. GitHub Actions artık
+bunları sırayla dener ve ikisi de geçersizse `tests/libredwg_host_type_inventory.c`
+adlı **yalnızca CI host'unda derlenen** yardımcı programı kullanır.
+Bu program pinned LibreDWG ile aynı DWG'yi okur, yalnızca çözümlenmiş
+`Dwg_Object` kayıtlarının türlerini yayımlar; koordinat/handle/katman
+adı/metin içeriğini asla çıktıya almaz. Ham çizim veya ham LibreDWG
+JSON verisi artifact olarak yüklenmez. Çözücü uyarı bitleri
+`reference_decoder_warning_mask` alanında saklanır.
+Her üç yöntem başarısızsa iş akışı kırmızı kalır; başarısız bir
+referans okuması başarı diye raporlanmaz.
+
+Bu doğrudan host yardımcı aracı GPL LibreDWG kütüphanesine **sadece
+geçici GitHub Actions bilgisayarında** bağlanır. MusaCAD'in özgün
+çekirdeğine, Android APK'sına veya dağıtım çıktısına eklenmez.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
