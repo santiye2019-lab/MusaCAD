@@ -109,6 +109,14 @@ def ac1024_probe_record():
             "mc_invalid_ms_extended_zero": 0,
             "mc_invalid_ms_extended_reserved": 0,
             "mc_invalid_ms_unclassified": 0,
+            "core_stream_bounds_verified": 0,
+            "core_stream_bounds_rejected": 0,
+            "core_stream_bounds_mismatch": 0,
+            "core_empty_handle_streams": 0,
+            "sampled_first_h_attempts": 0,
+            "sampled_first_h_self_matches": 0,
+            "sampled_first_h_other": 0,
+            "sampled_first_h_unreadable": 0,
         }
     }
 
@@ -281,6 +289,12 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_ot_raw_19": 25,
             "core_frame_verified": 100,
             "core_payload_bounds_verified": 100,
+            "core_stream_bounds_verified": 99,
+            "core_stream_bounds_rejected": 1,
+            "sampled_first_h_attempts": 100,
+            "sampled_first_h_self_matches": 75,
+            "sampled_first_h_other": 2,
+            "sampled_first_h_unreadable": 23,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
             "mc_invalid_ms_zero": 2,
@@ -321,6 +335,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("mc_unreadable_first_half", 3),
             ("mc_invalid_ms_zero", 1),
             ("mc_invalid_ms_unclassified", 1),
+            ("core_stream_bounds_verified", 99),
+            ("core_stream_bounds_mismatch", 1),
+            ("sampled_first_h_attempts", 2049),
+            ("sampled_first_h_self_matches", 120),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -369,6 +387,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_ot_raw_77": 13987,
             "core_frame_verified": 145277,
             "core_payload_bounds_verified": 145277,
+            "core_stream_bounds_verified": 145277,
+            "sampled_first_h_attempts": 2048,
+            "sampled_first_h_self_matches": 2000,
+            "sampled_first_h_other": 5,
+            "sampled_first_h_unreadable": 43,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
             "mc_invalid_ms_zero": 2,
