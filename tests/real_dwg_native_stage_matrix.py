@@ -76,6 +76,17 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if any(hint[keys[i]] and not hint[keys[i - 1]]
                for i in range(1, len(keys))):
             raise ValueError("inconsistent_ac1024_hint")
+        object_pages = hint.get("object_section_page_count")
+        handle_pages = hint.get("handle_section_page_count")
+        if (type(object_pages) is not int or type(handle_pages) is not int
+                or object_pages < 0 or handle_pages < 0
+                or object_pages > 65536 or handle_pages > 65536):
+            raise ValueError("invalid_ac1024_section_page_counts")
+        if hint["handles_section_pages"]:
+            if not object_pages or not handle_pages:
+                raise ValueError("missing_ac1024_section_page_counts")
+        elif object_pages or handle_pages:
+            raise ValueError("unverified_ac1024_section_page_counts")
         handles = hint.get("candidate_handle_count")
         if (type(handles) is not int or handles < 0 or handles > 1_000_000
                 or bool(handles) != hint["candidate_handle_index"]):
