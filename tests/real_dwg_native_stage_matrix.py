@@ -28,6 +28,7 @@ KNOWN_STAGES = {
     "ac1018_objects_section_pages",
     "ac1018_handles_section_pages",
     "ac1018_crc_backed_handle_index",
+    "ac1024_family_hypothesis_only",
     "ac1032_page_map_header",
     "ac1032_physical_page_locations",
     "ac1032_crc_backed_handle_index",
@@ -56,6 +57,31 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
     if result["result"] == "accepted":
         if not result["native_stage"].startswith("ac") or not result["evidence_count"]:
             raise ValueError("unsupported_native_acceptance")
+    hint = result.get("ac1024_compatibility_hypothesis")
+    if result.get("signature") == "AC1024":
+        if (
+            result["result"] != "not_covered_by_this_native_probe"
+            or result["native_stage"] != "ac1024_family_hypothesis_only"
+            or result["evidence_count"] != 0
+            or not isinstance(hint, dict)
+            or hint.get("patched_signature_in_memory_only") is not True
+            or hint.get("validated_original_ac1024_decoder") is not False
+        ):
+            raise ValueError("unsupported_ac1024_claim")
+        keys = ("page_map_header", "physical_page_map",
+                "objects_section_pages", "handles_section_pages",
+                "candidate_handle_index")
+        if any(type(hint.get(key)) is not bool for key in keys):
+            raise ValueError("invalid_ac1024_hint")
+        if any(hint[keys[i]] and not hint[keys[i - 1]]
+               for i in range(1, len(keys))):
+            raise ValueError("inconsistent_ac1024_hint")
+        handles = hint.get("candidate_handle_count")
+        if (type(handles) is not int or handles < 0 or handles > 1_000_000
+                or bool(handles) != hint["candidate_handle_index"]):
+            raise ValueError("invalid_ac1024_candidate_count")
+    elif hint is not None:
+        raise ValueError("ac1024_hint_on_wrong_version")
     return result
 
 
