@@ -242,3 +242,36 @@ int musa_dwg1032_owner_graph_apply_insert_context(
              definition_layer_visible[i]));
     return 1;
 }
+
+/* Bounded INSERT visibility for large definitions. Protect all original
+ * source pages, including future pages, before borrowing a subarray. The
+ * existing resolver performs strict per-page preflight before publishing. */
+int musa_dwg1032_owner_graph_apply_insert_context_page(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    const uint8_t *definition_layer_visible,
+    size_t total_count, size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *page_effective_visible) {
+    if (!source_layer_handles || !definition_owner_visible ||
+        !definition_layer_visible || !page_effective_visible ||
+        !page_count || first>total_count ||
+        page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_owner_visible) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_layer_visible) ||
+        page_count>PTRDIFF_MAX/sizeof(*page_effective_visible))
+        return 0;
+    const size_t bytes=page_count*sizeof(*page_effective_visible);
+    if (overlaps(page_effective_visible,bytes,source_layer_handles,
+                 total_count*sizeof(*source_layer_handles)) ||
+        overlaps(page_effective_visible,bytes,definition_owner_visible,
+                 total_count*sizeof(*definition_owner_visible)) ||
+        overlaps(page_effective_visible,bytes,definition_layer_visible,
+                 total_count*sizeof(*definition_layer_visible)))
+        return 0;
+    return musa_dwg1032_owner_graph_apply_insert_context(
+        source_layer_handles+first,definition_owner_visible+first,
+        definition_layer_visible+first,page_count,layer_zero_handle,
+        insert_visible,page_effective_visible);
+}

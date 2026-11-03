@@ -87,6 +87,23 @@ int musa_dwg1032_owner_graph_apply_insert_context(
     const uint8_t *definition_layer_visible,
     size_t count, uint64_t layer_zero_handle, uint8_t insert_visible,
     uint8_t *effective_visible);
+
+/* Resolve one bounded page of an authenticated block definition in the
+ * current INSERT's visibility context. Every source array spans total_count
+ * records and must remain immutable; even future source pages are protected
+ * against aliasing with the page output. Only records [first, first+
+ * page_count) are evaluated: the caller must authenticate the entire source
+ * definition separately before paging. No page may be treated as a complete
+ * DWG validation or as a substitute for owner-chain verification.
+ * A failure leaves this page's output unchanged. No heap, O(page_count).
+ * Page count must be nonzero; range and C pointer-span limits are checked. */
+int musa_dwg1032_owner_graph_apply_insert_context_page(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    const uint8_t *definition_layer_visible,
+    size_t total_count, size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *page_effective_visible);
 #ifdef __cplusplus
 }
 #endif
