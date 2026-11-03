@@ -312,6 +312,17 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("incomplete_ac1024_special_record_triage")
         elif any(hint[k] for k in bounds_fields + special_fields):
             raise ValueError("unmeasured_ac1024_bounds_or_special_claim")
+        ms_detail_fields = (
+            "mc_invalid_ms_zero", "mc_invalid_ms_one",
+            "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
+            "mc_invalid_ms_extended_reserved",
+            "mc_invalid_ms_unclassified",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in ms_detail_fields):
+            raise ValueError("invalid_ac1024_ms_reason_count")
+        if sum(hint[k] for k in ms_detail_fields) != invalid_ms:
+            raise ValueError("incomplete_ac1024_ms_reason_triage")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
