@@ -231,6 +231,29 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             raise ValueError("invalid_ac1024_short_gap_histogram")
         if sum(hint[k] for k in gap_fields) != short:
             raise ValueError("incomplete_ac1024_short_gap_histogram")
+        mc_fields = (
+            "mc_frame_crc_pass", "mc_frame_crc_mismatch",
+            "mc_frame_unreadable", "mc_frame_next_exact",
+            "mc_byte_len_matches_short_gap", "mc_bytes_1",
+            "mc_bytes_2", "mc_bytes_3", "mc_bytes_over3",
+        )
+        mc_complete = hint.get("mc_frame_probe_completed")
+        if (type(mc_complete) is not bool or
+                any(type(hint.get(k)) is not int or hint[k] < 0
+                    for k in mc_fields)):
+            raise ValueError("invalid_ac1024_mc_frame_contract")
+        (mc_ok, mc_bad, mc_unreadable, mc_adjacent, mc_short_match,
+         mc1, mc2, mc3, mc_more) = (hint[k] for k in mc_fields)
+        if measured:
+            if (not mc_complete or
+                    mc_ok + mc_bad + mc_unreadable != handles or
+                    mc1 + mc2 + mc3 + mc_more != mc_ok + mc_bad or
+                    mc_adjacent > pairs or
+                    mc_short_match > short or
+                    mc_short_match > mc_adjacent):
+                raise ValueError("incomplete_ac1024_mc_frame_evidence")
+        elif mc_complete or any(hint[k] for k in mc_fields):
+            raise ValueError("unmeasured_ac1024_mc_frame_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
