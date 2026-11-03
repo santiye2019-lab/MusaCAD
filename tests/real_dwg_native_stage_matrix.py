@@ -271,6 +271,22 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("inconsistent_ac1024_ot_counts")
         elif any(hint[k] for k in ot_fields):
             raise ValueError("unmeasured_ac1024_ot_claim")
+        core_fields = (
+            "core_frame_verified", "core_frame_probe_failed",
+            "core_raw_ot_or_span_mismatch",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in core_fields):
+            raise ValueError("invalid_ac1024_core_probe_contract")
+        core_ok, core_failed, core_mismatch = (hint[k] for k in core_fields)
+        if measured:
+            if core_ok + core_failed != mc_ok or
+                    core_mismatch > core_ok:
+                raise ValueError("inconsistent_ac1024_core_probe_counts")
+            if core_failed or core_mismatch:
+                raise ValueError("firstparty_ac1024_core_disagrees_with_diagnostic")
+        elif any(hint[k] for k in core_fields):
+            raise ValueError("unmeasured_ac1024_core_probe_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
