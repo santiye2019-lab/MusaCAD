@@ -293,6 +293,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_first_h_code0_mismatch;
     size_t sampled_first_h_absolute_other_code;
     size_t sampled_first_h_relative_code;
+    size_t sampled_first_h_reverse_bytes_matches;
+    size_t sampled_first_h_plus_one_matches;
+    size_t sampled_first_h_minus_one_matches;
+    size_t sampled_first_h_one_byte_values;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -723,8 +727,24 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         ++hint.sampled_first_h_self_matches;
                     } else {
                         ++hint.sampled_first_h_other;
-                        if (first.code == 0u)
+                        if (first.code == 0u) {
                             ++hint.sampled_first_h_code0_mismatch;
+                            if (first.count == 1u)
+                                ++hint.sampled_first_h_one_byte_values;
+                            uint64_t reversed = 0u, raw = first.encoded_value;
+                            for (size_t ri = 0u; ri < first.count; ri++) {
+                                reversed = (reversed << 8u) | (raw & 0xffu);
+                                raw >>= 8u;
+                            }
+                            if (reversed == legacy[k].handle)
+                                ++hint.sampled_first_h_reverse_bytes_matches;
+                            if (legacy[k].handle < UINT64_MAX &&
+                                first.target == legacy[k].handle + 1u)
+                                ++hint.sampled_first_h_plus_one_matches;
+                            if (legacy[k].handle > 1u &&
+                                first.target == legacy[k].handle - 1u)
+                                ++hint.sampled_first_h_minus_one_matches;
+                        }
                         else if (first.code >= 2u && first.code <= 5u)
                             ++hint.sampled_first_h_absolute_other_code;
                         else
@@ -878,7 +898,11 @@ static void report(const char *signature, const char *result,
                "\"sampled_first_h_unreadable\":%zu,"
                "\"sampled_first_h_code0_mismatch\":%zu,"
                "\"sampled_first_h_absolute_other_code\":%zu,"
-               "\"sampled_first_h_relative_code\":%zu}",
+               "\"sampled_first_h_relative_code\":%zu,"
+               "\"sampled_first_h_reverse_bytes_matches\":%zu,"
+               "\"sampled_first_h_plus_one_matches\":%zu,"
+               "\"sampled_first_h_minus_one_matches\":%zu,"
+               "\"sampled_first_h_one_byte_values\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -978,7 +1002,11 @@ static void report(const char *signature, const char *result,
                hint->sampled_first_h_unreadable,
                hint->sampled_first_h_code0_mismatch,
                hint->sampled_first_h_absolute_other_code,
-               hint->sampled_first_h_relative_code);
+               hint->sampled_first_h_relative_code,
+               hint->sampled_first_h_reverse_bytes_matches,
+               hint->sampled_first_h_plus_one_matches,
+               hint->sampled_first_h_minus_one_matches,
+               hint->sampled_first_h_one_byte_values);
     }
     puts("}");
 }
