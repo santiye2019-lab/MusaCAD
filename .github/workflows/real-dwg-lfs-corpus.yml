@@ -1,0 +1,61 @@
+name: MusaCAD real DWG LFS read-only corpus gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Projeler/**'
+      - '.gitattributes'
+      - 'tests/real_dwg_lfs_corpus_audit.py'
+      - 'tests/test_real_dwg_lfs_corpus_audit.py'
+      - '.github/workflows/real-dwg-lfs-corpus.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Projeler/**'
+      - '.gitattributes'
+      - 'tests/real_dwg_lfs_corpus_audit.py'
+      - 'tests/test_real_dwg_lfs_corpus_audit.py'
+      - '.github/workflows/real-dwg-lfs-corpus.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  real-dwg-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: Hydrate all tracked DWG blobs from Git LFS
+        run: |
+          set -euo pipefail
+          git lfs version
+          git lfs pull
+      - name: Compile first-party portable C DWG signature classifier
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
+            -Icore/native/include \
+            core/native/src/musacad_dwg_signature.c \
+            -o /tmp/libmusacad_dwg_signature.so
+      - name: Run negative corpus-audit regression tests
+        run: python3 -m unittest discover -s tests -p 'test_real_dwg_lfs_corpus_audit.py' -v
+      - name: Audit every real DWG without modification or geometry claims
+        run: |
+          python3 tests/real_dwg_lfs_corpus_audit.py \
+            --repository . \
+            --native-sig-library /tmp/libmusacad_dwg_signature.so \
+            --report /tmp/musacad-real-dwg-report.json
+      - name: Upload report (no drawing bytes)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: musacad-real-dwg-lfs-header-integrity
+          path: /tmp/musacad-real-dwg-report.json
+          if-no-files-found: ignore
+          retention-days: 14
