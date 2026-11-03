@@ -349,6 +349,18 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             raise ValueError("invalid_ac1024_first_h_code_counts")
         if sum(hint[k] for k in hcode_fields) != other_h:
             raise ValueError("incomplete_ac1024_first_h_code_breakdown")
+        comparison_fields = (
+            "sampled_first_h_reverse_bytes_matches",
+            "sampled_first_h_plus_one_matches",
+            "sampled_first_h_minus_one_matches",
+            "sampled_first_h_one_byte_values",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in comparison_fields):
+            raise ValueError("invalid_ac1024_handle_hypothesis_counters")
+        if any(hint[k] > hint["sampled_first_h_code0_mismatch"]
+               for k in comparison_fields):
+            raise ValueError("unbounded_ac1024_handle_hypothesis_counters")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
