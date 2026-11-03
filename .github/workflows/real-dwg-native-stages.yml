@@ -1,0 +1,99 @@
+name: MusaCAD real DWG native read-stage diagnostic
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Projeler/**'
+      - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/real_dwg_rejected_map_diagnostic.c'
+      - 'tests/real_dwg_rejected_map_triage.py'
+      - 'tests/test_real_dwg_rejected_map_diagnostic.py'
+      - 'tests/real_dwg_native_stage_matrix.py'
+      - 'tests/test_real_dwg_native_stage_probe.py'
+      - 'tests/real_dwg_lfs_corpus_audit.py'
+      - '.github/workflows/real-dwg-native-stages.yml'
+      - 'core/native/**'
+  push:
+    branches: [main]
+    paths:
+      - 'Projeler/**'
+      - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/real_dwg_rejected_map_diagnostic.c'
+      - 'tests/real_dwg_rejected_map_triage.py'
+      - 'tests/test_real_dwg_rejected_map_diagnostic.py'
+      - 'tests/real_dwg_native_stage_matrix.py'
+      - 'tests/test_real_dwg_native_stage_probe.py'
+      - 'tests/real_dwg_lfs_corpus_audit.py'
+      - '.github/workflows/real-dwg-native-stages.yml'
+      - 'core/native/**'
+
+permissions:
+  contents: read
+
+jobs:
+  native-version-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: Hydrate source LFS data
+        run: |
+          set -euo pipefail
+          git lfs pull
+      - name: Build single first-party portable C11 CAD core
+        run: |
+          set -euo pipefail
+          cmake -S core/native -B /tmp/musacad-real-stage-core \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build /tmp/musacad-real-stage-core --parallel 2
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include tests/real_dwg_native_stage_probe.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-real-stage-probe
+      - name: Reject fake and unsupported container signatures
+        env:
+          MUSACAD_NATIVE_STAGE_PROBE: /tmp/musacad-real-stage-probe
+        run: |
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_native_stage_probe.py' -v
+      - name: Run source-preserving real DWG version-stage matrix
+        run: |
+          python3 tests/real_dwg_native_stage_matrix.py \
+            --repository . --probe /tmp/musacad-real-stage-probe \
+            --timeout-seconds 45 \
+            --report /tmp/musacad-real-native-stages.json
+      - name: Compile read-only rejected map diagnostics
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include tests/real_dwg_rejected_map_diagnostic.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-rejected-map-diagnostic
+      - name: Prevent fake or truncated DWG admission
+        env:
+          MUSACAD_REJECTED_MAP_DIAGNOSTIC: /tmp/musacad-rejected-map-diagnostic
+        run: |
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_rejected_map_diagnostic.py' -v
+      - name: Triage rejected genuine maps without modifying original bytes
+        run: |
+          python3 tests/real_dwg_rejected_map_triage.py \
+            --repository . \
+            --stage-report /tmp/musacad-real-native-stages.json \
+            --diagnostic /tmp/musacad-rejected-map-diagnostic \
+            --report /tmp/musacad-real-rejected-map-triage.json
+      - name: Upload diagnostic only, never original DWG bytes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: musacad-real-dwg-native-stage-diagnostic
+          path: |
+            /tmp/musacad-real-native-stages.json
+            /tmp/musacad-real-rejected-map-triage.json
+          if-no-files-found: ignore
+          retention-days: 14

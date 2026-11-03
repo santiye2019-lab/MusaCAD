@@ -1,0 +1,43 @@
+/* SPDX-License-Identifier: MIT
+ * Independent, conservative 2D viewport candidate collection (2026-10-28).
+ */
+#ifndef MUSA_SCENE2D_CULL_H
+#define MUSA_SCENE2D_CULL_H
+#include "musa_scene2d.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+typedef struct MusaScene2dBox {
+    double min_x, min_y, max_x, max_y;
+} MusaScene2dBox;
+/* The three input arrays have identical order. INSERTs are not drawable;
+ * their local_bounds entries are ignored. Every ENTITY requires a finite,
+ * ordered local AABB. Returns indices of visible entities whose affine-
+ * transformed AABB intersects viewport (including touching edges).
+ * Conservative candidates only: no exact geometry clipping or DWG parsing.
+ * O(count), no allocation. On any failure leaves indices and *written
+ * unchanged. Rejects aliasing between output and input memory.
+ */
+int musa_scene2d_collect_visible(
+    const MusaScene2dNode *nodes, const MusaScene2dResolved *resolved,
+    const MusaScene2dBox *local_bounds, size_t count, MusaScene2dBox viewport,
+    size_t *indices, size_t capacity, size_t *written);
+/* Caller-scratch variant for large predecoded scenes. Evaluate each
+ * candidate exactly once, storing selected indices in caller-owned scratch,
+ * then publish the completed list only after every node validates.
+ * scratch_capacity >= min(count, capacity): only accepted hits need
+ * scratch storage, so a small viewport over a large sheet can use a small
+ * buffer. Scratch, output, inputs and written must be pairwise disjoint
+ * where writes can occur. Scratch may be modified on
+ * failure, but indices and *written remain unchanged. O(count) time,
+ * O(count) caller-owned scratch; no allocation or DWG byte decoding.
+ * A zero-node call succeeds with written=0 and no arrays required. */
+int musa_scene2d_collect_visible_scratch(
+    const MusaScene2dNode *nodes, const MusaScene2dResolved *resolved,
+    const MusaScene2dBox *local_bounds, size_t count, MusaScene2dBox viewport,
+    size_t *indices, size_t capacity, size_t *written,
+    size_t *scratch, size_t scratch_capacity);
+#ifdef __cplusplus
+}
+#endif
+#endif

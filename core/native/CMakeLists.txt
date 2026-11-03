@@ -755,3 +755,14 @@ if(PROJECT_IS_TOP_LEVEL)
         add_test(NAME musacad_core_3d_screen_scene_click_and_rect COMMAND musacad_core_screen_scene_test)
     endif()
 endif()
+
+# AC1032 source-authenticated physical page entries can be non-monotone in
+# file order. Reject duplicate page IDs and invalid CRC before publication.
+if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING)
+    add_executable(musacad_core_ac1032_page_id_permutation_test
+        tests/core_dwg_ac1032_page_id_permutation_test.c)
+    target_link_libraries(musacad_core_ac1032_page_id_permutation_test
+        PRIVATE musacad_core)
+    add_test(NAME musacad_core_ac1032_page_id_unique_sorted_index
+        COMMAND musacad_core_ac1032_page_id_permutation_test)
+endif()
