@@ -33,6 +33,10 @@ def ac1024_probe_record():
             "legacy_raw_type_18_circle": 0,
             "legacy_raw_type_19_line": 0,
             "legacy_raw_type_77_lwpolyline": 0,
+            "continuous_offset_candidate_index": False,
+            "continuous_candidate_handles": 0,
+            "continuous_frame_crc_ok": 0,
+            "continuous_frame_crc_failed": 0,
         }
     }
 
@@ -102,6 +106,27 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             with self.subTest(field=field):
                 corrupt = deepcopy(record)
                 corrupt["ac1024_compatibility_hypothesis"][field] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(corrupt)
+
+
+    def test_continuous_offset_candidate_only_and_consistent_crc_counts(self):
+        record = ac1024_probe_record()
+        hint = record["ac1024_compatibility_hypothesis"]
+        hint["continuous_offset_candidate_index"] = True
+        hint["continuous_candidate_handles"] = 145279
+        hint["continuous_frame_crc_ok"] = 145000
+        hint["continuous_frame_crc_failed"] = 279
+        self.assertEqual(validate_fake_result(record), record)
+        for key, value in (
+            ("continuous_candidate_handles", 145278),
+            ("continuous_frame_crc_ok", 145279),
+            ("continuous_frame_crc_failed", -1),
+            ("continuous_offset_candidate_index", False),
+        ):
+            with self.subTest(key=key, value=value):
+                corrupt = deepcopy(record)
+                corrupt["ac1024_compatibility_hypothesis"][key] = value
                 with self.assertRaises(ValueError):
                     validate_fake_result(corrupt)
 
