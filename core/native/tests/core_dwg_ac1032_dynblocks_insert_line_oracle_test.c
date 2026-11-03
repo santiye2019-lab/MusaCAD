@@ -382,11 +382,29 @@ static int original(const char *filename){
                            scene,&one_handle,1u,scene_items,
                            MUSACAD_AC1032_OT49_CHILD_LIMIT,&produced)||
                        produced!=complete_lines.line_count){ok=0;break;}
+                    /* Independently joined original H5/OT51 layer oracle. */
+                    MusaDwgAc1032CompleteBlockLineBatch layer_oracle={0};
+                    if(!musa_dwg_ac1032_complete_block_line_batch(
+                           scene,entry.handle,&layer_oracle)||
+                       !layer_oracle.original_complete_source_batch_verified||
+                       layer_oracle.final_visibility_color_and_paint_accepted||
+                       layer_oracle.line_count!=produced){ok=0;break;}
                     for(size_t si=0u;si<produced;si++){
                         const MusaDwgAc1032LineSceneItem *item=&scene_items[si];
-                        if(item->insert_handle!=entry.handle||
+                        MusaDwgAc1032EntityBlockOwnerLayerSource original_layer={0};
+                        if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                               scene,complete_lines.child_handles[si],
+                               &original_layer)||
+                           !musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &original_layer,complete_lines.child_handles[si],
+                               coverage.block_header_handle,19u)||
+                           item->insert_handle!=entry.handle||
                            item->block_header_handle!=coverage.block_header_handle||
-                           item->line_handle!=complete_lines.child_handles[si]){
+                           item->line_handle!=complete_lines.child_handles[si]||
+                           !item->layer_handle||
+                           item->layer_handle!=original_layer.layer_handle||
+                           item->layer_handle!=
+                               layer_oracle.lines[si].source.layer_handle){
                             ok=0;break;
                         }
                         for(unsigned axis=0u;axis<4u;axis++)
@@ -1540,7 +1558,8 @@ static int original(const char *filename){
                    scene,m->entity_handle,&edge)&&
                musa_dwg_ac1032_block_child_owner_edge_matches(
                    &edge,m->entity_handle,m->block_header_handle,19u)&&
-               m->layer_handle==edge.layer_handle;
+               m->layer_handle==edge.layer_handle&&
+               m->layer_handle==original_lines[i].layer_handle;
             for(unsigned k=0u;ok&&k<4u;k++)
                 if(m->values[k]!=original_lines[i].xy[k])ok=0;
         }
