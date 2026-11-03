@@ -331,7 +331,80 @@ static void reject_nonrepresentable_owner_spans(void) {
     assert(output==1u);
 }
 
+
+/* A single shared definition may be inserted many times with different
+ * instance visibility. Pages must match the full resolution, and invalid
+ * late data must not partially publish the current page. */
+static void insert_instance_paged_visibility(void) {
+    enum { N=20000, PAGE=127 };
+    static uint64_t layers[N];
+    static uint8_t owners[N],layer_on[N],full[N];
+    uint8_t page[PAGE],other[PAGE],saved[PAGE];
+    for (size_t i=0;i<N;++i) {
+        layers[i]=(i%3u==0u)?100u:200u;
+        owners[i]=(uint8_t)(i%7u!=0u);
+        layer_on[i]=(uint8_t)(i%5u!=0u);
+    }
+    assert(musa_dwg1032_owner_graph_apply_insert_context(
+        layers,owners,layer_on,N,100u,1u,full));
+    for (size_t first=0;first<N;first+=PAGE) {
+        const size_t n=N-first<PAGE?N-first:PAGE;
+        memset(page,9,sizeof(page));
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            layers,owners,layer_on,N,first,n,100u,1u,page));
+        assert(memcmp(page,full+first,n)==0);
+        memset(other,9,sizeof(other));
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            layers,owners,layer_on,N,first,n,100u,0u,other));
+        for (size_t i=0;i<n;++i) assert(other[i]==0u);
+        assert(memcmp(page,full+first,n)==0);
+    }
+    const size_t first=N-PAGE;
+    assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,first,PAGE,100u,1u,page));
+    memcpy(saved,page,sizeof(page));
+    layer_on[N-1u]=2u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,first,PAGE,100u,1u,page));
+    assert(memcmp(page,saved,sizeof(page))==0);
+    layer_on[N-1u]=1u;
+    layers[N-1u]=0u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,first,PAGE,100u,1u,page));
+    assert(memcmp(page,saved,sizeof(page))==0);
+    layers[N-1u]=(N-1u)%3u==0u?100u:200u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,0u,0u,100u,1u,page));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,N,1u,100u,1u,page));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,N-1u,2u,100u,1u,page));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,SIZE_MAX,1u,100u,1u,page));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,first,PAGE,0u,1u,page));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,first,PAGE,100u,2u,page));
+    /* Output aliasing is prohibited even when it targets an unvisited page. */
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,0u,1u,100u,1u,&owners[N-1u]));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,0u,1u,100u,1u,&layer_on[N-1u]));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,0u,1u,100u,1u,
+        (uint8_t *)(void *)&layers[N-1u]));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,
+        (size_t)(PTRDIFF_MAX/sizeof(layers[0]))+1u,
+        0u,1u,100u,1u,page));
+    assert(memcmp(page,saved,sizeof(page))==0);
+    assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owners,layer_on,N,first,PAGE,100u,1u,page));
+    assert(memcmp(page,saved,sizeof(page))==0);
+}
+
 int main(void) {
+    insert_instance_paged_visibility();
     reject_nonrepresentable_owner_spans();
     insert_instance_large_atomic();
     nested_insert_instance_visibility();
