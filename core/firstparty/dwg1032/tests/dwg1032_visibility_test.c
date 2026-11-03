@@ -479,7 +479,43 @@ static void nested_insert_paged_boundary_visibility(void) {
     assert(child[0]==7u && child[1]==8u);
 }
 
+/* Multiple nested INSERT instances must be isolated even when the same
+ * definition page is revisited in a different traversal order. */
+static void nested_insert_repeated_instance_isolation(void) {
+    const uint64_t outer_layers[]={100u,200u,100u,200u};
+    const uint8_t outer_owners[]={1u,1u,1u,1u};
+    const uint8_t outer_on[]={0u,1u,0u,1u};
+    const uint64_t inner_layers[]={100u,300u,100u,300u};
+    const uint8_t inner_owners[]={1u,1u,1u,1u};
+    const uint8_t inner_on[]={0u,1u,0u,0u};
+    const uint8_t expected_on[]={1u,1u,1u,0u};
+    uint8_t outer=9u, child[4]={9u,9u,9u,9u};
+    for (size_t iteration=0u;iteration<8u;++iteration) {
+        const uint8_t visible=(uint8_t)(iteration%2u);
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            outer_layers,outer_owners,outer_on,4u,2u,1u,
+            100u,visible,&outer));
+        assert(outer==visible);
+        for (size_t first=0u;first<4u;first+=2u) {
+            assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+                inner_layers,inner_owners,inner_on,4u,first,2u,
+                100u,outer,child+first));
+        }
+        for (size_t i=0u;i<4u;++i)
+            assert(child[i]==(uint8_t)(visible && expected_on[i]));
+    }
+    const uint8_t preserved[]={0u,0u,0u,0u};
+    assert(memcmp(child,preserved,sizeof(child))==0);
+    /* A malformed late record cannot partially publish its page. */
+    uint8_t bad_on[]={0u,1u,0u,2u};
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        inner_layers,inner_owners,bad_on,4u,2u,2u,
+        100u,1u,child+2u));
+    assert(memcmp(child,preserved,sizeof(child))==0);
+}
+
 int main(void) {
+    nested_insert_repeated_instance_isolation();
     nested_insert_paged_boundary_visibility();
     insert_instance_single_record_invalid_flags();
     insert_instance_single_record_pages();
