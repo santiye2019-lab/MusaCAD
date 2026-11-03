@@ -1436,3 +1436,133 @@ test("24-hour Qwen pilot is developer-only, expires and fails closed before infe
   assert.match(answer.reply,/Zemin kat ön inceleme/);
   assert.equal(calls,1);
 });
+
+function diagnosticFixture(){
+  return {
+    schema:"musacad-diagnostics/v1",
+    reportId:"00000000-0000-4000-8000-000000000717",
+    occurredAt:"2026-11-03T16:38:00Z",
+    appVersion:"1.2.2",format:"DWG",signature:"AC1024",
+    result:"failure",stage:"NATIVE_OPEN",elapsedMs:315,
+    inputBytes:4728533,parsedEntities:0,layerCount:0,
+    conversionWarnings:0,errorCode:"IO"
+  };
+}
+
+test("diagnostics endpoint refuses unsigned, licensed and unconfigured uploads",async()=>{
+  const keys=sessionPair();
+  const url="https://ai.musacad.test/v1/diagnostics";
+  const body=JSON.stringify(diagnosticFixture());
+  const env={
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_REPORT_GITHUB_TOKEN:"server-only-token",
+    __fetch:async()=>{throw Error("GitHub must not be touched")}
+  };
+  const missing=await worker.fetch(new Request(url,{method:"POST",body}),env);
+  assert.equal(missing.status,401);
+  const licensed=await worker.fetch(new Request(url,{method:"POST",body,headers:{
+    authorization:"Bearer "+sessionToken(keys.privateKey,Date.now()+600000)
+  }}),env);
+  assert.equal(licensed.status,403);
+  const unconfigured=await worker.fetch(new Request(url,{method:"POST",body,headers:{
+    authorization:"Bearer "+developerSessionToken(keys.privateKey,Date.now()+600000)
+  }}),{MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem});
+  assert.equal(unconfigured.status,503);
+});
+
+test("diagnostics endpoint stores only strict technical fields under public Raporlar",async()=>{
+  const keys=sessionPair();
+  const token=developerSessionToken(keys.privateKey,Date.now()+600000);
+  let writes=0, githubPath="";
+  const report=diagnosticFixture();
+  const env={
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_REPORT_GITHUB_TOKEN:"server-only-token",
+    __fetch:async(url,opts)=>{
+      assert.equal(opts.method,"PUT");
+      assert.equal(opts.headers.authorization,"Bearer server-only-token");
+      assert.match(url,/api.github.com\\/repos\\/santiye2019-lab\\/MusaCAD\\/contents\\/Raporlar\\/2026-11-03\\/00000000-0000-4000-8000-000000000717\\.json$/);
+      const request=JSON.parse(opts.body);
+      const decoded=Buffer.from(request.content,"base64").toString("utf8");
+      assert.deepEqual(JSON.parse(decoded),report);
+      assert.equal(decoded.includes("fileName"),false);
+      assert.equal(decoded.includes("deviceId"),false);
+      githubPath=url;
+      writes++;
+      return new Response("{}",{status:201});
+    }
+  };
+  const url="https://ai.musacad.test/v1/diagnostics";
+  const response=await worker.fetch(new Request(url,{
+    method:"POST",
+    headers:{authorization:"Bearer "+token},
+    body:JSON.stringify(report)
+  }),env);
+  assert.equal(response.status,201);
+  assert.equal((await response.json()).status,"stored");
+  assert.match(githubPath,/Raporlar/);
+  assert.equal(writes,1);
+});
+
+test("diagnostics rejects sensitive or malformed fields before GitHub write",async()=>{
+  const keys=sessionPair(),token=developerSessionToken(keys.privateKey,Date.now()+600000);
+  let writes=0;
+  const env={
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_REPORT_GITHUB_TOKEN:"server-only-token",
+    __fetch:async()=>{writes++;return new Response("{}",{status:201})}
+  };
+  const url="https://ai.musacad.test/v1/diagnostics";
+  const cases=[
+    {...diagnosticFixture(),fileName:"Karagumruk.dwg"},
+    {...diagnosticFixture(),deviceId:"phone-id"},
+    {...diagnosticFixture(),signature:"AC1024/../../source"},
+    {...diagnosticFixture(),parsedEntities:-1},
+    {...diagnosticFixture(),errorCode:"/dev/private"},
+    {...diagnosticFixture(),reportId:"../../other"},
+    {...diagnosticFixture(),result:"success",errorCode:"IO"}
+  ];
+  for(const report of cases){
+    const response=await worker.fetch(new Request(url,{method:"POST",body:JSON.stringify(report),
+      headers:{authorization:"Bearer "+token}}),env);
+    assert.equal(response.status,400);
+  }
+  assert.equal(writes,0);
+});
+
+test("diagnostics duplicate retry verifies saved payload and avoids overwrite",async()=>{
+  const keys=sessionPair(),token=developerSessionToken(keys.privateKey,Date.now()+600000);
+  const report=diagnosticFixture();
+  let saved="",puts=0,gets=0;
+  const env={
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_REPORT_GITHUB_TOKEN:"server-only-token",
+    __fetch:async(url,opts)=>{
+      if(opts.method==="PUT"){
+        puts++;
+        saved=JSON.parse(opts.body).content;
+        return new Response("{}",{status:422});
+      }
+      gets++;return new Response(JSON.stringify({content:saved}),{status:200});
+    }
+  };
+  const response=await worker.fetch(new Request("https://ai.musacad.test/v1/diagnostics",{
+    method:"POST",headers:{authorization:"Bearer "+token},body:JSON.stringify(report)
+  }),env);
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).status,"stored");
+  assert.equal(puts,1);assert.equal(gets,1);
+});
+
+test("diagnostics upload keeps retryable failures and never claims a stored report",async()=>{
+  const keys=sessionPair(),token=developerSessionToken(keys.privateKey,Date.now()+600000);
+  const response=await worker.fetch(new Request("https://ai.musacad.test/v1/diagnostics",{
+    method:"POST",headers:{authorization:"Bearer "+token},body:JSON.stringify(diagnosticFixture())
+  }),{
+    MUSACAD_AI_SESSION_PUBLIC_KEY_PEM:keys.publicPem,
+    MUSACAD_REPORT_GITHUB_TOKEN:"server-only-token",
+    __fetch:async()=>new Response("server unavailable",{status:503})
+  });
+  assert.equal(response.status,502);
+  assert.equal((await response.json()).status,"github_unavailable");
+});
