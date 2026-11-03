@@ -56,6 +56,7 @@ def ac1024_probe_record():
             "legacy_shift_minus_one_crc_pass": 0,
             "legacy_shift_plus_one_crc_pass": 0,
             "legacy_shift_plus_two_crc_pass": 0,
+            "legacy_shift_samples_tested": 0,
         }
     }
 
@@ -190,6 +191,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_shift_minus_one_crc_pass": 8,
             "legacy_shift_plus_one_crc_pass": 6,
             "legacy_shift_plus_two_crc_pass": 5,
+            "legacy_shift_samples_tested": 128,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -204,6 +206,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("legacy_offset_distribution_measured", False),
             ("legacy_frame_crc_mismatch", 1),
             ("legacy_shift_plus_one_crc_pass", 145280),
+            ("legacy_shift_samples_tested", 0),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -226,6 +229,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_frame_invalid_ms": 140000,
             "legacy_frame_exceeds_section": 4000,
             "legacy_frame_crc_mismatch": 979,
+            "legacy_shift_samples_tested": 2048,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
