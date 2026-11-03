@@ -1566,6 +1566,97 @@ static int original(const char *filename){
                 if(joined[cursor++].insert_handle!=packet_source_handles[batch])
                     ok=0;
     }
+    /* Real untouched R2018: join independently authenticated complete
+     * LINE source(s) with partial CIRCLE source(s) without concealing the
+     * unsupported sibling or elevating them to visible paint geometry. */
+    if(ok&&packet_source_count){
+        const uint64_t circle_insert=UINT64_C(0xC1A1);
+        MusaDwgAc1032MixedSourceItem mixed[
+            MUSACAD_AC1032_OT49_CHILD_LIMIT*2u]={0};
+        size_t mixed_count=SIZE_MAX,nline=SIZE_MAX,ncircle=SIZE_MAX;
+        size_t unresolved=SIZE_MAX;
+        ok=musa_dwg_ac1032_scene_index_build_mixed_source_packet(
+               scene,&packet_source_handles[0],1u,
+               &circle_insert,1u,mixed,
+               MUSACAD_AC1032_OT49_CHILD_LIMIT*2u,
+               &mixed_count,&nline,&ncircle,&unresolved)&&
+           nline==packet_source_lines[0]&&ncircle==4u&&
+           mixed_count==nline+ncircle&&unresolved==1u;
+        MusaDwgAc1032LineSceneItem original_lines[
+            MUSACAD_AC1032_OT49_CHILD_LIMIT]={0};
+        size_t original_count=SIZE_MAX;
+        MusaDwgAc1032InsertBlockCircleBoundsBatch original_circles={0};
+        ok=ok&&musa_dwg_ac1032_scene_index_build_line_scene_packet(
+                  scene,&packet_source_handles[0],1u,original_lines,
+                  MUSACAD_AC1032_OT49_CHILD_LIMIT,&original_count)&&
+           original_count==nline&&
+           musa_dwg_ac1032_scene_index_source_block_circle_batch(
+                  scene,circle_insert,&original_circles)&&
+           original_circles.circle_count==ncircle;
+        for(size_t i=0u;ok&&i<nline;i++){
+            const MusaDwgAc1032MixedSourceItem *m=&mixed[i];
+            MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+            ok=m->entity_type==19u&&
+               !m->final_visibility_color_and_paint_accepted&&
+               m->insert_handle==original_lines[i].insert_handle&&
+               m->block_header_handle==original_lines[i].block_header_handle&&
+               m->entity_handle==original_lines[i].line_handle&&
+               musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                   scene,m->entity_handle,&edge)&&
+               musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &edge,m->entity_handle,m->block_header_handle,19u)&&
+               m->layer_handle==edge.layer_handle&&
+               m->layer_handle==original_lines[i].layer_handle;
+            for(unsigned k=0u;ok&&k<4u;k++)
+                if(m->values[k]!=original_lines[i].xy[k])ok=0;
+        }
+        for(size_t i=0u;ok&&i<ncircle;i++){
+            const MusaDwgAc1032MixedSourceItem *m=&mixed[nline+i];
+            ok=m->entity_type==18u&&
+               !m->final_visibility_color_and_paint_accepted&&
+               m->insert_handle==circle_insert&&
+               m->block_header_handle==original_circles.block_header_handle&&
+               m->entity_handle==original_circles.circle_handles[i]&&
+               m->layer_handle==original_circles.layer_handles[i];
+            for(unsigned k=0u;ok&&k<4u;k++)
+                if(m->values[k]!=original_circles.bounds[i][k])ok=0;
+        }
+        MusaDwgAc1032MixedSourceItem denied[
+            MUSACAD_AC1032_OT49_CHILD_LIMIT*2u];
+        memset(denied,0xa5,sizeof(denied));
+        MusaDwgAc1032MixedSourceItem before_denied[
+            MUSACAD_AC1032_OT49_CHILD_LIMIT*2u];
+        memcpy(before_denied,denied,sizeof(denied));
+        size_t old_count=SIZE_MAX,old_line=SIZE_MAX;
+        size_t old_circle=SIZE_MAX,old_unresolved=SIZE_MAX;
+        const uint64_t duplicate_line_inserts[2]={
+            packet_source_handles[0],packet_source_handles[0]};
+        const uint64_t zero_insert=0u;
+        ok=ok&&!musa_dwg_ac1032_scene_index_build_mixed_source_packet(
+                  scene,duplicate_line_inserts,2u,
+                  &circle_insert,1u,denied,
+                  MUSACAD_AC1032_OT49_CHILD_LIMIT*2u,
+                  &old_count,&old_line,&old_circle,&old_unresolved)&&
+           !musa_dwg_ac1032_scene_index_build_mixed_source_packet(
+                  scene,&packet_source_handles[0],1u,
+                  &circle_insert,1u,denied,mixed_count-1u,
+                  &old_count,&old_line,&old_circle,&old_unresolved)&&
+           !musa_dwg_ac1032_scene_index_build_mixed_source_packet(
+                  scene,&packet_source_handles[0],1u,
+                  &zero_insert,1u,denied,
+                  MUSACAD_AC1032_OT49_CHILD_LIMIT*2u,
+                  &old_count,&old_line,&old_circle,&old_unresolved)&&
+           !musa_dwg_ac1032_scene_index_build_mixed_source_packet(
+                  NULL,&packet_source_handles[0],1u,
+                  &circle_insert,1u,denied,
+                  MUSACAD_AC1032_OT49_CHILD_LIMIT*2u,
+                  &old_count,&old_line,&old_circle,&old_unresolved)&&
+           old_count==SIZE_MAX&&old_line==SIZE_MAX&&
+           old_circle==SIZE_MAX&&old_unresolved==SIZE_MAX&&
+           !memcmp(denied,before_denied,sizeof(denied));
+        if(!ok)fprintf(stderr,
+            "FAIL original mixed LINE/CIRCLE source packet or atomicity\\n");
+    }
     if(!packet_source_count)ok=0;
     fprintf(stderr,"%s genuine R2018 Dynblocks INSERT source LINE: "
                    "%zu INSERT, %zu strict source joins, %zu lines; "
