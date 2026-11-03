@@ -17,6 +17,7 @@ on:
       - 'tests/real_dwg_reference_compare.py'
       - 'tests/libredwg_host_type_inventory.c'
       - 'tests/test_real_dwg_reference_compare.py'
+      - 'tests/test_real_dwg_native_stage_contract.py'
       - '.github/workflows/real-dwg-libredwg-host-oracle.yml'
       - 'docs/DWG_LIBREDWG_HOST_ORACLE.md'
       - 'tests/real_dwg_native_stage_probe.c'
@@ -56,6 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_real_dwg_reference_compare.py' -v
+          python3 -m unittest discover -s tests -p 'test_real_dwg_native_stage_contract.py' -v
 
       - name: Checkout pinned upstream LibreDWG for CI host tool ONLY
         uses: actions/checkout@v4
