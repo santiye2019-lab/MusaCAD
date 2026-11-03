@@ -15,6 +15,7 @@
 #include "musacad_crc16.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_dwg_ac1024_record.h"
+#include "musacad_dwg_ac1015_handle_refs.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
@@ -285,6 +286,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t mc_invalid_ms_zero, mc_invalid_ms_one;
     size_t mc_invalid_ms_2to7, mc_invalid_ms_extended_zero;
     size_t mc_invalid_ms_extended_reserved, mc_invalid_ms_unclassified;
+    size_t core_stream_bounds_verified, core_stream_bounds_rejected;
+    size_t core_stream_bounds_mismatch, core_empty_handle_streams;
+    size_t sampled_first_h_attempts, sampled_first_h_self_matches;
+    size_t sampled_first_h_other, sampled_first_h_unreadable;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -568,6 +573,32 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             !bounds.record_crc16_verified)
                                             hint.core_payload_bounds_mismatch += group;
                                     }
+                                    MusaDwgAc1024StreamBounds stream = {0};
+                                    if (!musa_dwg_ac1024_record_stream_bounds(
+                                            objects, nb, offsets[start],
+                                            &stream)) {
+                                        hint.core_stream_bounds_rejected += group;
+                                    } else {
+                                        hint.core_stream_bounds_verified += group;
+                                        if (!stream.record_crc16_verified ||
+                                            stream.raw_object_type != core.raw_object_type ||
+                                            stream.payload_start_byte !=
+                                                bounds.payload_start_byte ||
+                                            stream.data_after_ot_bit !=
+                                                bounds.type_end_bit ||
+                                            stream.handle_stream_end_bit !=
+                                                bounds.payload_end_bit ||
+                                            stream.handle_stream_start_bit <
+                                                bounds.type_end_bit ||
+                                            stream.handle_stream_bits !=
+                                                core.handle_stream_bits ||
+                                            stream.handle_stream_end_bit -
+                                                stream.handle_stream_start_bit !=
+                                                core.handle_stream_bits)
+                                            hint.core_stream_bounds_mismatch += group;
+                                        if (stream.handle_stream_bits == 0u)
+                                            hint.core_empty_handle_streams += group;
+                                    }
                                 }
                             } else
                                 hint.mc_frame_crc_mismatch += group;
@@ -653,6 +684,42 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 ++hint.legacy_shift_plus_two_crc_pass;
                         }
                         start = end;
+                    }
+                }
+                /* Separate fixed-budget exploratory H identity:
+                   the public R2010 layout places a self-H immediately
+                   after OT in the DATA stream. Only report aggregate
+                   matches to the independently CRC-backed handle map.
+                   Never serialize source IDs, offsets, text or geometry. */
+                size_t stride = legacy_count / 2048u;
+                if (!stride) stride = 1u;
+                for (size_t k = 0u; k < legacy_count; k += stride) {
+                    if (hint.sampled_first_h_attempts >= 2048u) break;
+                    ++hint.sampled_first_h_attempts;
+                    MusaDwgAc1024StreamBounds stream = {0};
+                    if (!musa_dwg_ac1024_record_stream_bounds(
+                            objects, nb, legacy[k].object_offset,
+                            &stream) || !legacy[k].handle ||
+                        stream.handle_stream_start_bit <=
+                            stream.data_after_ot_bit) {
+                        ++hint.sampled_first_h_unreadable;
+                        continue;
+                    }
+                    MusaDwgAc1015Bits cursor = {0};
+                    MusaDwgAc1015HandleRef first = {0};
+                    if (!musa_dwg_ac1015_bits_init(
+                            &cursor, objects + stream.payload_start_byte,
+                            stream.handle_stream_end_bit / 8u,
+                            stream.data_after_ot_bit,
+                            stream.handle_stream_start_bit) ||
+                        !musa_dwg_ac1015_read_handle_ref(
+                            &cursor, legacy[k].handle, &first)) {
+                        ++hint.sampled_first_h_unreadable;
+                    } else if (first.code == 0u &&
+                               first.target == legacy[k].handle) {
+                        ++hint.sampled_first_h_self_matches;
+                    } else {
+                        ++hint.sampled_first_h_other;
                     }
                 }
                 free(offsets);
@@ -791,7 +858,15 @@ static void report(const char *signature, const char *result,
                "\"mc_invalid_ms_2to7\":%zu,"
                "\"mc_invalid_ms_extended_zero\":%zu,"
                "\"mc_invalid_ms_extended_reserved\":%zu,"
-               "\"mc_invalid_ms_unclassified\":%zu}",
+               "\"mc_invalid_ms_unclassified\":%zu,"
+               "\"core_stream_bounds_verified\":%zu,"
+               "\"core_stream_bounds_rejected\":%zu,"
+               "\"core_stream_bounds_mismatch\":%zu,"
+               "\"core_empty_handle_streams\":%zu,"
+               "\"sampled_first_h_attempts\":%zu,"
+               "\"sampled_first_h_self_matches\":%zu,"
+               "\"sampled_first_h_other\":%zu,"
+               "\"sampled_first_h_unreadable\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -880,7 +955,15 @@ static void report(const char *signature, const char *result,
                hint->mc_invalid_ms_2to7,
                hint->mc_invalid_ms_extended_zero,
                hint->mc_invalid_ms_extended_reserved,
-               hint->mc_invalid_ms_unclassified);
+               hint->mc_invalid_ms_unclassified,
+               hint->core_stream_bounds_verified,
+               hint->core_stream_bounds_rejected,
+               hint->core_stream_bounds_mismatch,
+               hint->core_empty_handle_streams,
+               hint->sampled_first_h_attempts,
+               hint->sampled_first_h_self_matches,
+               hint->sampled_first_h_other,
+               hint->sampled_first_h_unreadable);
     }
     puts("}");
 }
