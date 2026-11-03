@@ -423,7 +423,34 @@ static void insert_instance_single_record_pages(void) {
     assert(output==7u);
 }
 
-int main(void) {
+/* Reject invalid flags at either edge of a one-record page without
+ * publishing output or borrowing state from adjacent INSERT instances. */
+static void insert_instance_single_record_invalid_flags(void) {
+    uint64_t layers[]={100u,200u,100u};
+    uint8_t owner[]={1u,1u,1u};
+    uint8_t layer_on[]={0u,1u,0u};
+    uint8_t output=77u;
+    owner[1]=2u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owner,layer_on,3u,1u,1u,100u,1u,&output));
+    assert(output==77u);
+    owner[1]=1u;
+    layer_on[1]=2u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owner,layer_on,3u,1u,1u,100u,1u,&output));
+    assert(output==77u);
+    layer_on[1]=1u;
+    assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owner,layer_on,3u,1u,1u,100u,1u,&output));
+    assert(output==1u);
+    output=77u;
+    owner[0]=2u; /* Outside selected page: page-local validation. */
+    assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owner,layer_on,3u,1u,1u,100u,1u,&output));
+    assert(output==1u);
+}
+
+int main(void) {\n    insert_instance_single_record_invalid_flags();
     insert_instance_single_record_pages();
     insert_instance_paged_visibility();
     reject_nonrepresentable_owner_spans();
