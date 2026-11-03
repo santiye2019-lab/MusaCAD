@@ -26,6 +26,18 @@ int musa_dwg1032_object_ms_utf16le_text(
     uint64_t field_payload_offset, size_t field_byte_count,
     size_t max_payload_bytes, uint8_t *scratch, size_t scratch_capacity,
     char *utf8, size_t utf8_capacity, size_t *written);
+/* Ordinal counterpart for a previously located, immutable object index.
+ * Avoids a second O(log n) handle lookup when rendering a viewport page.
+ * The position is a verified index ordinal, NOT a DWG byte offset.
+ * Same transactional output, buffer disjointness and caller-authenticated
+ * UTF-16LE field requirements as the handle-based entry point. */
+int musa_dwg1032_object_ms_utf16le_text_at_position(
+    const uint8_t *file_bytes, size_t file_size,
+    const MusaDwg1032FilePage *validated_pages, size_t page_count,
+    const MusaDwg1032ObjectIndex *validated_index, size_t position,
+    uint64_t field_payload_offset, size_t field_byte_count,
+    size_t max_payload_bytes, uint8_t *scratch, size_t scratch_capacity,
+    char *utf8, size_t utf8_capacity, size_t *written);
 #ifdef __cplusplus
 }
 #endif
