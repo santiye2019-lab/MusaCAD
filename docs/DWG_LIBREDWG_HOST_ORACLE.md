@@ -153,6 +153,36 @@ listeleri, handle değerleri, koordinatlar veya kişisel bilgiler
 yayımlanmadan hesaplanır. Bir boşluk boyu eşleşmesi dahi tek başına
 AC1024 nesne dekoderi veya render kanıtı değildir.
 
+## Özgün MusaCAD ortak çekirdeğinde AC1024 kayıt-kanıt API'si
+
+`core/native/include/musacad_dwg_ac1024_record.h` ve
+`core/native/src/musacad_dwg_ac1024_record.c` ilk taraf MIT C11
+kaynaklarıdır. Tek bir indeks adresinden R2010 **MS + unsigned MC +
+OT + CRC16** kayıt çerçevesini salt-okunur, sınır kontrollü ve
+atomik biçimde doğrular. Özgün çizim/dekomprese kaynak ve çıktı
+birbirine alias olamaz; hatada çıktı değişmez.
+
+Gerçek Karagümrük pis su DWG'sinde bu yeni ortak çekirdek yordamı,
+bağımsız salt-okunur tanı koduyla karşılaştırıldığında:
+
+- **145.277 / 145.279** CRC doğrulanmış çerçeve,
+- **0** çekirdek doğrulama hatası,
+- **0** çekirdek / tanı kodu MS+MC boyu veya ham OT tür uyuşmazlığı,
+- **2** halen desteklenmeyen özel kayıt.
+
+Bağımsız tanı + ortak çekirdek karşılaştırma GitHub Actions
+`41727421605` çalışmasında başarılı sonuçlandı. C çekirdeği için
+ayrı `core_dwg_ac1024_record_test.c` regresyonu ile geçersiz MC,
+yanlış CRC, kısa tampon, bozulmamış orijinal giriş ve atomik çıktı
+kontrolleri ayrıca devreye alındı.
+
+Karagümrük çiziminde CRC doğrulanmış ham OT kayıt türleri ile izole
+LibreDWG host referans **sayım eşitliği** (LINE/INSERT/TEXT/MTEXT/
+ARC/CIRCLE/LWPOLYLINE/LAYER/BLOCK_HEADER) var. Bu **kesinlikle**
+kayıt kimliği, handle self, blok sahipliği, geometri, koordinat,
+renk, katman ilişkisi veya görüntüleme eşdeğerliği değildir. Tam
+AC1024 DWG açma yolu hâlâ fail-closed.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
