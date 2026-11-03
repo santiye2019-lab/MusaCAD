@@ -23,7 +23,12 @@ KNOWN_STAGES = {
     "invalid_signature",
     "ac1015_section_locators",
     "ac1015_crc_verified_section_locators",
+    "ac1018_page_map_header",
+    "ac1018_physical_page_locations",
+    "ac1018_objects_section_pages",
+    "ac1018_handles_section_pages",
     "ac1018_crc_backed_handle_index",
+    "ac1032_page_map_header",
     "ac1032_physical_page_locations",
     "ac1032_crc_backed_handle_index",
 }
