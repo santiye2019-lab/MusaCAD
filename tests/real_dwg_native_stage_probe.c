@@ -155,6 +155,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t legacy_next_offset_pairs, legacy_next_frame_unavailable;
     size_t legacy_next_frame_exact, legacy_next_frame_short;
     size_t legacy_next_frame_overlaps, legacy_crc_ok_next_frame_exact;
+    size_t legacy_short_gap_1, legacy_short_gap_2, legacy_short_gap_3;
+    size_t legacy_short_gap_4, legacy_short_gap_5to16;
+    size_t legacy_short_gap_17to64, legacy_short_gap_over64;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -351,10 +354,26 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 ++hint.legacy_next_frame_exact;
                                 if (status == AC1024_FRAME_CRC_OK)
                                     ++hint.legacy_crc_ok_next_frame_exact;
-                            } else if ((uint64_t)frame_span < gap)
+                            } else if ((uint64_t)frame_span < gap) {
                                 ++hint.legacy_next_frame_short;
-                            else
+                                const uint64_t missing = gap - (uint64_t)frame_span;
+                                if (missing == 1u)
+                                    ++hint.legacy_short_gap_1;
+                                else if (missing == 2u)
+                                    ++hint.legacy_short_gap_2;
+                                else if (missing == 3u)
+                                    ++hint.legacy_short_gap_3;
+                                else if (missing == 4u)
+                                    ++hint.legacy_short_gap_4;
+                                else if (missing <= 16u)
+                                    ++hint.legacy_short_gap_5to16;
+                                else if (missing <= 64u)
+                                    ++hint.legacy_short_gap_17to64;
+                                else
+                                    ++hint.legacy_short_gap_over64;
+                            } else {
                                 ++hint.legacy_next_frame_overlaps;
+                            }
                         }
                         /* Fixed deterministic <=2048 offset sample
                            for shift hypotheses. The FULL source still
@@ -475,7 +494,14 @@ static void report(const char *signature, const char *result,
                "\"legacy_next_frame_exact\":%zu,"
                "\"legacy_next_frame_short\":%zu,"
                "\"legacy_next_frame_overlaps\":%zu,"
-               "\"legacy_crc_ok_next_frame_exact\":%zu}",
+               "\"legacy_crc_ok_next_frame_exact\":%zu,"
+               "\"legacy_short_gap_1\":%zu,"
+               "\"legacy_short_gap_2\":%zu,"
+               "\"legacy_short_gap_3\":%zu,"
+               "\"legacy_short_gap_4\":%zu,"
+               "\"legacy_short_gap_5to16\":%zu,"
+               "\"legacy_short_gap_17to64\":%zu,"
+               "\"legacy_short_gap_over64\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -520,7 +546,14 @@ static void report(const char *signature, const char *result,
                hint->legacy_next_frame_exact,
                hint->legacy_next_frame_short,
                hint->legacy_next_frame_overlaps,
-               hint->legacy_crc_ok_next_frame_exact);
+               hint->legacy_crc_ok_next_frame_exact,
+               hint->legacy_short_gap_1,
+               hint->legacy_short_gap_2,
+               hint->legacy_short_gap_3,
+               hint->legacy_short_gap_4,
+               hint->legacy_short_gap_5to16,
+               hint->legacy_short_gap_17to64,
+               hint->legacy_short_gap_over64);
     }
     puts("}");
 }
