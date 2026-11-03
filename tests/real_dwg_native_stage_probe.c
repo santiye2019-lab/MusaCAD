@@ -290,6 +290,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t core_stream_bounds_mismatch, core_empty_handle_streams;
     size_t sampled_first_h_attempts, sampled_first_h_self_matches;
     size_t sampled_first_h_other, sampled_first_h_unreadable;
+    size_t sampled_first_h_code0_mismatch;
+    size_t sampled_first_h_absolute_other_code;
+    size_t sampled_first_h_relative_code;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -720,6 +723,12 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         ++hint.sampled_first_h_self_matches;
                     } else {
                         ++hint.sampled_first_h_other;
+                        if (first.code == 0u)
+                            ++hint.sampled_first_h_code0_mismatch;
+                        else if (first.code >= 2u && first.code <= 5u)
+                            ++hint.sampled_first_h_absolute_other_code;
+                        else
+                            ++hint.sampled_first_h_relative_code;
                     }
                 }
                 free(offsets);
@@ -866,7 +875,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_first_h_attempts\":%zu,"
                "\"sampled_first_h_self_matches\":%zu,"
                "\"sampled_first_h_other\":%zu,"
-               "\"sampled_first_h_unreadable\":%zu}",
+               "\"sampled_first_h_unreadable\":%zu,"
+               "\"sampled_first_h_code0_mismatch\":%zu,"
+               "\"sampled_first_h_absolute_other_code\":%zu,"
+               "\"sampled_first_h_relative_code\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -963,7 +975,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_first_h_attempts,
                hint->sampled_first_h_self_matches,
                hint->sampled_first_h_other,
-               hint->sampled_first_h_unreadable);
+               hint->sampled_first_h_unreadable,
+               hint->sampled_first_h_code0_mismatch,
+               hint->sampled_first_h_absolute_other_code,
+               hint->sampled_first_h_relative_code);
     }
     puts("}");
 }
