@@ -44,6 +44,29 @@ int musa_dwg1032_instance_attributes(
     MusaDwg1032ResolvedColor *colors_scratch, size_t color_scratch_capacity,
     uint8_t *visibility_scratch, size_t visibility_scratch_capacity);
 
+
+/* Bounded-memory form for one page of a verified INSERT child array.
+ * All source arrays describe total_count children. Only [first,
+ * first+page_count) is evaluated, with caller scratch sized for that page.
+ * Outputs and scratch must not overlap ANY part of the full source arrays,
+ * including later pages; a failed page leaves both outputs untouched.
+ * Caller still authenticates each child's source and the concrete INSERT.
+ * No DWG parsing, owner discovery or rendering permission is implied. */
+int musa_dwg1032_instance_attributes_page(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    size_t total_count, size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    MusaDwg1032ResolvedColor *colors_page_out, uint8_t *visible_page_out,
+    MusaDwg1032ResolvedColor *colors_scratch, size_t color_scratch_capacity,
+    uint8_t *visibility_scratch, size_t visibility_scratch_capacity);
+
 #ifdef __cplusplus
 }
 #endif
