@@ -112,6 +112,32 @@ class ObservableReferenceTest(unittest.TestCase):
             self.assertEqual(failure["reference_status"], "libredwg_unusable_json")
             self.assertEqual(len(failure["reference_attempts"]), 2)
 
+    def test_direct_host_probe_survives_both_broken_json_exporters(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "fake.dwg"
+            source.write_bytes(b"AC1024")
+            reader = root / "bad-reader"
+            reader.write_text("#!/usr/bin/env python3\nprint('{ malformed')\n",
+                              encoding="utf-8")
+            reader.chmod(0o755)
+            host = root / "host-types"
+            host.write_text(
+                "#!/usr/bin/env python3\n"
+                "print('{\"DECODER_WARNING_MASK\":4,\"OBJECTS\":['"
+                "'{\"entity\":\"3DSOLID\"},{\"entity\":\"LINE\"},"
+                "{\"object\":\"LAYER\"}]}')\n",
+                encoding="utf-8",
+            )
+            host.chmod(0o755)
+            result = reference_read(reader, source, 10, host)
+            self.assertEqual(result["reference_status"], "libredwg_typed_inventory_only")
+            self.assertEqual(result["reference_output_mode"], "libredwg_host_direct_types")
+            self.assertTrue(result["reference_json_exporter_failed"])
+            self.assertEqual(result["reference_decoder_warning_mask"], 4)
+            self.assertEqual(result["reference_typed_entity_count"], 2)
+            self.assertEqual(result["reference_layer_record_count"], 1)
+
     def test_bounded_cli_success_and_nonzero_are_distinct(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
