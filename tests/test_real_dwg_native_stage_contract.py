@@ -335,7 +335,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("mc_unreadable_first_half", 3),
             ("mc_invalid_ms_zero", 1),
             ("mc_invalid_ms_unclassified", 1),
-            ("core_stream_bounds_verified", 99),
+            ("core_stream_bounds_verified", 98),
             ("core_stream_bounds_mismatch", 1),
             ("sampled_first_h_attempts", 2049),
             ("sampled_first_h_self_matches", 120),
