@@ -107,6 +107,21 @@ int musa_dwg1032_layer_color_select_page(
     size_t first, size_t page_count,
     MusaDwg1032ResolvedColor *page_resolved,
     MusaDwg1032ResolvedColor *page_scratch, size_t scratch_capacity);
+/* Apply one bounded page of a caller-authenticated block definition under
+ * a specific INSERT instance. All source arrays are full-drawing arrays:
+ * the page output is forbidden to alias even future source pages.
+ * Source and INSERT provenance is validated for the selected page only;
+ * callers must authenticate and hold the complete source immutable first.
+ * The selected page publishes atomically; no allocation or DWG decoding.
+ * A different INSERT instance requires a separate call and output. */
+int musa_dwg1032_layer_color_apply_insert_context_page(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles, size_t total_count,
+    size_t first, size_t page_count, uint64_t layer_zero_handle,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    MusaDwg1032ResolvedColor *page_resolved);
 #ifdef __cplusplus
 }
 #endif
