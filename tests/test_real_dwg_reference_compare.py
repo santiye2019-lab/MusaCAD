@@ -182,6 +182,44 @@ class ObservableReferenceTest(unittest.TestCase):
         self.assertEqual(ac1024_candidate_alignment(reference, native)["state"],
                          "NOT_APPLICABLE")
 
+    def test_r2010_crc_backed_raw_ot_count_equality_is_not_entity_parity(self):
+        reference = {
+            "reference_status": "libredwg_typed_inventory_only",
+            "reference_total_object_records": 145279,
+            "reference_entities_by_type": {
+                "LINE": 44941, "INSERT": 31799,
+            },
+            "reference_nonentities_by_type": {"LAYER": 175},
+        }
+        hint = {
+            "candidate_handle_index": True,
+            "candidate_handle_count": 145279,
+            "mc_frame_probe_completed": True,
+            "mc_frame_crc_pass": 145277,
+            "mc_frame_unreadable": 2,
+            "mc_ot_decoded": 145277,
+        }
+        for code in ("1", "7", "17", "18", "19", "44",
+                     "49", "51", "77"):
+            hint["mc_ot_raw_" + code] = 0
+        hint["mc_ot_raw_7"] = 31799
+        hint["mc_ot_raw_19"] = 44941
+        hint["mc_ot_raw_51"] = 175
+        native = {"signature": "AC1024",
+                  "ac1024_compatibility_hypothesis": hint}
+        report = ac1024_candidate_alignment(reference, native)
+        correlations = report["r2010_raw_ot_count_correlations"]
+        for code in ("7", "19", "51"):
+            self.assertTrue(correlations[code]["counts_equal_only"])
+            self.assertFalse(correlations[code]["verified_entity_identity"])
+        self.assertFalse(report["type_parity_verified"])
+        self.assertEqual(report["entity_parity"], "NOT_MEASURABLE")
+        hint["mc_ot_raw_19"] -= 1
+        mismatch = ac1024_candidate_alignment(reference, native)
+        self.assertFalse(
+            mismatch["r2010_raw_ot_count_correlations"]["19"]["counts_equal_only"])
+        self.assertEqual(mismatch["entity_parity"], "NOT_MEASURABLE")
+
     def test_bounded_cli_success_and_nonzero_are_distinct(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
