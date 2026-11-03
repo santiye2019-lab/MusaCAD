@@ -102,6 +102,9 @@ int main(int argc, char **argv) {
     size_t map_consumed = 0u, map_entries = 0u, gaps = 0u, positive = 0u;
     uint64_t physical_end = 256u;
     unsigned ordering_violations = 0u, invalid_spans = 0u;
+    unsigned positive_order_violations = 0u, gap_order_violations = 0u;
+    uint32_t previous_positive_id = 0u, previous_gap_id = 0u;
+    int last_entry_is_map = 0, last_entry_is_gap = 0;
     int found_map = 0, found_section_map = 0, eof_header_copy = 0;
     const size_t compressed_start = (size_t)header.page_map_offset + 20u;
     if (header.map_decoded_bytes &&
@@ -132,6 +135,16 @@ int main(int argc, char **argv) {
                     const uint32_t id = gap ?
                         (uint32_t)(-(int64_t)(int32_t)raw) : raw;
                     if (id <= last_id || !id) ordering_violations++;
+                    if(gap) {
+                        if (id <= previous_gap_id || !id) gap_order_violations++;
+                        previous_gap_id = id;
+                    } else {
+                        if (id <= previous_positive_id || !id)
+                            positive_order_violations++;
+                        previous_positive_id = id;
+                    }
+                    last_entry_is_map = !gap && id == header.page_map_id;
+                    last_entry_is_gap = gap;
                     if (!span || physical_end > UINT64_MAX - span)
                         invalid_spans++;
                     if (invalid_spans) { physical_scan_safe = 0; break; }
@@ -222,6 +235,10 @@ int main(int argc, char **argv) {
            "\"map_gap_records\":%zu,"
            "\"physical_scan_safe\":%s,"
            "\"page_id_order_violations\":%u,"
+           "\"positive_order_violations\":%u,"
+           "\"gap_order_violations\":%u,"
+           "\"final_record_is_page_map\":%s,"
+           "\"final_record_is_gap\":%s,"
            "\"invalid_spans\":%u,"
            "\"contains_page_map_id\":%s,"
            "\"contains_section_map_id\":%s,"
@@ -244,7 +261,10 @@ int main(int argc, char **argv) {
            decompressed ? "true" : "false", map_consumed,
            map_entries, positive, gaps,
            physical_scan_safe ? "true" : "false",
-           ordering_violations, invalid_spans,
+           ordering_violations,
+           positive_order_violations,gap_order_violations,
+           last_entry_is_map ? "true" : "false",
+           last_entry_is_gap ? "true" : "false",invalid_spans,
            found_map ? "true" : "false",
            found_section_map ? "true" : "false",
            (long long)((int64_t)physical_end - (int64_t)n),
