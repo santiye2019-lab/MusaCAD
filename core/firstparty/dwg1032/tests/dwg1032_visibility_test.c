@@ -279,7 +279,60 @@ static void nested_insert_instance_visibility(void) {
     assert(inner[0]==0u && inner[1]==0u);
 }
 
+
+/* Fabricated lengths that fit size_t but exceed representable pointer
+ * differences must fail before dereferencing one-element backing arrays.
+ * Public outputs remain untouched on every rejection. */
+static void reject_nonrepresentable_owner_spans(void) {
+    const MusaDwg1032ObjectLocation entry={10u,0u,1u};
+    MusaDwg1032ObjectIndex index={&entry,1u,1u};
+    const uint64_t owner=0u, layer_ref=100u;
+    const uint8_t local=1u;
+    const MusaDwg1032LayerState layer={100u,1u,1u};
+    MusaDwg1032OwnerWork work[1]={{0}};
+    uint64_t root=777u;
+    size_t depth=888u;
+    uint8_t output=9u, local_work=7u;
+    const size_t huge_index=(size_t)(PTRDIFF_MAX/sizeof(entry))+1u;
+    const size_t huge_work=(size_t)(PTRDIFF_MAX/sizeof(work[0]))+1u;
+    const size_t huge_layers=(size_t)(PTRDIFF_MAX/sizeof(layer))+1u;
+    const size_t huge_children=(size_t)(PTRDIFF_MAX/sizeof(layer_ref))+1u;
+
+    index.count=huge_index;
+    assert(!musa_dwg1032_owner_graph_resolve(
+        &index,&owner,work,1u,&root,&depth));
+    assert(!musa_dwg1032_owner_graph_visibility(
+        &index,&owner,&local,work,1u,&output));
+    assert(!musa_dwg1032_owner_graph_layer_visibility(
+        &index,&owner,&layer_ref,&local,&layer,1u,
+        work,1u,&local_work,&output));
+    index.count=1u;
+
+    assert(!musa_dwg1032_owner_graph_resolve(
+        &index,&owner,work,huge_work,&root,&depth));
+    assert(!musa_dwg1032_owner_graph_visibility(
+        &index,&owner,&local,work,huge_work,&output));
+    assert(!musa_dwg1032_owner_graph_layer_visibility(
+        &index,&owner,&layer_ref,&local,&layer,1u,
+        work,huge_work,&local_work,&output));
+    assert(!musa_dwg1032_owner_graph_layer_visibility(
+        &index,&owner,&layer_ref,&local,&layer,huge_layers,
+        work,1u,&local_work,&output));
+    assert(!musa_dwg1032_owner_graph_apply_insert_context(
+        &layer_ref,&local,&local,huge_children,100u,1u,&output));
+
+    assert(root==777u && depth==888u && output==9u);
+    assert(musa_dwg1032_owner_graph_resolve(
+        &index,&owner,work,1u,&root,&depth));
+    assert(root==10u && depth==0u);
+    assert(musa_dwg1032_owner_graph_layer_visibility(
+        &index,&owner,&layer_ref,&local,&layer,1u,
+        work,1u,&local_work,&output));
+    assert(output==1u);
+}
+
 int main(void) {
+    reject_nonrepresentable_owner_spans();
     insert_instance_large_atomic();
     nested_insert_instance_visibility();
     insert_instance_layer_zero();
