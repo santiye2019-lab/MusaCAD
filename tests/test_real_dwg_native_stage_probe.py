@@ -56,6 +56,10 @@ class NativeDwgStageProbeTest(unittest.TestCase):
                     "candidate_handle_index"):
             self.assertFalse(hypothesis[key], key)
         self.assertEqual(hypothesis["candidate_handle_count"], 0)
+        self.assertFalse(hypothesis["continuous_offset_candidate_index"])
+        self.assertEqual(hypothesis["continuous_candidate_handles"], 0)
+        self.assertEqual(hypothesis["continuous_frame_crc_ok"], 0)
+        self.assertEqual(hypothesis["continuous_frame_crc_failed"], 0)
 
     def test_r2013_version_is_not_falsely_accepted_as_r2018(self):
         record = self.probe(b"AC1027" + bytes(506))
