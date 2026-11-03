@@ -14,6 +14,8 @@
 #include "musacad_dwg_ac1032_layer.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -990,12 +992,13 @@ static inline int musa_dwg_ac1032_scene_index_complete_block_line_sources(
 
 
 
-/* Build a bounded source scene packet from an arbitrary set of original
- * INSERTs, using only complete reverse-owner BLOCK LINE inventories.
- * Caller provides INSERT handles from the indexed model; this does not
- * discover model space or nested INSERTs, nor authorize display. */
+/* Build a bounded source-only scene packet from original INSERTs,
+ * preserving the authenticated H5 layer reference of every LINE. The
+ * original LINE -> BLOCK reverse owner and layer H edges must match,
+ * but no inherited color, viewport, visibility or paint is authorized.
+ * All allocations and source checks complete before caller output changes. */
 typedef struct MusaDwgAc1032LineSceneItem {
-    uint64_t insert_handle,block_header_handle,line_handle;
+    uint64_t insert_handle,block_header_handle,line_handle,layer_handle;
     double xy[4];
 } MusaDwgAc1032LineSceneItem;
 static inline int musa_dwg_ac1032_scene_index_build_line_scene_packet(
@@ -1004,38 +1007,65 @@ static inline int musa_dwg_ac1032_scene_index_build_line_scene_packet(
     size_t capacity,size_t *out_count){
     if(!index||!insert_handles||!insert_count||!out_count||
        (!items&&capacity))return 0;
-    size_t written=0;
-    /* Preflight all source packets before touching caller output. */
-    for(size_t i=0;i<insert_count;i++){
+    size_t required=0u;
+    /* Preflight complete original reverse-owner inventories and bounds. */
+    for(size_t i=0u;i<insert_count;i++){
         if(!insert_handles[i])return 0;
-        for(size_t j=0;j<i;j++)
+        for(size_t j=0u;j<i;j++)
             if(insert_handles[j]==insert_handles[i])return 0;
         MusaDwgAc1032InsertBlockLineSources packet={0};
         if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
                index,insert_handles[i],&packet)||
-           packet.line_count>capacity-written)return 0;
-        written+=packet.line_count;
+           packet.line_count>capacity-required)return 0;
+        for(uint32_t k=0u;k<packet.line_count;k++){
+            MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+            if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                   index,packet.child_handles[k],&edge)||
+               !musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &edge,packet.child_handles[k],
+                   packet.block_header_handle,19u))return 0;
+        }
+        required+=packet.line_count;
     }
-    written=0;
-    for(size_t i=0;i<insert_count;i++){
+    if(required>SIZE_MAX/sizeof(MusaDwgAc1032LineSceneItem)||
+       (required&&!items))return 0;
+    MusaDwgAc1032LineSceneItem *staged=
+        (MusaDwgAc1032LineSceneItem*)malloc(
+            (required?required:1u)*sizeof(MusaDwgAc1032LineSceneItem));
+    if(!staged)return 0;
+    size_t written=0u;
+    for(size_t i=0u;i<insert_count;i++){
         MusaDwgAc1032InsertBlockLineSources packet={0};
         if(!musa_dwg_ac1032_scene_index_complete_block_line_sources(
-               index,insert_handles[i],&packet))return 0;
-        for(uint32_t k=0;k<packet.line_count;k++){
-            MusaDwgAc1032LineSceneItem *dst=&items[written++];
+               index,insert_handles[i],&packet)||
+           packet.line_count>required-written){
+            free(staged);
+            return 0;
+        }
+        for(uint32_t k=0u;k<packet.line_count;k++){
+            MusaDwgAc1032EntityBlockOwnerLayerSource edge={0};
+            if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                   index,packet.child_handles[k],&edge)||
+               !musa_dwg_ac1032_block_child_owner_edge_matches(
+                   &edge,packet.child_handles[k],
+                   packet.block_header_handle,19u)){
+                free(staged);
+                return 0;
+            }
+            MusaDwgAc1032LineSceneItem *dst=&staged[written++];
             dst->insert_handle=insert_handles[i];
             dst->block_header_handle=packet.block_header_handle;
             dst->line_handle=packet.child_handles[k];
-            for(unsigned q=0;q<4u;q++)dst->xy[q]=packet.endpoints[k][q];
+            dst->layer_handle=edge.layer_handle;
+            for(unsigned q=0u;q<4u;q++)dst->xy[q]=packet.endpoints[k][q];
         }
     }
-    *out_count=written;
+    if(written!=required){free(staged);return 0;}
+    if(required)memcpy(items,staged,required*sizeof(*items));
+    free(staged);
+    *out_count=required;
     return 1;
 }
-
-
-
-
 
 /* A stricter source-only LINE join: all siblings must have verified OT49
  * reverse owners, and this LINE must be in the same authenticated list.
