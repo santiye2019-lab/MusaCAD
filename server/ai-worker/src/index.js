@@ -1,3 +1,4 @@
+import { handleDiagnostics } from "./diagnostics.js";
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -8,6 +9,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return json({ status: "ok", service: "musacad-ai-worker" });
+    if (url.pathname === "/v1/diagnostics") return handleDiagnostics(request, env, verifySession);
     if (url.pathname === "/v1/analyze" || (url.pathname === "/" && request.method === "POST")) return handleAnalyze(request, env);
     return json({ status: "not_found" }, 404);
   }
