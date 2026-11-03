@@ -73,6 +73,18 @@ int musa_dwg_ac1032_page_map_header(
     const uint8_t *file,size_t n,MusaDwgAc1032FileMapHeader *out){
     return shared_page_map_header(file,n,"AC1032",out);
 }
+/* The authenticated physical stream gives positions in file order. Modern
+ * AC1032 page IDs need not follow that order. Present an ID-sorted index
+ * to section readers while retaining each original physical offset. */
+static int compare_page_ids(const void *a,const void *b){
+    const uint32_t x=((const MusaDwgAc1018PageLocation*)a)->page_id;
+    const uint32_t y=((const MusaDwgAc1018PageLocation*)b)->page_id;
+    return (x>y)-(x<y);
+}
+static int compare_gap_ids(const void *a,const void *b){
+    const uint32_t x=*(const uint32_t*)a,y=*(const uint32_t*)b;
+    return (x>y)-(x<y);
+}
 static int shared_page_locations(const uint8_t *file,size_t n,
     const char required_signature[6],
     MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *out_count){
@@ -92,6 +104,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
      * additional 16-byte gap-tree record (R2004+ physical format).
      * Never trust a sequential page-id == index assumption. Validation
      * pass is separate from publication of caller-owned output. */
+    const int modern=memcmp(required_signature,"AC1032",6u)==0;
     uint64_t pos=256u;
     uint32_t actual=0u,last_abs_id=0u,found_map=0u,found_section=0u;
     int valid=1,verified_secondary_header=0;
@@ -109,7 +122,7 @@ static int shared_page_locations(const uint8_t *file,size_t n,
          * allocated span may exceed the actual file EOF; its encoded
          * compressed content must still be fully present and checksummed.
          * Earlier pages and gaps MUST fit entirely in source bytes. */
-        if(!id||id<=last_abs_id||id>1048576u||
+        if(!id||(!modern&&id<=last_abs_id)||id>1048576u||
            !size||pos>UINT64_MAX-size||pos>=n){
             valid=0;break;
         }
@@ -220,10 +233,62 @@ static int shared_page_locations(const uint8_t *file,size_t n,
           (verified_secondary_header==3&&n-(size_t)pos==108u)))){
         free(plain);return 0;
     }
-    /* To uphold atomic publication, validate without writing entries
-     * when a caller result array is provided: otherwise malformed later
-     * entries could partially overwrite existing output on failure. */
-    if(entries){
+    /* AC1032 physical page records are ordered by physical FILE location,
+     * not necessarily numeric ID. The exact compressed source map CRC and
+     * every physical span were validated above. Build an independent
+     * ID-ordered scratch map and reject duplicate positive or signed gap
+     * IDs before publishing either output or count. This preserves the
+     * binary-search contract used by AcDb section readers. AC1018 retains
+     * its original strict monotone admission unchanged. */
+    if(modern){
+        MusaDwgAc1018PageLocation *sorted=
+            (MusaDwgAc1018PageLocation*)calloc(
+                h.page_count,sizeof(*sorted));
+        const size_t max_gaps=h.map_decoded_bytes/24u+1u;
+        uint32_t *gap_ids=(uint32_t*)calloc(max_gaps,sizeof(*gap_ids));
+        if(!sorted||!gap_ids){
+            free(sorted);free(gap_ids);free(plain);return 0;
+        }
+        size_t cursor=0u,index=0u,gap_count=0u;
+        uint64_t offset=256u;
+        while(cursor<h.map_decoded_bytes){
+            const uint32_t raw=u32(plain+cursor);
+            const uint32_t span=u32(plain+cursor+4u);
+            const int gap=(raw&UINT32_C(0x80000000))!=0u;
+            if(gap){
+                if(gap_count>=max_gaps){valid=0;break;}
+                gap_ids[gap_count++]=(uint32_t)(-(int64_t)(int32_t)raw);
+            }else{
+                if(index>=h.page_count){valid=0;break;}
+                sorted[index].page_id=raw;
+                sorted[index].file_span_bytes=span;
+                sorted[index].file_offset=offset;
+                ++index;
+            }
+            offset+=span;
+            cursor+=gap?24u:8u;
+        }
+        if(index!=h.page_count)valid=0;
+        if(valid){
+            qsort(sorted,index,sizeof(*sorted),compare_page_ids);
+            qsort(gap_ids,gap_count,sizeof(*gap_ids),compare_gap_ids);
+            for(size_t i=1u;i<index;i++){
+                if(sorted[i-1u].page_id==sorted[i].page_id){
+                    valid=0;break;
+                }
+            }
+            for(size_t i=1u;i<gap_count;i++){
+                if(gap_ids[i-1u]==gap_ids[i]){
+                    valid=0;break;
+                }
+            }
+        }
+        if(valid&&entries)
+            memcpy(entries,sorted,index*sizeof(*sorted));
+        free(gap_ids);free(sorted);
+        if(!valid){free(plain);return 0;}
+    }else if(entries){
+        /* Existing AC1018 file-order semantics remain untouched. */
         size_t cursor=0u;uint64_t off=256u;size_t idx=0u;
         while(cursor<h.map_decoded_bytes){
             const uint32_t raw=u32(plain+cursor);
