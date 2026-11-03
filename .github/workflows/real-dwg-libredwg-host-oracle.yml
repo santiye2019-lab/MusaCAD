@@ -52,6 +52,7 @@ jobs:
           repository: LibreDWG/libredwg
           ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
           path: reference-tools/libredwg
+          submodules: true
           persist-credentials: false
 
       - name: Build separate reference dwgread executable (not a MusaCAD dependency)
