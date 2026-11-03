@@ -25,6 +25,18 @@ korpusu sınanabilir. Telefona veya bilgisayara program kurulmaz.
   kaynak değişimi veya eksik indirme altyapı hatası olarak işaretlenir.
   Rapor GitHub Actions artifact olarak 14 gün saklanır.
 
+## Büyük LibreDWG JSON çıktıları (PR #720 sınır düzeltmesi)
+
+İlk testte LibreDWG JSON çıktısı 128 MiB toplam dosya sınırına takılarak
+`libredwg_json_exceeds_bounded_limit` durumuna düşüyordu. Host-only
+karşılaştırıcı artık tüm JSON'u belleğe yüklemez: sabit sürümlü `ijson`
+olay ayrıştırıcısı ile `OBJECTS` içindeki tür alanlarını tek geçişte
+sayar. Ham koordinat, metin, handle ve layer adları rapora aktarılmaz.
+Toplam JSON boyutu 128 MiB'yi aşsa da sayım devam eder; korunan sınır
+tek bir çizimdeki 2.000.000 nesne kayıt sınırıdır. CI testi özellikle
+128 MiB üzeri JSON ve iç içe sahte kayıtları doğrular. Bu değişiklik
+LibreDWG'yi sadece izole host testine ekler; MusaCAD çekirdeğine eklemez.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
