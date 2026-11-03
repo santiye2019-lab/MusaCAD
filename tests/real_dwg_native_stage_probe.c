@@ -10,6 +10,7 @@
 #include "musacad_dwg_ac1018_file_index.h"
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1018_sections.h"
+#include "musacad_dwg_ac1018_scene.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
@@ -68,6 +69,10 @@ static const char *signature_name(MusaCoreDwgSignature format) {
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
     size_t candidate_handles;
+    int legacy_frame_probe_completed;
+    size_t legacy_frame_crc_ok, legacy_frame_crc_failed;
+    size_t raw_type_17_arc, raw_type_18_circle;
+    size_t raw_type_19_line, raw_type_77_lwpolyline;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -103,6 +108,36 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
             scratch, length, NULL, 0u, &handles) && handles > 0u;
         if (hint.handle_index) hint.candidate_handles = handles;
     }
+    /* Separate bounded experiment: try the existing R2004 CRC-framed
+       record vocabulary against the authenticated candidate index.
+       A numeric BS type is NEVER a decoded AC1024 entity/class/owner.
+       This is diagnostic and not a normal-open or rendering path. */
+    if (hint.handle_index && hint.candidate_handles <= 400000u &&
+        length <= 12u * 1024u * 1024u) {
+        MusaDwgAc1018Scene *scene = NULL;
+        if (musa_dwg_ac1018_scene_open(scratch, length, &scene) &&
+            scene && musa_dwg_ac1018_scene_handle_count(scene) ==
+                     hint.candidate_handles) {
+            hint.legacy_frame_probe_completed = 1;
+            for (size_t i = 0u; i < hint.candidate_handles; i++) {
+                MusaDwgAc1018RecordProbe record = {0};
+                if (!musa_dwg_ac1018_scene_probe_record_at(scene, i, &record)
+                    || !record.record_crc_verified) {
+                    hint.legacy_frame_crc_failed++;
+                    continue;
+                }
+                hint.legacy_frame_crc_ok++;
+                switch (record.declared_type) {
+                case 17u: hint.raw_type_17_arc++; break;
+                case 18u: hint.raw_type_18_circle++; break;
+                case 19u: hint.raw_type_19_line++; break;
+                case 77u: hint.raw_type_77_lwpolyline++; break;
+                default: break;
+                }
+            }
+        }
+        musa_dwg_ac1018_scene_close(scene);
+    }
     memcpy(scratch, "AC1024", 6u);
     return hint;
 }
@@ -121,13 +156,26 @@ static void report(const char *signature, const char *result,
                "\"validated_original_ac1024_decoder\":false,"
                "\"page_map_header\":%s,\"physical_page_map\":%s,"
                "\"objects_section_pages\":%s,\"handles_section_pages\":%s,"
-               "\"candidate_handle_index\":%s,\"candidate_handle_count\":%zu}",
+               "\"candidate_handle_index\":%s,\"candidate_handle_count\":%zu,"
+               "\"legacy_frame_probe_completed\":%s,"
+               "\"legacy_frame_crc_ok\":%zu,\"legacy_frame_crc_failed\":%zu,"
+               "\"legacy_raw_type_17_arc\":%zu,"
+               "\"legacy_raw_type_18_circle\":%zu,"
+               "\"legacy_raw_type_19_line\":%zu,"
+               "\"legacy_raw_type_77_lwpolyline\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
                hint->handle_pages ? "true" : "false",
                hint->handle_index ? "true" : "false",
-               hint->candidate_handles);
+               hint->candidate_handles,
+               hint->legacy_frame_probe_completed ? "true" : "false",
+               hint->legacy_frame_crc_ok,
+               hint->legacy_frame_crc_failed,
+               hint->raw_type_17_arc,
+               hint->raw_type_18_circle,
+               hint->raw_type_19_line,
+               hint->raw_type_77_lwpolyline);
     }
     puts("}");
 }
