@@ -129,6 +129,7 @@ static int ac1024_candidate_frame_crc(
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
     size_t candidate_handles;
+    size_t object_section_page_count, handle_section_page_count;
     int legacy_frame_probe_completed;
     size_t legacy_frame_crc_ok, legacy_frame_crc_failed;
     size_t raw_type_17_arc, raw_type_18_circle;
@@ -176,6 +177,10 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
         hint.handle_pages = musa_dwg_ac1018_section_pages(
             scratch, length, MUSA_DWG_AC1018_HANDLES,
             NULL, 0u, &desc, &handle_pages) && handle_pages > 0u;
+    }
+    if (hint.object_pages && hint.handle_pages) {
+        hint.object_section_page_count = object_pages;
+        hint.handle_section_page_count = handle_pages;
     }
     if (hint.handle_pages) {
         size_t handles = 0u;
@@ -408,6 +413,8 @@ static void report(const char *signature, const char *result,
                "\"page_map_header\":%s,\"physical_page_map\":%s,"
                "\"objects_section_pages\":%s,\"handles_section_pages\":%s,"
                "\"candidate_handle_index\":%s,\"candidate_handle_count\":%zu,"
+               "\"object_section_page_count\":%zu,"
+               "\"handle_section_page_count\":%zu,"
                "\"legacy_frame_probe_completed\":%s,"
                "\"legacy_frame_crc_ok\":%zu,\"legacy_frame_crc_failed\":%zu,"
                "\"legacy_raw_type_17_arc\":%zu,"
@@ -444,6 +451,8 @@ static void report(const char *signature, const char *result,
                hint->handle_pages ? "true" : "false",
                hint->handle_index ? "true" : "false",
                hint->candidate_handles,
+               hint->object_section_page_count,
+               hint->handle_section_page_count,
                hint->legacy_frame_probe_completed ? "true" : "false",
                hint->legacy_frame_crc_ok,
                hint->legacy_frame_crc_failed,
