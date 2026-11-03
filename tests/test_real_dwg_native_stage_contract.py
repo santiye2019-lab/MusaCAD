@@ -37,6 +37,10 @@ def ac1024_probe_record():
             "continuous_candidate_handles": 0,
             "continuous_frame_crc_ok": 0,
             "continuous_frame_crc_failed": 0,
+            "page_absolute_candidate_index": False,
+            "page_absolute_candidate_handles": 0,
+            "page_absolute_frame_crc_ok": 0,
+            "page_absolute_frame_crc_failed": 0,
         }
     }
 
@@ -125,6 +129,27 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("continuous_offset_candidate_index", False),
         ):
             with self.subTest(key=key, value=value):
+                corrupt = deepcopy(record)
+                corrupt["ac1024_compatibility_hypothesis"][key] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(corrupt)
+
+
+    def test_page_absolute_candidate_requires_full_crc_accounting(self):
+        record = ac1024_probe_record()
+        hint = record["ac1024_compatibility_hypothesis"]
+        hint["page_absolute_candidate_index"] = True
+        hint["page_absolute_candidate_handles"] = 145279
+        hint["page_absolute_frame_crc_ok"] = 120000
+        hint["page_absolute_frame_crc_failed"] = 25279
+        self.assertEqual(validate_fake_result(record), record)
+        for key, value in (
+            ("page_absolute_candidate_handles", 145278),
+            ("page_absolute_frame_crc_ok", 145279),
+            ("page_absolute_frame_crc_failed", -1),
+            ("page_absolute_candidate_index", False),
+        ):
+            with self.subTest(key=key):
                 corrupt = deepcopy(record)
                 corrupt["ac1024_compatibility_hypothesis"][key] = value
                 with self.assertRaises(ValueError):
