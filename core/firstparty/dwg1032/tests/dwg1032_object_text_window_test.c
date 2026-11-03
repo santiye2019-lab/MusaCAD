@@ -125,7 +125,61 @@ static void large_cross_page_text(void) {
         scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
     assert(written==77 && utf8[0]=='Z');
 }
+
+/* Synthetic regression: one UTF-16 surrogate pair crosses a reversed
+ * physical RAW-page seam. It is not a DWG entity-decoding fixture. */
+static void surrogate_pair_across_physical_seam(void) {
+    MusaDwg1032FilePage pages[]={
+        {0,HALF,HALF},{HALF,0,FILE_BYTES-HALF}
+    };
+    MusaDwg1032ObjectLocation entries[]={{11,0,FILE_BYTES}};
+    MusaDwg1032ObjectIndex index={0};
+    size_t order[2];
+    const size_t seam_unit=(HALF-4u)/2u-1u;
+    const size_t expected_bytes=3u*N-2u;
+    /* 40,000-byte MS payload with two code units replaced by one scalar. */
+    put_logical(0,0x40); put_logical(1,0x9c);
+    put_logical(2,1); put_logical(3,0);
+    for (size_t i=0;i<N;++i) {
+        put_logical(4u+2u*i,0xac);
+        put_logical(5u+2u*i,0x20);
+    }
+    assert(4u+2u*(seam_unit+1u)==HALF);
+    put_logical(4u+2u*seam_unit,0x3d);
+    put_logical(5u+2u*seam_unit,0xd8);
+    put_logical(4u+2u*(seam_unit+1u),0x00);
+    put_logical(5u+2u*(seam_unit+1u),0xde);
+    assert(musa_dwg1032_file_pages_validate_window_directory(
+        pages,2,FILE_BYTES,FILE_BYTES,order,2));
+    assert(musa_dwg1032_object_index_init(
+        &index,entries,1,FILE_BYTES));
+    assert(musa_dwg1032_object_spans_prepare(&index,order,2));
+    size_t written=91u;
+    memset(utf8,0x5a,sizeof(utf8));
+    assert(musa_dwg1032_object_ms_utf16le_text(
+        file,FILE_BYTES,pages,2,&index,11,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==expected_bytes && utf8[written]=='\0');
+    const size_t seam_utf8=3u*seam_unit;
+    assert((unsigned char)utf8[seam_utf8]==0xf0u);
+    assert((unsigned char)utf8[seam_utf8+1u]==0x9fu);
+    assert((unsigned char)utf8[seam_utf8+2u]==0x98u);
+    assert((unsigned char)utf8[seam_utf8+3u]==0x80u);
+    assert((unsigned char)utf8[seam_utf8+4u]==0xe2u);
+    assert((unsigned char)utf8[written-1u]==0xacu);
+    /* Ordinal viewport access must yield the identical scalar and length. */
+    written=92u;
+    memset(utf8,0x5a,sizeof(utf8));
+    assert(musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==expected_bytes && utf8[written]=='\0');
+    assert((unsigned char)utf8[seam_utf8]==0xf0u);
+    assert((unsigned char)utf8[seam_utf8+3u]==0x80u);
+}
+
 int main(void) {
     large_cross_page_text();
+    surrogate_pair_across_physical_seam();
     return 0;
 }
