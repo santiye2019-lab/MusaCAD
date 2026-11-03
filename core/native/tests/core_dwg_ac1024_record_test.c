@@ -158,11 +158,63 @@ static int test_short_ot_only(void) {
     return 1;
 }
 
+/* Only a CRC-backed MC count INSIDE the verified payload may define a
+ * candidate handle-stream bit window. Neither H nor geometry is read. */
+static int test_declared_handle_stream_window(void) {
+    _Alignas(MusaDwgAc1024StreamBounds) uint8_t record[64] = {0};
+    record[0] = 8u; /* MS body bytes */
+    record[2] = 16u; /* 16 handle bits including pad, one MC byte */
+    record[3] = 0x04u; record[4] = 0xc0u; /* numeric OT 19 */
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    MusaDwgAc1024StreamBounds out = {0};
+    if (!musa_dwg_ac1024_record_stream_bounds(record, 13u, 0u, &out) ||
+        !out.record_crc16_verified || out.payload_start_byte != 3u ||
+        out.data_after_ot_bit != 10u || out.handle_stream_bits != 16u ||
+        out.handle_stream_start_bit != 48u ||
+        out.handle_stream_end_bit != 64u || out.raw_object_type != 19u)
+        return 0;
+    const MusaDwgAc1024StreamBounds saved = out;
+    /* 55 handle bits leave 9 OT bits: reject even with valid CRC. */
+    record[2] = 55u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_stream_bounds(record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(saved)))
+        return 0;
+    /* 65 bits overflow the entire 64-bit body; still reject. */
+    record[2] = 65u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_stream_bounds(record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(saved)))
+        return 0;
+    /* No source/output alias, no release of an unverified window. */
+    record[2] = 16u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_stream_bounds(
+            record, 13u, 0u, (MusaDwgAc1024StreamBounds *)(void *)record) ||
+        musa_dwg_ac1024_record_stream_bounds(record, 12u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(saved)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     for (size_t i = 1u; i <= 3u; i++)
         if (!test_one(i)) return 1;
     if (!test_ot_variants() || !test_bad_prefix() ||
-        !test_short_ot_only()) return 2;
+        !test_short_ot_only() || !test_declared_handle_stream_window()) return 2;
     puts("First-party AC1024 record-envelope and raw OT: pass");
     return 0;
 }
