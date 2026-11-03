@@ -312,6 +312,33 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("incomplete_ac1024_special_record_triage")
         elif any(hint[k] for k in bounds_fields + special_fields):
             raise ValueError("unmeasured_ac1024_bounds_or_special_claim")
+        stream_fields = (
+            "core_stream_bounds_verified", "core_stream_bounds_rejected",
+            "core_stream_bounds_mismatch", "core_empty_handle_streams",
+        )
+        sample_fields = (
+            "sampled_first_h_attempts", "sampled_first_h_self_matches",
+            "sampled_first_h_other", "sampled_first_h_unreadable",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in stream_fields + sample_fields):
+            raise ValueError("invalid_ac1024_stream_or_h_sample_counts")
+        stream_ok, stream_rejected, stream_mismatch, empty_streams = (
+            hint[k] for k in stream_fields)
+        attempts, self_matches, other_h, unreadable_h = (
+            hint[k] for k in sample_fields)
+        if measured:
+            if (stream_ok + stream_rejected != core_ok or
+                    stream_mismatch > stream_ok or
+                    empty_streams > stream_ok or
+                    stream_mismatch):
+                raise ValueError("invalid_ac1024_handle_stream_bounds")
+            if (not 1 <= attempts <= min(handles, 2048) or
+                    self_matches + other_h + unreadable_h != attempts or
+                    self_matches > stream_ok):
+                raise ValueError("invalid_ac1024_first_handle_sample")
+        elif any(hint[k] for k in stream_fields + sample_fields):
+            raise ValueError("unmeasured_ac1024_handle_stream_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
