@@ -1,7 +1,6 @@
 package com.musa.cad;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -184,10 +183,14 @@ public final class MusaCadDiagnosticReports {
             }
             if(connection.getResponseCode()!=200)return false;
             try(InputStream in=connection.getInputStream()){
-                byte[] response=new byte[256];int length=in.read(response);
-                if(length<=0)return false;
-                String text=new String(response,0,length,StandardCharsets.UTF_8);
-                JSONObject ack=new JSONObject(text);
+                java.io.ByteArrayOutputStream response=new java.io.ByteArrayOutputStream();
+                byte[] chunk=new byte[256];int n;
+                while((n=in.read(chunk))!=-1){
+                    if(response.size()+n>2048)return false;
+                    response.write(chunk,0,n);
+                }
+                if(response.size()==0)return false;
+                JSONObject ack=new JSONObject(response.toString("UTF-8"));
                 String expected=file.getName().replace(".json","");
                 return "stored".equals(ack.optString("status")) &&
                     expected.equals(ack.optString("id"));
