@@ -22,7 +22,6 @@ from real_dwg_native_stage_matrix import run_probe
 
 PILOT = "Projeler/01-KARAGÜMRÜK STADYUM - PİS SU TESİSATI.dwg"
 SAFE_TYPE = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
-MAX_JSON_BYTES = 128 * 1024 * 1024
 
 
 def observable_inventory(payload: object) -> dict:
@@ -69,6 +68,79 @@ def observable_inventory(payload: object) -> dict:
     }
 
 
+def observable_inventory_stream(stream) -> dict:
+    """Count typed OBJECTS in a potentially multi-gigabyte JSON stream.
+
+    ijson emits parser events one at a time. In particular, non-OBJECTS
+    payloads, geometry, coordinates, labels and handles are never materialized
+    into a large Python object. A record contributes to the count only after
+    its complete top-level object has been seen.
+    """
+    import ijson  # CI-only host tool; never linked or bundled into MusaCAD.
+
+    entity = Counter()
+    other = Counter()
+    unknown = 0
+    total = 0
+    seen_objects = False
+    in_record = False
+    record_entity = None
+    record_object = None
+
+    for prefix, event, value in ijson.parse(stream):
+        if prefix == "OBJECTS" and event == "start_array":
+            if seen_objects:
+                raise ValueError("duplicate_reference_objects_array")
+            seen_objects = True
+        elif seen_objects and prefix == "OBJECTS.item":
+            if event == "start_map":
+                in_record = True
+                record_entity = None
+                record_object = None
+            elif event == "end_map" and in_record:
+                total += 1
+                if record_entity is not None:
+                    entity[record_entity] += 1
+                elif record_object is not None:
+                    other[record_object] += 1
+                else:
+                    unknown += 1
+                in_record = False
+            elif event in ("start_array", "string", "number", "boolean", "null"):
+                # Non-map array entries are not decoded CAD entities.
+                total += 1
+                unknown += 1
+        elif in_record and prefix == "OBJECTS.item.entity":
+            if event == "string" and SAFE_TYPE.fullmatch(value):
+                record_entity = value
+            elif event != "map_key":
+                record_entity = None
+        elif in_record and prefix == "OBJECTS.item.object":
+            if event == "string" and SAFE_TYPE.fullmatch(value):
+                record_object = value
+            elif event != "map_key":
+                record_object = None
+        if total > 2_000_000:
+            raise ValueError("unbounded_reference_objects")
+
+    if not seen_objects:
+        raise ValueError("unsupported_libredwg_json_schema")
+    if not entity and not other:
+        raise ValueError("reference_has_no_typed_objects")
+    return {
+        "reference_total_object_records": total,
+        "reference_typed_entity_count": sum(entity.values()),
+        "reference_typed_nonentity_count": sum(other.values()),
+        "reference_unclassified_count": unknown,
+        "reference_entities_by_type": dict(sorted(entity.items())),
+        "reference_layer_record_count": other.get("LAYER", 0),
+        "reference_block_header_record_count": other.get("BLOCK_HEADER", 0),
+        "reference_nonentities_by_type": dict(sorted(other.items())),
+        "reference_status": "libredwg_typed_inventory_only",
+    }
+
+
+
 def reference_read(executable: Path, source: Path, timeout: int) -> dict:
     with tempfile.TemporaryDirectory(prefix="musacad-oracle-") as folder:
         output = Path(folder) / "reference.json"
@@ -84,12 +156,14 @@ def reference_read(executable: Path, source: Path, timeout: int) -> dict:
         if process.returncode != 0:
             return {"reference_status": "libredwg_rejected_or_failed",
                     "reference_exit_code": process.returncode}
-        if output.stat().st_size > MAX_JSON_BYTES:
-            return {"reference_status": "libredwg_json_exceeds_bounded_limit"}
         try:
-            with output.open("r", encoding="utf-8") as stream:
-                return observable_inventory(json.load(stream))
-        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
+            import ijson
+            with output.open("rb") as stream:
+                inventory = observable_inventory_stream(stream)
+            inventory["reference_json_bytes"] = output.stat().st_size
+            return inventory
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError,
+                ijson.JSONError) as error:
             return {"reference_status": "libredwg_unusable_json",
                     "reference_reason": str(error)[:80] if isinstance(error, ValueError)
                     else type(error).__name__}
