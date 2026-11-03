@@ -99,6 +99,22 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             raise ValueError("unsupported_ac1024_raw_record_claim")
         if sum(hint[k] for k in fields[2:]) > hint["legacy_frame_crc_ok"]:
             raise ValueError("invalid_ac1024_type_claim")
+        continuous = hint.get("continuous_offset_candidate_index")
+        continuous_count = hint.get("continuous_candidate_handles")
+        continuous_ok = hint.get("continuous_frame_crc_ok")
+        continuous_bad = hint.get("continuous_frame_crc_failed")
+        if (type(continuous) is not bool or
+                any(type(value) is not int or value < 0
+                    for value in (continuous_count, continuous_ok, continuous_bad))):
+            raise ValueError("invalid_ac1024_continuous_contract")
+        if continuous:
+            if (not hint["candidate_handle_index"] or
+                    continuous_count != handles or
+                    continuous_count > 400_000 or
+                    continuous_ok + continuous_bad != continuous_count):
+                raise ValueError("invalid_ac1024_continuous_coverage")
+        elif continuous_count or continuous_ok or continuous_bad:
+            raise ValueError("unproven_ac1024_continuous_index")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
