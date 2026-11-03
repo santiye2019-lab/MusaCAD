@@ -41,6 +41,16 @@ jobs:
           lfs: true
           persist-credentials: false
 
+      - name: Set up test-only Python for incremental JSON parsing
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned stream parser in ephemeral CI host only
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-input ijson==3.4.0.post0
+
       - name: Unit-test independent count extractor before processing DWGs
         run: |
           set -euo pipefail
