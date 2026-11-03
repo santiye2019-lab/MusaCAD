@@ -51,6 +51,29 @@ static void large_cross_page_text(void) {
         assert((unsigned char)utf8[3u*i+1u]==0x82u);
         assert((unsigned char)utf8[3u*i+2u]==0xacu);
     }
+    /* The ordinal fast path must produce byte-for-byte identical UTF-8
+     * for a large cross-page field, without an extra handle lookup. */
+    memset(utf8,0x5a,sizeof(utf8));
+    written=91u;
+    assert(musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==3u*N && utf8[written]=='\0');
+    for (size_t i=0;i<N;++i) {
+        assert((unsigned char)utf8[3u*i]==0xe2u);
+        assert((unsigned char)utf8[3u*i+1u]==0x82u);
+        assert((unsigned char)utf8[3u*i+2u]==0xacu);
+    }
+    /* A position is an index ordinal, never a byte offset or handle. */
+    written=123u;
+    memset(utf8,0x5a,sizeof(utf8));
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,1,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,SIZE_MAX,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==123u && utf8[0]=='Z' && utf8[3u*N]=='Z');
     /* A malformed LAST scalar must not expose earlier valid geometry text. */
     put_logical(FILE_BYTES-2u,0);
     put_logical(FILE_BYTES-1u,0xd8);
