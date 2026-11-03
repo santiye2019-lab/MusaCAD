@@ -131,6 +131,36 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("invalid_ac1024_page_absolute_coverage")
         elif absolute_count or absolute_ok or absolute_bad:
             raise ValueError("unproven_ac1024_page_absolute_index")
+        measured = hint.get("legacy_offset_distribution_measured")
+        offset_fields = ("legacy_distinct_offsets",
+                         "legacy_duplicate_offset_entries",
+                         "legacy_zero_offset_entries",
+                         "legacy_max_offset_multiplicity",
+                         "legacy_distinct_frame_crc_pass",
+                         "legacy_repeated_crc_pass_entries")
+        if (type(measured) is not bool or
+                any(type(hint.get(k)) is not int or hint[k] < 0
+                    for k in offset_fields)):
+            raise ValueError("invalid_ac1024_offset_diagnostic_contract")
+        (distinct, duplicates, zeros, max_repeat,
+         distinct_crc, crc_entries) = (hint[k] for k in offset_fields)
+        if measured:
+            if (not hint["candidate_handle_index"] or
+                    handles > 400_000 or
+                    distinct + duplicates != handles or
+                    not 1 <= distinct <= handles or
+                    not 1 <= max_repeat <= handles or
+                    zeros > max_repeat or
+                    max_repeat > duplicates + 1 or
+                    distinct_crc > distinct or
+                    crc_entries > handles or
+                    crc_entries < distinct_crc or
+                    (distinct_crc == 0) != (crc_entries == 0)):
+                raise ValueError("inconsistent_ac1024_offset_evidence")
+            if duplicates == 0 and max_repeat != 1:
+                raise ValueError("false_unique_ac1024_offset_claim")
+        elif any(hint[k] for k in offset_fields):
+            raise ValueError("unmeasured_ac1024_offset_evidence")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
