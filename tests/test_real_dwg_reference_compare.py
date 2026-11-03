@@ -1,10 +1,11 @@
 """Test read-only observable reference inventory; no GPL code or drawings."""
 import json
+from io import BytesIO
 from pathlib import Path
 import tempfile
 import unittest
 
-from real_dwg_reference_compare import observable_inventory, reference_read
+from real_dwg_reference_compare import (observable_inventory, observable_inventory_stream, reference_read)
 
 
 class ObservableReferenceTest(unittest.TestCase):
@@ -38,6 +39,43 @@ class ObservableReferenceTest(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 with self.assertRaises(ValueError):
                     observable_inventory(invalid)
+
+
+    def test_streaming_schema_parity_and_nested_spoofing(self):
+        document = {
+            "HEADER": {"irrelevant": [{"entity": "FAKE"}]},
+            "OBJECTS": [
+                {"entity": "LINE", "details": {"entity": "FAKE", "object": "LAYER"}},
+                {"object": "LAYER"},
+                {"entity": "INSERT", "name": "never-export-me"},
+                {"type": 17, "details": {"entity": "FAKE"}},
+                "unclassified",
+            ],
+        }
+        expected = observable_inventory(document)
+        actual = observable_inventory_stream(BytesIO(json.dumps(document).encode()))
+        self.assertEqual(actual, expected)
+        self.assertNotIn("never-export-me", json.dumps(actual))
+        for invalid in ({}, {"OBJECTS": []}, {"OBJECTS": "not-an-array"}):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    observable_inventory_stream(BytesIO(json.dumps(invalid).encode()))
+
+    def test_streaming_counts_beyond_original_128_mib_json_cap(self):
+        # Stream >128 MiB of disposable non-CAD metadata, keeping each token
+        # 64 KiB; do not build a huge JSON object or allocate huge RAM.
+        with tempfile.TemporaryFile() as output:
+            output.write(b'{"HEADER":{"padding":[')
+            chunk = b'"' + (b'x' * 65536) + b'",'
+            for _ in range(2048):
+                output.write(chunk)
+            output.write(b'"" ]},"OBJECTS":[{"entity":"LINE"},{"object":"LAYER"}]}')
+            self.assertGreater(output.tell(), 128 * 1024 * 1024)
+            output.seek(0)
+            result = observable_inventory_stream(output)
+        self.assertEqual(result["reference_typed_entity_count"], 1)
+        self.assertEqual(result["reference_layer_record_count"], 1)
+        self.assertEqual(result["reference_unclassified_count"], 0)
 
     def test_bounded_cli_success_and_nonzero_are_distinct(self):
         with tempfile.TemporaryDirectory() as temp:
