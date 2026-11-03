@@ -220,6 +220,17 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("inconsistent_ac1024_frame_adjacency")
         elif any(hint[k] for k in next_fields):
             raise ValueError("unmeasured_ac1024_frame_adjacency")
+        gap_fields = (
+            "legacy_short_gap_1", "legacy_short_gap_2",
+            "legacy_short_gap_3", "legacy_short_gap_4",
+            "legacy_short_gap_5to16", "legacy_short_gap_17to64",
+            "legacy_short_gap_over64",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in gap_fields):
+            raise ValueError("invalid_ac1024_short_gap_histogram")
+        if sum(hint[k] for k in gap_fields) != short:
+            raise ValueError("incomplete_ac1024_short_gap_histogram")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
