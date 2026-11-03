@@ -43,10 +43,16 @@ class NativeDwgStageProbeTest(unittest.TestCase):
         self.assertEqual(record["result"], "rejected")
         self.assertEqual(record["native_stage"], "ac1032_page_map_header")
 
-    def test_r2010_version_is_not_falsely_accepted_as_r2004(self):
+    def test_r2010_fake_header_fails_authenticated_map_gate(self):
         record = self.probe(b"AC1024" + bytes(506))
-        self.assertEqual(record["result"], "not_covered_by_this_native_probe")
-        self.assertEqual(record["native_stage"], "signature_only")
+        self.assertEqual(record["result"], "rejected")
+        self.assertEqual(record["native_stage"], "ac1024_page_map_header")
+        self.assertEqual(record["evidence_count"], 0)
+
+    def test_r2010_does_not_accept_r2004_signature_without_real_map(self):
+        record = self.probe(b"AC1018" + bytes(506))
+        self.assertEqual(record["result"], "rejected")
+        self.assertEqual(record["native_stage"], "ac1018_page_map_header")
 
     def test_r2013_version_is_not_falsely_accepted_as_r2018(self):
         record = self.probe(b"AC1027" + bytes(506))

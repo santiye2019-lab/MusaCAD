@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1024_page_map.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -65,6 +66,13 @@ static int shared_page_map_header(const uint8_t *file,size_t n,
 int musa_dwg_ac1018_page_map_header(
     const uint8_t *file,size_t n,MusaDwgAc1018FileMapHeader *out){
     return shared_page_map_header(file,n,"AC1018",out);
+}
+/* AC1024 (R2010) shares the authenticated R2004 file header and physical
+ * page-map envelope. Do not use the AC1018 object/geometry decoder: R2010
+ * bit coding and object types differ. Fail closed on any structural reject. */
+int musa_dwg_ac1024_page_map_header(
+    const uint8_t *file,size_t n,MusaDwgAc1024FileMapHeader *out){
+    return shared_page_map_header(file,n,"AC1024",out);
 }
 /* AC1032 is a different OBJECT schema but retains the documented R2004
  * family encrypted HEADER/page-location structural organization. The
@@ -329,4 +337,11 @@ int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t n,
 int musa_dwg_ac1032_page_locations(const uint8_t *file,size_t n,
     MusaDwgAc1032PageLocation *entries,size_t capacity,size_t *count){
     return shared_page_locations(file,n,"AC1032",entries,capacity,count);
+}
+
+/* The physical page map is shared with R2004, NOT its object layout.
+ * This is only authenticated container-index admission, never geometry. */
+int musa_dwg_ac1024_page_locations(const uint8_t *file,size_t n,
+    MusaDwgAc1024PageLocation *entries,size_t capacity,size_t *count){
+    return shared_page_locations(file,n,"AC1024",entries,capacity,count);
 }
