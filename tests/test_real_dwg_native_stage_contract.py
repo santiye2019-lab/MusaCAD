@@ -371,6 +371,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "core_payload_bounds_verified": 145277,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
+            "mc_invalid_ms_zero": 2,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
