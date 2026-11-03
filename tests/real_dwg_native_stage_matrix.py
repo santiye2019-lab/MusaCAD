@@ -254,6 +254,23 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("incomplete_ac1024_mc_frame_evidence")
         elif mc_complete or any(hint[k] for k in mc_fields):
             raise ValueError("unmeasured_ac1024_mc_frame_claim")
+        ot_fields = (
+            "mc_ot_decoded", "mc_ot_unreadable",
+            "mc_ot_raw_1", "mc_ot_raw_7", "mc_ot_raw_17",
+            "mc_ot_raw_18", "mc_ot_raw_19", "mc_ot_raw_44",
+            "mc_ot_raw_49", "mc_ot_raw_51", "mc_ot_raw_77",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in ot_fields):
+            raise ValueError("invalid_ac1024_ot_type_contract")
+        ot_decoded = hint["mc_ot_decoded"]
+        ot_unreadable = hint["mc_ot_unreadable"]
+        if measured:
+            if (ot_decoded + ot_unreadable != mc_ok or
+                    sum(hint[k] for k in ot_fields[2:]) > ot_decoded):
+                raise ValueError("inconsistent_ac1024_ot_counts")
+        elif any(hint[k] for k in ot_fields):
+            raise ValueError("unmeasured_ac1024_ot_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
