@@ -287,6 +287,31 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("firstparty_ac1024_core_disagrees_with_diagnostic")
         elif any(hint[k] for k in core_fields):
             raise ValueError("unmeasured_ac1024_core_probe_claim")
+        bounds_fields = (
+            "core_payload_bounds_verified", "core_payload_bounds_rejected",
+            "core_payload_bounds_mismatch",
+        )
+        special_fields = (
+            "mc_unreadable_invalid_ms", "mc_unreadable_short_or_boundary",
+            "mc_unreadable_other", "mc_unreadable_first_half",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in bounds_fields + special_fields):
+            raise ValueError("invalid_ac1024_bounds_or_special_contract")
+        bounds_ok, bounds_failed, bounds_mismatch = (
+            hint[k] for k in bounds_fields)
+        invalid_ms, truncated, other, first_half = (
+            hint[k] for k in special_fields)
+        if measured:
+            if bounds_ok + bounds_failed != core_ok or
+                    bounds_mismatch > bounds_ok or
+                    bounds_failed or bounds_mismatch:
+                raise ValueError("firstparty_ac1024_payload_bounds_mismatch")
+            if invalid_ms + truncated + other != mc_unreadable or
+                    first_half > mc_unreadable:
+                raise ValueError("incomplete_ac1024_special_record_triage")
+        elif any(hint[k] for k in bounds_fields + special_fields):
+            raise ValueError("unmeasured_ac1024_bounds_or_special_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
