@@ -107,6 +107,9 @@ typedef struct MusaAc1024CompatibilityHint {
     int continuous_offset_candidate_index;
     size_t continuous_candidate_handles;
     size_t continuous_frame_crc_ok, continuous_frame_crc_failed;
+    int page_absolute_candidate_index;
+    size_t page_absolute_candidate_handles;
+    size_t page_absolute_frame_crc_ok, page_absolute_frame_crc_failed;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -225,6 +228,35 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                 }
                 free(entries);
             }
+            /* Third, distinct CRC-backed handle-map encoding; a missing
+               continuous-index result must not be taken as permission to
+               invent record positions. */
+            size_t absolute_count = 0u;
+            if (objects && handles && got_obj == nb && got_h == hb &&
+                musa_dwg_ac1018_handles_index_page_absolute_handles(
+                    handles, hb, nb, NULL, 0u, &absolute_count) &&
+                absolute_count == hint.candidate_handles &&
+                absolute_count <= SIZE_MAX / sizeof(MusaDwgAc1018HandleEntry)) {
+                MusaDwgAc1018HandleEntry *absolute_entries =
+                    (MusaDwgAc1018HandleEntry *)malloc(
+                        absolute_count * sizeof(*absolute_entries));
+                size_t actual_abs = 0u;
+                if (absolute_entries &&
+                    musa_dwg_ac1018_handles_index_page_absolute_handles(
+                        handles, hb, nb, absolute_entries,
+                        absolute_count, &actual_abs) &&
+                    actual_abs == absolute_count) {
+                    hint.page_absolute_candidate_index = 1;
+                    hint.page_absolute_candidate_handles = actual_abs;
+                    for (size_t j = 0u; j < actual_abs; j++) {
+                        if (ac1024_candidate_frame_crc(
+                              objects, nb, absolute_entries[j].object_offset))
+                            hint.page_absolute_frame_crc_ok++;
+                        else hint.page_absolute_frame_crc_failed++;
+                    }
+                }
+                free(absolute_entries);
+            }
             free(handles);
             free(objects);
         }
@@ -257,7 +289,11 @@ static void report(const char *signature, const char *result,
                "\"continuous_offset_candidate_index\":%s,"
                "\"continuous_candidate_handles\":%zu,"
                "\"continuous_frame_crc_ok\":%zu,"
-               "\"continuous_frame_crc_failed\":%zu}",
+               "\"continuous_frame_crc_failed\":%zu,"
+               "\"page_absolute_candidate_index\":%s,"
+               "\"page_absolute_candidate_handles\":%zu,"
+               "\"page_absolute_frame_crc_ok\":%zu,"
+               "\"page_absolute_frame_crc_failed\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -274,7 +310,11 @@ static void report(const char *signature, const char *result,
                hint->continuous_offset_candidate_index ? "true" : "false",
                hint->continuous_candidate_handles,
                hint->continuous_frame_crc_ok,
-               hint->continuous_frame_crc_failed);
+               hint->continuous_frame_crc_failed,
+               hint->page_absolute_candidate_index ? "true" : "false",
+               hint->page_absolute_candidate_handles,
+               hint->page_absolute_frame_crc_ok,
+               hint->page_absolute_frame_crc_failed);
     }
     puts("}");
 }
