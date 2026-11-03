@@ -127,6 +127,8 @@ static int original(const char *filename){
         if(!ok)fprintf(stderr,
             "FAIL original CIRCLE per-child BLOCK owner/OT51/affine bounds\\n");
     }
+    uint64_t packet_source_handles[2]={0u,0u};
+    size_t packet_source_lines[2]={0u,0u},packet_source_count=0u;
     size_t inserts=0u,admitted=0u,verified=0u;
     size_t graph_ok=0u,inventory_ok=0u,affine_ok=0u;
     size_t line_sources_ok=0u,segments_ok=0u;
@@ -296,6 +298,53 @@ static int original(const char *filename){
                    !complete_lines.original_source_geometry_verified||
                    complete_lines.final_display_accepted||
                    complete_lines.line_count==0u){ok=0;break;}
+                /* Authentic source INSERT packet; never promotes scene
+                 * geometry to viewport / color / final paint admission. */
+                if(packet_source_count<2u){
+                    MusaDwgAc1032LineSceneItem scene_items[
+                        MUSACAD_AC1032_OT49_CHILD_LIMIT]={0};
+                    const uint64_t one_handle=entry.handle;
+                    size_t produced=SIZE_MAX;
+                    if(!musa_dwg_ac1032_scene_index_build_line_scene_packet(
+                           scene,&one_handle,1u,scene_items,
+                           MUSACAD_AC1032_OT49_CHILD_LIMIT,&produced)||
+                       produced!=complete_lines.line_count){ok=0;break;}
+                    for(size_t si=0u;si<produced;si++){
+                        const MusaDwgAc1032LineSceneItem *item=&scene_items[si];
+                        if(item->insert_handle!=entry.handle||
+                           item->block_header_handle!=coverage.block_header_handle||
+                           item->line_handle!=complete_lines.child_handles[si]){
+                            ok=0;break;
+                        }
+                        for(unsigned axis=0u;axis<4u;axis++)
+                            if(!near(item->xy[axis],
+                                     complete_lines.endpoints[si][axis]))
+                                ok=0;
+                    }
+                    if(!ok)break;
+                    MusaDwgAc1032LineSceneItem untouched[
+                        MUSACAD_AC1032_OT49_CHILD_LIMIT];
+                    memset(untouched,0xa5,sizeof(untouched));
+                    MusaDwgAc1032LineSceneItem saved[
+                        MUSACAD_AC1032_OT49_CHILD_LIMIT];
+                    memcpy(saved,untouched,sizeof(saved));
+                    size_t unchanged_count=SIZE_MAX;
+                    const uint64_t duplicate[2]={one_handle,one_handle};
+                    if(musa_dwg_ac1032_scene_index_build_line_scene_packet(
+                           scene,duplicate,2u,untouched,
+                           MUSACAD_AC1032_OT49_CHILD_LIMIT,&unchanged_count)||
+                       musa_dwg_ac1032_scene_index_build_line_scene_packet(
+                           scene,&one_handle,1u,untouched,
+                           produced-1u,&unchanged_count)||
+                       musa_dwg_ac1032_scene_index_build_line_scene_packet(
+                           NULL,&one_handle,1u,untouched,
+                           MUSACAD_AC1032_OT49_CHILD_LIMIT,&unchanged_count)||
+                       unchanged_count!=SIZE_MAX||
+                       memcmp(untouched,saved,sizeof(saved))){ok=0;break;}
+                    packet_source_handles[packet_source_count]=one_handle;
+                    packet_source_lines[packet_source_count]=produced;
+                    packet_source_count++;
+                }
                 MusaDwgAc1032CompleteBlockLineBatch batch={0};
                 if(!musa_dwg_ac1032_complete_block_line_batch(
                        scene,entry.handle,&batch)||
@@ -1363,6 +1412,23 @@ static int original(const char *filename){
                previous,MUSACAD_AC1032_OT49_CHILD_LIMIT+1u,
                UINT64_C(0x789));
     }
+    /* Two distinct genuine INSERT sources can be concatenated without
+     * inventing paint, model-space or complete-DWG acceptance. */
+    if(ok&&packet_source_count==2u){
+        MusaDwgAc1032LineSceneItem joined[
+            MUSACAD_AC1032_OT49_CHILD_LIMIT*2u]={0};
+        size_t joined_count=SIZE_MAX;
+        if(!musa_dwg_ac1032_scene_index_build_line_scene_packet(
+               scene,packet_source_handles,2u,joined,
+               MUSACAD_AC1032_OT49_CHILD_LIMIT*2u,&joined_count)||
+           joined_count!=packet_source_lines[0]+packet_source_lines[1])ok=0;
+        size_t cursor=0u;
+        for(unsigned batch=0u;ok&&batch<2u;batch++)
+            for(size_t k=0u;ok&&k<packet_source_lines[batch];k++)
+                if(joined[cursor++].insert_handle!=packet_source_handles[batch])
+                    ok=0;
+    }
+    if(!packet_source_count)ok=0;
     fprintf(stderr,"%s genuine R2018 Dynblocks INSERT source LINE: "
                    "%zu INSERT, %zu strict source joins, %zu lines; "
                    "first H%llx child H%llx (%.8f %.8f)-(%.8f %.8f); "
