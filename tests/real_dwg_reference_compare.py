@@ -21,7 +21,7 @@ from real_dwg_lfs_corpus_audit import LFS_POINTER, file_digest, git_bytes, track
 from real_dwg_native_stage_matrix import run_probe
 
 PILOT = "Projeler/01-KARAGÜMRÜK STADYUM - PİS SU TESİSATI.dwg"
-SAFE_TYPE = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
+SAFE_TYPE = re.compile(r"[A-Z0-9][A-Z0-9_]{0,63}\Z")
 
 
 def observable_inventory(payload: object) -> dict:
@@ -86,8 +86,11 @@ def observable_inventory_stream(stream) -> dict:
     in_record = False
     record_entity = None
     record_object = None
+    decoder_warning_mask = None
 
     for prefix, event, value in ijson.parse(stream):
+        if prefix == "DECODER_WARNING_MASK" and event == "number":
+            decoder_warning_mask = int(value)
         if prefix == "OBJECTS" and event == "start_array":
             if seen_objects:
                 raise ValueError("duplicate_reference_objects_array")
@@ -127,7 +130,7 @@ def observable_inventory_stream(stream) -> dict:
         raise ValueError("unsupported_libredwg_json_schema")
     if not entity and not other:
         raise ValueError("reference_has_no_typed_objects")
-    return {
+    result = {
         "reference_total_object_records": total,
         "reference_typed_entity_count": sum(entity.values()),
         "reference_typed_nonentity_count": sum(other.values()),
@@ -138,10 +141,13 @@ def observable_inventory_stream(stream) -> dict:
         "reference_nonentities_by_type": dict(sorted(other.items())),
         "reference_status": "libredwg_typed_inventory_only",
     }
+    if decoder_warning_mask is not None:
+        result["reference_decoder_warning_mask"] = decoder_warning_mask
+    return result
 
 
 
-def reference_read(executable: Path, source: Path, timeout: int) -> dict:
+def reference_read(executable: Path, source: Path, timeout: int, host_probe: Path | None = None) -> dict:
     """Try strict JSON, then LibreDWG's independently formatted minJSON.
 
     A successful exit code is never mistaken for successful parsing. Each
@@ -193,6 +199,33 @@ def reference_read(executable: Path, source: Path, timeout: int) -> dict:
                 attempts.append({"mode": mode, "status": kind,
                                  "output_bytes": byte_count})
 
+        if host_probe is not None:
+            with output.open("wb") as stream:
+                try:
+                    process = subprocess.run(
+                        [str(host_probe), str(source)],
+                        stdout=stream, stderr=subprocess.DEVNULL,
+                        check=False, timeout=timeout,
+                    )
+                except subprocess.TimeoutExpired:
+                    attempts.append({"mode": "direct_types", "status": "timeout"})
+                    process = None
+            if process is not None and process.returncode == 0:
+                try:
+                    with output.open("rb") as stream:
+                        inventory = observable_inventory_stream(stream)
+                    inventory["reference_json_bytes"] = output.stat().st_size
+                    inventory["reference_output_mode"] = "libredwg_host_direct_types"
+                    inventory["reference_json_exporter_failed"] = True
+                    return inventory
+                except (OSError, ValueError, ijson.JSONError):
+                    attempts.append({"mode": "direct_types",
+                                     "status": "invalid_typed_inventory"})
+            elif process is not None:
+                attempts.append({"mode": "direct_types",
+                                 "status": "exit_nonzero",
+                                 "exit_code": process.returncode})
+
         if all(item["status"] == "exit_nonzero" for item in attempts):
             return {"reference_status": "libredwg_rejected_or_failed",
                     "reference_exit_code": attempts[0]["exit_code"],
@@ -224,6 +257,7 @@ def main() -> int:
     parser.add_argument("--repository", type=Path, default=Path("."))
     parser.add_argument("--dwgread", required=True, type=Path)
     parser.add_argument("--probe", required=True, type=Path)
+    parser.add_argument("--reference-probe", type=Path)
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=90)
@@ -231,7 +265,9 @@ def main() -> int:
     repo = args.repository.resolve()
     executable = args.dwgread.resolve()
     probe = args.probe.resolve()
-    if not executable.is_file() or not probe.is_file():
+    host_probe = args.reference_probe.resolve() if args.reference_probe else None
+    if (not executable.is_file() or not probe.is_file()
+            or (host_probe is not None and not host_probe.is_file())):
         parser.error("host tools not found; this is infrastructure failure")
     tracked = tracked_dwgs(repo)
     paths = tracked if args.all else [PILOT]
@@ -253,7 +289,7 @@ def main() -> int:
             source, digest, byte_count = audit_source(repo, relative)
             row["source_sha256"] = digest
             row["source_bytes"] = byte_count
-            row["libredwg"] = reference_read(executable, source, args.timeout_seconds)
+            row["libredwg"] = reference_read(executable, source, args.timeout_seconds, host_probe)
             row["musacad"] = run_probe(probe, source, float(args.timeout_seconds))
             after_digest, after_size, _ = file_digest(source)
             if (after_digest, after_size) != (digest, byte_count):
@@ -282,7 +318,7 @@ def main() -> int:
             )
     report = {
         "check": "host_only_libredwg_observable_reference_vs_firstparty_native_stage",
-        "reference_tool": "upstream LibreDWG dwgread -O JSON (separate process)",
+        "reference_tool": "upstream LibreDWG dwgread JSON/minJSON or isolated decoded-object host CLI",
         "firstparty_tool": "core/native MusaCAD stage probe (not a geometry exporter)",
         "uses_libredwg_in_musacad_runtime": False,
         "coverage": "reference type counts and independent native read stage only",
