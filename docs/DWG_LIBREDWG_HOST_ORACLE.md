@@ -86,6 +86,26 @@ olarak kalır; `entity_parity=NOT_MEASURABLE` değişmez.
 Yetersiz veya yanlış indeks/CRC durumunda kesin eşdeğerlik iddiası
 üretilmez. Çizim kaynağı SHA-256 değeri iki kez denetlenir.
 
+## Kayıt ofseti karşılaştırması (R2010)
+
+İlk kapsamlı orijinal Karagümrük pis su taramasında R2004 kayıt
+çerçevesi yalnızca **558 / 145.279** aday kaydın CRC'sini doğruladı;
+**144.721** kayıt için kabul üretilmedi. ODA'nın yayımlanmış
+DWG format tanımı R2010'un R2004 bölüm yapısı ile R2007
+ayrılmış string/handle alanını ve farklı object-type kodlamasını
+birleştirdiğini belirtir:
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+
+Bu nedenle sonraki CI tanısı, doğrulanmış `AcDbObjects` ve
+`AcDb:Handles` ham bölüm baytlarında *sürekli (continuous) nesne
+ofsetleri* hipotezini eski sayfa-içi ofset modelinden ayrı olarak
+test eder. İkinci harita da kendi CRC16 doğrulamasından geçer;
+kayıt CRC'leri her orijinal aday ofseti için ayrı doğrulanır.
+Bu yöntem yalnızca geçici, izole tanı kodudur. Tam AC1024
+nesne sınıfı/handle self/owner/layer/renk doğrulaması ya da
+normal uygulama açılışı değildir. Yanlış ofset profilini
+başarıya yükseltmek yasaktır.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
