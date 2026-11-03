@@ -115,6 +115,22 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("invalid_ac1024_continuous_coverage")
         elif continuous_count or continuous_ok or continuous_bad:
             raise ValueError("unproven_ac1024_continuous_index")
+        absolute = hint.get("page_absolute_candidate_index")
+        absolute_count = hint.get("page_absolute_candidate_handles")
+        absolute_ok = hint.get("page_absolute_frame_crc_ok")
+        absolute_bad = hint.get("page_absolute_frame_crc_failed")
+        if (type(absolute) is not bool or
+                any(type(value) is not int or value < 0
+                    for value in (absolute_count, absolute_ok, absolute_bad))):
+            raise ValueError("invalid_ac1024_page_absolute_contract")
+        if absolute:
+            if (not hint["candidate_handle_index"] or
+                    absolute_count != handles or
+                    absolute_count > 400_000 or
+                    absolute_ok + absolute_bad != absolute_count):
+                raise ValueError("invalid_ac1024_page_absolute_coverage")
+        elif absolute_count or absolute_ok or absolute_bad:
+            raise ValueError("unproven_ac1024_page_absolute_index")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
