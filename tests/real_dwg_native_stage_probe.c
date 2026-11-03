@@ -71,6 +71,12 @@ static const char *signature_name(MusaCoreDwgSignature format) {
 /* Diagnostic-only R2004-family MS envelope/CRC: NO type or geometry
    decoding. Offset belongs to an independently CRC-checked handle map.
    Return false for malformed ranges instead of reading out of bounds. */
+static int ac1024_compare_offsets_u64(const void *left, const void *right) {
+    const uint64_t a = *(const uint64_t *)left;
+    const uint64_t b = *(const uint64_t *)right;
+    return (a > b) - (a < b);
+}
+
 static int ac1024_candidate_frame_crc(
     const uint8_t *objects, size_t object_bytes, uint64_t offset) {
     if (!objects || offset >= (uint64_t)object_bytes) return 0;
@@ -110,6 +116,10 @@ typedef struct MusaAc1024CompatibilityHint {
     int page_absolute_candidate_index;
     size_t page_absolute_candidate_handles;
     size_t page_absolute_frame_crc_ok, page_absolute_frame_crc_failed;
+    int legacy_offset_distribution_measured;
+    size_t legacy_distinct_offsets, legacy_duplicate_offset_entries;
+    size_t legacy_zero_offset_entries, legacy_max_offset_multiplicity;
+    size_t legacy_distinct_frame_crc_pass, legacy_repeated_crc_pass_entries;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -228,6 +238,56 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                 }
                 free(entries);
             }
+            /* Count repeated logical object offsets in the original
+               CRC-backed R2004 handle map. No handle IDs, offsets, raw
+               drawing fields, coordinates or user text are emitted.
+               An index with many collisions is NOT a proven object map. */
+            size_t legacy_count = 0u;
+            if (objects && handles && got_obj == nb && got_h == hb &&
+                musa_dwg_ac1018_handles_index(
+                    handles, hb, nb, NULL, 0u, &legacy_count) &&
+                legacy_count == hint.candidate_handles &&
+                legacy_count <= SIZE_MAX / sizeof(MusaDwgAc1018HandleEntry) &&
+                legacy_count <= SIZE_MAX / sizeof(uint64_t)) {
+                MusaDwgAc1018HandleEntry *legacy =
+                    (MusaDwgAc1018HandleEntry *)malloc(
+                        legacy_count * sizeof(*legacy));
+                uint64_t *offsets =
+                    (uint64_t *)malloc(legacy_count * sizeof(*offsets));
+                size_t actual_legacy = 0u;
+                if (legacy && offsets &&
+                    musa_dwg_ac1018_handles_index(
+                        handles, hb, nb, legacy, legacy_count,
+                        &actual_legacy) && actual_legacy == legacy_count) {
+                    for (size_t k = 0u; k < legacy_count; k++)
+                        offsets[k] = legacy[k].object_offset;
+                    qsort(offsets, legacy_count, sizeof(*offsets),
+                          ac1024_compare_offsets_u64);
+                    hint.legacy_offset_distribution_measured = 1;
+                    size_t start = 0u;
+                    while (start < legacy_count) {
+                        size_t end = start + 1u;
+                        while (end < legacy_count &&
+                               offsets[end] == offsets[start])
+                            ++end;
+                        const size_t group = end - start;
+                        ++hint.legacy_distinct_offsets;
+                        hint.legacy_duplicate_offset_entries += group - 1u;
+                        if (offsets[start] == 0u)
+                            hint.legacy_zero_offset_entries = group;
+                        if (group > hint.legacy_max_offset_multiplicity)
+                            hint.legacy_max_offset_multiplicity = group;
+                        if (ac1024_candidate_frame_crc(
+                              objects, nb, offsets[start])) {
+                            ++hint.legacy_distinct_frame_crc_pass;
+                            hint.legacy_repeated_crc_pass_entries += group;
+                        }
+                        start = end;
+                    }
+                }
+                free(offsets);
+                free(legacy);
+            }
             /* Third, distinct CRC-backed handle-map encoding; a missing
                continuous-index result must not be taken as permission to
                invent record positions. */
@@ -293,7 +353,14 @@ static void report(const char *signature, const char *result,
                "\"page_absolute_candidate_index\":%s,"
                "\"page_absolute_candidate_handles\":%zu,"
                "\"page_absolute_frame_crc_ok\":%zu,"
-               "\"page_absolute_frame_crc_failed\":%zu}",
+               "\"page_absolute_frame_crc_failed\":%zu,"
+               "\"legacy_offset_distribution_measured\":%s,"
+               "\"legacy_distinct_offsets\":%zu,"
+               "\"legacy_duplicate_offset_entries\":%zu,"
+               "\"legacy_zero_offset_entries\":%zu,"
+               "\"legacy_max_offset_multiplicity\":%zu,"
+               "\"legacy_distinct_frame_crc_pass\":%zu,"
+               "\"legacy_repeated_crc_pass_entries\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -314,7 +381,14 @@ static void report(const char *signature, const char *result,
                hint->page_absolute_candidate_index ? "true" : "false",
                hint->page_absolute_candidate_handles,
                hint->page_absolute_frame_crc_ok,
-               hint->page_absolute_frame_crc_failed);
+               hint->page_absolute_frame_crc_failed,
+               hint->legacy_offset_distribution_measured ? "true" : "false",
+               hint->legacy_distinct_offsets,
+               hint->legacy_duplicate_offset_entries,
+               hint->legacy_zero_offset_entries,
+               hint->legacy_max_offset_multiplicity,
+               hint->legacy_distinct_frame_crc_pass,
+               hint->legacy_repeated_crc_pass_entries);
     }
     puts("}");
 }
