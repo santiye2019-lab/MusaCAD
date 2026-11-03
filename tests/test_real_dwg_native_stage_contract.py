@@ -117,6 +117,9 @@ def ac1024_probe_record():
             "sampled_first_h_self_matches": 0,
             "sampled_first_h_other": 0,
             "sampled_first_h_unreadable": 0,
+            "sampled_first_h_code0_mismatch": 0,
+            "sampled_first_h_absolute_other_code": 0,
+            "sampled_first_h_relative_code": 0,
         }
     }
 
@@ -295,6 +298,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_first_h_self_matches": 75,
             "sampled_first_h_other": 2,
             "sampled_first_h_unreadable": 23,
+            "sampled_first_h_code0_mismatch": 2,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
             "mc_invalid_ms_zero": 2,
@@ -339,6 +343,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("core_stream_bounds_mismatch", 1),
             ("sampled_first_h_attempts", 2049),
             ("sampled_first_h_self_matches", 120),
+            ("sampled_first_h_code0_mismatch", 1),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -392,6 +397,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_first_h_self_matches": 2000,
             "sampled_first_h_other": 5,
             "sampled_first_h_unreadable": 43,
+            "sampled_first_h_code0_mismatch": 5,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
             "mc_invalid_ms_zero": 2,
