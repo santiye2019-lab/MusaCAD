@@ -26,6 +26,13 @@ def ac1024_probe_record():
             "handles_section_pages": True,
             "candidate_handle_index": True,
             "candidate_handle_count": 145279,
+            "legacy_frame_probe_completed": False,
+            "legacy_frame_crc_ok": 0,
+            "legacy_frame_crc_failed": 0,
+            "legacy_raw_type_17_arc": 0,
+            "legacy_raw_type_18_circle": 0,
+            "legacy_raw_type_19_line": 0,
+            "legacy_raw_type_77_lwpolyline": 0,
         }
     }
 
@@ -76,6 +83,27 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
                 record["ac1024_compatibility_hypothesis"][key] = value
                 with self.assertRaises(ValueError):
                     validate_fake_result(record)
+
+
+    def test_crc_frame_count_contract(self):
+        record = ac1024_probe_record()
+        hint = record["ac1024_compatibility_hypothesis"]
+        hint["legacy_frame_probe_completed"] = True
+        hint["legacy_frame_crc_ok"] = 145279
+        hint["legacy_raw_type_19_line"] = 44941
+        hint["legacy_raw_type_18_circle"] = 9543
+        self.assertEqual(validate_fake_result(record), record)
+        for field, value in (
+            ("legacy_frame_crc_ok", 145278),
+            ("legacy_frame_crc_failed", 1),
+            ("legacy_raw_type_17_arc", 100000),
+            ("legacy_frame_probe_completed", False),
+        ):
+            with self.subTest(field=field):
+                corrupt = deepcopy(record)
+                corrupt["ac1024_compatibility_hypothesis"][field] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(corrupt)
 
     def test_hint_never_applies_to_another_dwg_version(self):
         record = ac1024_probe_record()
