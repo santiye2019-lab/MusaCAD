@@ -282,6 +282,17 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                     valid=0;break;
                 }
             }
+            /* Signed free-page nodes and positive pages share one
+             * absolute-index namespace in the R2004-family page map.
+             * A reused index cannot describe both a file page and a gap. */
+            size_t page_at=0u,gap_at=0u;
+            while(valid&&page_at<index&&gap_at<gap_count){
+                const uint32_t page_id=sorted[page_at].page_id;
+                const uint32_t gap_id=gap_ids[gap_at];
+                if(page_id==gap_id){valid=0;break;}
+                if(page_id<gap_id)++page_at;
+                else ++gap_at;
+            }
         }
         if(valid&&entries)
             memcpy(entries,sorted,index*sizeof(*sorted));
