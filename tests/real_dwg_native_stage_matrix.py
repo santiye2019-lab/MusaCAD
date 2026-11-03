@@ -172,13 +172,18 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if any(type(hint.get(k)) is not int or hint[k] < 0
                for k in status_fields):
             raise ValueError("invalid_ac1024_frame_reason_contract")
+        samples = hint.get("legacy_shift_samples_tested")
+        if type(samples) is not int or samples < 0 or samples > 2048:
+            raise ValueError("invalid_ac1024_shift_sample_size")
         if measured:
             if (sum(hint[k] for k in status_fields[:4]) +
                     hint["legacy_repeated_crc_pass_entries"] != handles):
                 raise ValueError("incomplete_ac1024_frame_reason_accounting")
-            if any(hint[k] > handles for k in status_fields[4:]):
+            if not 1 <= samples <= distinct:
+                raise ValueError("unrepresentative_ac1024_shift_sample")
+            if any(hint[k] > samples for k in status_fields[4:]):
                 raise ValueError("invalid_ac1024_shift_probe_count")
-        elif any(hint[k] for k in status_fields):
+        elif samples or any(hint[k] for k in status_fields):
             raise ValueError("unmeasured_ac1024_frame_reason_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
