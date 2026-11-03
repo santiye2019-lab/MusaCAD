@@ -271,6 +271,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t core_payload_bounds_mismatch;
     size_t mc_unreadable_invalid_ms, mc_unreadable_short_or_boundary;
     size_t mc_unreadable_other, mc_unreadable_first_half;
+    size_t mc_invalid_ms_zero, mc_invalid_ms_one;
+    size_t mc_invalid_ms_2to7, mc_invalid_ms_extended_zero;
+    size_t mc_invalid_ms_extended_reserved, mc_invalid_ms_unclassified;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -578,9 +581,35 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 ++hint.mc_frame_next_exact;
                         } else {
                             hint.mc_frame_unreadable += group;
-                            if (status == AC1024_FRAME_INVALID_MS)
+                            if (status == AC1024_FRAME_INVALID_MS) {
                                 hint.mc_unreadable_invalid_ms += group;
-                            else if (status == AC1024_FRAME_TOO_SHORT ||
+                                if (nb >= 4u && offsets[start] <= nb - 4u) {
+                                    const size_t bad_at = (size_t)offsets[start];
+                                    const uint16_t first_ms =
+                                        (uint16_t)objects[bad_at] |
+                                        ((uint16_t)objects[bad_at + 1u] << 8u);
+                                    if (first_ms == 0u)
+                                        hint.mc_invalid_ms_zero += group;
+                                    else if (first_ms == 1u)
+                                        hint.mc_invalid_ms_one += group;
+                                    else if (first_ms < 8u)
+                                        hint.mc_invalid_ms_2to7 += group;
+                                    else if (first_ms & 0x8000u) {
+                                        const uint16_t second_ms =
+                                            (uint16_t)objects[bad_at + 2u] |
+                                            ((uint16_t)objects[bad_at + 3u] << 8u);
+                                        if (second_ms == 0u)
+                                            hint.mc_invalid_ms_extended_zero += group;
+                                        else if (second_ms & 0x8000u)
+                                            hint.mc_invalid_ms_extended_reserved += group;
+                                        else
+                                            hint.mc_invalid_ms_unclassified += group;
+                                    } else
+                                        hint.mc_invalid_ms_unclassified += group;
+                                } else {
+                                    hint.mc_invalid_ms_unclassified += group;
+                                }
+                            } else if (status == AC1024_FRAME_TOO_SHORT ||
                                      status == AC1024_FRAME_EXCEEDS_SECTION)
                                 hint.mc_unreadable_short_or_boundary += group;
                             else
@@ -745,7 +774,13 @@ static void report(const char *signature, const char *result,
                "\"mc_unreadable_invalid_ms\":%zu,"
                "\"mc_unreadable_short_or_boundary\":%zu,"
                "\"mc_unreadable_other\":%zu,"
-               "\"mc_unreadable_first_half\":%zu}",
+               "\"mc_unreadable_first_half\":%zu,"
+               "\"mc_invalid_ms_zero\":%zu,"
+               "\"mc_invalid_ms_one\":%zu,"
+               "\"mc_invalid_ms_2to7\":%zu,"
+               "\"mc_invalid_ms_extended_zero\":%zu,"
+               "\"mc_invalid_ms_extended_reserved\":%zu,"
+               "\"mc_invalid_ms_unclassified\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -828,7 +863,13 @@ static void report(const char *signature, const char *result,
                hint->mc_unreadable_invalid_ms,
                hint->mc_unreadable_short_or_boundary,
                hint->mc_unreadable_other,
-               hint->mc_unreadable_first_half);
+               hint->mc_unreadable_first_half,
+               hint->mc_invalid_ms_zero,
+               hint->mc_invalid_ms_one,
+               hint->mc_invalid_ms_2to7,
+               hint->mc_invalid_ms_extended_zero,
+               hint->mc_invalid_ms_extended_reserved,
+               hint->mc_invalid_ms_unclassified);
     }
     puts("}");
 }
