@@ -133,3 +133,37 @@ int musa_dwg_ac1024_record_data_bounds(
     *out = next;
     return 1;
 }
+
+/* R2010 MC's payload bit count includes handle-stream padding.
+ * Any value beyond the CRC-verified payload or crossing the raw OT
+ * declaration must be REJECTED; we never shift/guess boundaries.
+ * This gives an immutable window, not authenticated H references. */
+int musa_dwg_ac1024_record_stream_bounds(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024StreamBounds *out) {
+    if (!objects || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024RecordFrame frame = {0};
+    MusaDwgAc1024DataBounds data = {0};
+    if (!musa_dwg_ac1024_record_probe(
+            objects, object_bytes, indexed_offset, &frame) ||
+        !musa_dwg_ac1024_record_data_bounds(
+            objects, object_bytes, indexed_offset, &data))
+        return 0;
+    if (!frame.original_crc16_verified || !data.record_crc16_verified ||
+        frame.raw_object_type != data.raw_object_type ||
+        frame.handle_stream_bits > (uint64_t)data.payload_end_bit)
+        return 0;
+    const size_t handle_count = (size_t)frame.handle_stream_bits;
+    const size_t start = data.payload_end_bit - handle_count;
+    if (start < data.type_end_bit || start > data.payload_end_bit)
+        return 0;
+    const MusaDwgAc1024StreamBounds next = {
+        indexed_offset, data.payload_start_byte, data.type_end_bit,
+        start, data.payload_end_bit, frame.handle_stream_bits,
+        frame.raw_object_type, 1u
+    };
+    *out = next;
+    return 1;
+}
