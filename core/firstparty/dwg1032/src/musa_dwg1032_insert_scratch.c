@@ -92,3 +92,31 @@ int musa_dwg1032_insert_visibility_scratch(
     if (count) memcpy(result,scratch,count);
     return 1;
 }
+
+
+/* A bounded child page must not overwrite even a *future* source page.
+ * The existing scratch implementation provides transactional publication
+ * once this adapter has checked the complete caller-owned source spans. */
+int musa_dwg1032_insert_visibility_page_scratch(
+    const uint64_t *child_layers, const uint8_t *owner_visible,
+    size_t total_count, size_t first, size_t page_count,
+    uint64_t zero_layer, uint8_t insert_visible,
+    const MusaDwg1032LayerState *layers, size_t layer_count,
+    const MusaDwg1032ViewportFreeze *overrides, size_t override_count,
+    uint8_t *result, uint8_t *scratch, size_t scratch_capacity) {
+    if (!child_layers || !owner_visible || !result || !scratch ||
+        !page_count || first>total_count || page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*child_layers) ||
+        total_count>PTRDIFF_MAX/sizeof(*owner_visible) ||
+        scratch_capacity>PTRDIFF_MAX) return 0;
+    const size_t layer_bytes=total_count*sizeof(*child_layers);
+    if (spans_overlap(result,page_count,child_layers,layer_bytes) ||
+        spans_overlap(result,page_count,owner_visible,total_count) ||
+        spans_overlap(scratch,scratch_capacity,child_layers,layer_bytes) ||
+        spans_overlap(scratch,scratch_capacity,owner_visible,total_count))
+        return 0;
+    return musa_dwg1032_insert_visibility_scratch(
+        child_layers+first,owner_visible+first,page_count,
+        zero_layer,insert_visible,layers,layer_count,
+        overrides,override_count,result,scratch,scratch_capacity);
+}
