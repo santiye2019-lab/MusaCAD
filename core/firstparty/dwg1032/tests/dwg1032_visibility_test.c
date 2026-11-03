@@ -403,7 +403,28 @@ static void insert_instance_paged_visibility(void) {
     assert(memcmp(page,saved,sizeof(page))==0);
 }
 
+/* Boundary pages must not borrow visibility from an adjacent INSERT. */
+static void insert_instance_single_record_pages(void) {
+    const uint64_t layers[]={100u,200u,100u};
+    const uint8_t owner[]={1u,1u,1u};
+    const uint8_t layer_on[]={0u,1u,0u};
+    uint8_t output=9u;
+    for (size_t i=0;i<3u;++i) {
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            layers,owner,layer_on,3u,i,1u,100u,1u,&output));
+        assert(output==1u);
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            layers,owner,layer_on,3u,i,1u,100u,0u,&output));
+        assert(output==0u);
+    }
+    output=7u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        layers,owner,layer_on,3u,2u,2u,100u,1u,&output));
+    assert(output==7u);
+}
+
 int main(void) {
+    insert_instance_single_record_pages();
     insert_instance_paged_visibility();
     reject_nonrepresentable_owner_spans();
     insert_instance_large_atomic();
