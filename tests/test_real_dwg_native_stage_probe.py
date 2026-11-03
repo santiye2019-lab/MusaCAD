@@ -36,12 +36,12 @@ class NativeDwgStageProbeTest(unittest.TestCase):
     def test_r2004_fake_container_does_not_pass_handle_index(self):
         record = self.probe(b"AC1018" + bytes(506))
         self.assertEqual(record["result"], "rejected")
-        self.assertEqual(record["native_stage"], "ac1018_crc_backed_handle_index")
+        self.assertEqual(record["native_stage"], "ac1018_page_map_header")
 
     def test_r2018_fake_container_does_not_pass_page_map(self):
         record = self.probe(b"AC1032" + bytes(506))
         self.assertEqual(record["result"], "rejected")
-        self.assertEqual(record["native_stage"], "ac1032_physical_page_locations")
+        self.assertEqual(record["native_stage"], "ac1032_page_map_header")
 
     def test_r2010_version_is_not_falsely_accepted_as_r2004(self):
         record = self.probe(b"AC1024" + bytes(506))
