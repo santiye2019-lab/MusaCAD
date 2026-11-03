@@ -8,6 +8,8 @@
 #include "musacad_dwg_signature.h"
 #include "musacad_dwg_ac1015.h"
 #include "musacad_dwg_ac1018_file_index.h"
+#include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
@@ -96,19 +98,39 @@ int main(int argc, char **argv) {
             stage = "ac1015_section_locators";
         }
     } else if (format == MUSA_DWG_2004) {
-        if (musa_dwg_ac1018_file_handle_index(
-                file, bytes, NULL, 0u, &count) && count > 0u) {
-            result = "accepted";
-            stage = "ac1018_crc_backed_handle_index";
-        } else {
-            result = "rejected";
+        MusaDwgAc1018FileMapHeader header = {0};
+        MusaDwgAc1018SectionDescriptor desc = {0};
+        size_t locations = 0u, objects = 0u, handles = 0u;
+        result = "rejected";
+        if (!musa_dwg_ac1018_page_map_header(file, bytes, &header)) {
+            stage = "ac1018_page_map_header";
+        } else if (!musa_dwg_ac1018_page_locations(
+                       file, bytes, NULL, 0u, &locations) || !locations) {
+            stage = "ac1018_physical_page_locations";
+        } else if (!musa_dwg_ac1018_section_pages(
+                       file, bytes, MUSA_DWG_AC1018_OBJECTS,
+                       NULL, 0u, &desc, &objects) || !objects) {
+            stage = "ac1018_objects_section_pages";
+        } else if (!musa_dwg_ac1018_section_pages(
+                       file, bytes, MUSA_DWG_AC1018_HANDLES,
+                       NULL, 0u, &desc, &handles) || !handles) {
+            stage = "ac1018_handles_section_pages";
+        } else if (!musa_dwg_ac1018_file_handle_index(
+                       file, bytes, NULL, 0u, &count) || !count) {
             stage = "ac1018_crc_backed_handle_index";
             count = 0u;
+        } else {
+            result = "accepted";
+            stage = "ac1018_crc_backed_handle_index";
         }
     } else if (format == MUSA_DWG_2018_2026) {
+        MusaDwgAc1032FileMapHeader header = {0};
         size_t locations = 0u;
-        if (musa_dwg_ac1032_page_locations(
-                file, bytes, NULL, 0u, &locations) && locations > 0u) {
+        if (!musa_dwg_ac1032_page_map_header(file, bytes, &header)) {
+            result = "rejected";
+            stage = "ac1032_page_map_header";
+        } else if (musa_dwg_ac1032_page_locations(
+                       file, bytes, NULL, 0u, &locations) && locations > 0u) {
             result = "accepted";
             stage = "ac1032_physical_page_locations";
             count = locations;
