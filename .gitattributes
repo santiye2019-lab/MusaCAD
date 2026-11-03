@@ -1,0 +1,2 @@
+*.dwg filter=lfs diff=lfs merge=lfs -text
+*.DWG filter=lfs diff=lfs merge=lfs -text
