@@ -35,8 +35,8 @@ static inline int musa_dwg1032_scene_handoff_validate(
         const MusaDwg1032SceneEvidence *e = &entities[i];
         if (!e->source_handle || e->source_handle <= previous ||
             !e->layer_handle || !e->entity_kind ||
-            !e->owner_verified || !e->layer_verified ||
-            !e->color_verified || !e->geometry_verified ||
+            e->owner_verified != 1u || e->layer_verified != 1u ||
+            e->color_verified != 1u || e->geometry_verified != 1u ||
             e->owner_handle == e->source_handle)
             return 0;
         previous = e->source_handle;
