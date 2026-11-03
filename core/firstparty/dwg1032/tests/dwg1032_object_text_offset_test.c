@@ -43,6 +43,28 @@ static void offset_surrogate_and_empty(void) {
     assert(memcmp(output,expected,sizeof(expected))==0);
     assert(output[written+1u]=='Z');
 
+    /* Ordinal fast path must match the handle path byte-for-byte, while
+     * rejecting an out-of-range position without changing public output. */
+    written=77;
+    memset(output,0x5a,sizeof(output));
+    assert(musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,sizeof(file),pages,2,&index,0,2,6,12,
+        scratch,sizeof(scratch),output,sizeof(output),&written));
+    assert(written==sizeof(expected)-1u);
+    assert(memcmp(output,expected,sizeof(expected))==0);
+    assert(output[written+1u]=='Z');
+    written=77;
+    memset(output,0x5a,sizeof(output));
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,sizeof(file),pages,2,&index,1,2,6,12,
+        scratch,sizeof(scratch),output,sizeof(output),&written));
+    assert(written==77 && output[0]=='Z' && output[15]=='Z');
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,sizeof(file),pages,2,&index,0,2,6,12,
+        scratch,sizeof(scratch),output,sizeof(output),
+        (size_t *)(void *)pages));
+    assert(written==77 && output[0]=='Z');
+
     written=77;
     memset(output,0x5a,sizeof(output));
     put(file,9,0); /* Invalid low surrogate in second physical page. */
