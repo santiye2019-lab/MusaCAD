@@ -101,6 +101,13 @@ Bu nedenle sonraki CI tanısı, doğrulanmış `AcDbObjects` ve
 ofsetleri* hipotezini eski sayfa-içi ofset modelinden ayrı olarak
 test eder. İkinci harita da kendi CRC16 doğrulamasından geçer;
 kayıt CRC'leri her orijinal aday ofseti için ayrı doğrulanır.
+Sürekli ofsetli indeks profili Karagümrük'teki 10 AC1024 çizimden
+hiçbirinde mevcut katı ve CRC denetimli indeks kabulünü geçemedi.
+Bir diğer olası alternatif olan `page_absolute_handles` profili
+aynı kaynak üzerinde ayrı sınanır. Her profil özgün handle-map CRC'si
+ve orijinal kayıt çerçevesi CRC ölçümlerini ayrı raporlar;
+hiçbiri son kullanıcı çizim modeline otomatik kabul edilmez.
+
 Bu yöntem yalnızca geçici, izole tanı kodudur. Tam AC1024
 nesne sınıfı/handle self/owner/layer/renk doğrulaması ya da
 normal uygulama açılışı değildir. Yanlış ofset profilini
