@@ -1,0 +1,8 @@
+# Bounded offset-aware UTF-16LE record field (2026-11-02)
+
+- **Scope:** Existing MusaCAD first-party `core/firstparty/scene2d/` C11 code. No changes to `MusaCAD2/`, `main`, 3D code, or Android/JNI integration.
+- **Source origin:** Independently authored record-bound arithmetic and preflight checks, composing the existing first-party strict UTF-16LE counted decoder. Standard C11 and Unicode scalar validity only. No GPL, AGPL, LGPL, third-party DWG implementation, or unknown-origin source copied, adapted, or linked.
+- **Purpose:** Read a caller-authenticated UTF-16LE code-unit count at a caller-authenticated byte offset within a bounded record, including an odd offset after a packed prefix. Return an **absolute record end offset**, not a guessed DWG field length. Supplementary Unicode characters are decoded by the existing strict scalar decoder.
+- **Safety:** Reject offset/count beyond record bounds, malformed Unicode, aliasing with **any part** of the enclosing record, output/count aliasing, invalid capacity, and oversized lengths. Validate before publishing counts or output. Supports empty fields and size-query mode without allocation.
+- **Regression:** `independent_scene2d_utf16le_bounded_offsets_20k` covers odd offset, supplementary scalar, malformed/truncated surrogate, record overflow, output alias, rollback, empty field, and 20,000 code units with trailing opaque bytes. Run CMake/CTest and check GitHub Actions independently.
+- **Limitation:** This is an adapter for **preverified** record framing; it does not discover AC1032 text fields, parse compressed pages, authenticate page maps, decode TEXT/MTEXT objects, render fonts, or demonstrate Android integration. No claim of complete DWG support.

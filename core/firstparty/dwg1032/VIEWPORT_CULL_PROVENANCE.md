@@ -1,0 +1,8 @@
+# Independent paged INSERT viewport culling — 2026-11-02
+
+- **Location:** original MusaCAD `core/firstparty/dwg1032/`; no `MusaCAD2/` edits.
+- **Origin:** first-party C11 implementation of elementary affine corner mapping, finite-number checks, integer bounds checks, axis-aligned rectangle intersection and two-pass transactional output. No GPL/AGPL/LGPL or unknown-origin CAD implementation was copied, adapted, used as a template or linked. License: MIT, matching the standalone source headers.
+- **Purpose:** `musa_dwg1032_affine2_cull_page` combines *caller-authenticated* per-INSERT affine transforms, local bounds and fully resolved effective visibility for a bounded page. A 20,000-object synthetic drawing verifies rotated/reflected and degenerate bounds, edge contact, hidden instances, late malformed values, alias rejection and unchanged output on failure.
+- **Safety:** no heap allocation, no output writes until the entire requested page validates, no aliasing with *any* part of full source arrays, and no inference of layer, block owner, OCS/UCS or viewport semantics. Inputs must remain immutable during a call. Large transformed coordinates that overflow finite double bounds are rejected rather than silently culled.
+- **Test:** standalone `cmake -S core/firstparty/dwg1032 -B build/dwg1032 -DBUILD_TESTING=ON && cmake --build build/dwg1032 && ctest --test-dir build/dwg1032 --output-on-failure`; CI status must be verified at the exact final branch SHA.
+- **Limit:** this is post-decode geometry and viewport filtering only. It does **not** parse compressed AC1032 pages, decode entity records, prove real DWG color/text fidelity, enable Android JNI imports or validate real licensed DWG files. Existing 3D sources and the `main` branch are untouched.
