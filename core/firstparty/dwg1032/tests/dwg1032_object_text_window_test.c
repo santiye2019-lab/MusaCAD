@@ -84,6 +84,15 @@ static void large_cross_page_text(void) {
         scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
     assert(written==77 && utf8[0]=='Z' &&
            utf8[3u*N/2u]=='Z' && utf8[3u*N]=='Z');
+    /* The ordinal path must also fail atomically on a late surrogate,
+     * including when its UTF-8 buffer could hold the entire valid text. */
+    written=141u;
+    memset(utf8,0x5a,sizeof(utf8));
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==141u && utf8[0]=='Z' &&
+           utf8[3u*N/2u]=='Z' && utf8[3u*N]=='Z');
     put_logical(FILE_BYTES-2u,0xac);
     put_logical(FILE_BYTES-1u,0x20);
 
