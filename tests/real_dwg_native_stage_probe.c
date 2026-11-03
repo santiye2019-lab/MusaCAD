@@ -58,13 +58,78 @@ static const char *signature_name(MusaCoreDwgSignature format) {
     }
 }
 
+/*
+ * AC1024/R2010 is not yet supported by the original MusaCAD decoder.
+ * On a disposable, in-memory copy of the source, explore whether the
+ * documented older R2004-family container *shape* matches existing strict
+ * native page-map checks. This is NOT a decoder and NEVER accepted evidence.
+ * The 6 signature bytes are restored before the caller continues.
+ */
+typedef struct MusaAc1024CompatibilityHint {
+    int header, physical_map, object_pages, handle_pages, handle_index;
+    size_t candidate_handles;
+} MusaAc1024CompatibilityHint;
+
+static MusaAc1024CompatibilityHint ac1024_family_hint(
+    uint8_t *scratch, size_t length) {
+    MusaAc1024CompatibilityHint hint = {0};
+    if (!scratch || length < 256u || memcmp(scratch, "AC1024", 6u) != 0) {
+        return hint;
+    }
+    /* Re-use existing bounded structural validators only; never copy
+       LibreDWG source or include GPL reference-tool headers here. */
+    memcpy(scratch, "AC1018", 6u);
+    MusaDwgAc1018FileMapHeader header = {0};
+    MusaDwgAc1018SectionDescriptor desc = {0};
+    size_t locations = 0u, object_pages = 0u, handle_pages = 0u;
+    hint.header = musa_dwg_ac1018_page_map_header(scratch, length, &header);
+    if (hint.header) {
+        hint.physical_map = musa_dwg_ac1018_page_locations(
+            scratch, length, NULL, 0u, &locations) && locations > 0u;
+    }
+    if (hint.physical_map) {
+        hint.object_pages = musa_dwg_ac1018_section_pages(
+            scratch, length, MUSA_DWG_AC1018_OBJECTS,
+            NULL, 0u, &desc, &object_pages) && object_pages > 0u;
+    }
+    if (hint.object_pages) {
+        hint.handle_pages = musa_dwg_ac1018_section_pages(
+            scratch, length, MUSA_DWG_AC1018_HANDLES,
+            NULL, 0u, &desc, &handle_pages) && handle_pages > 0u;
+    }
+    if (hint.handle_pages) {
+        size_t handles = 0u;
+        hint.handle_index = musa_dwg_ac1018_file_handle_index(
+            scratch, length, NULL, 0u, &handles) && handles > 0u;
+        if (hint.handle_index) hint.candidate_handles = handles;
+    }
+    memcpy(scratch, "AC1024", 6u);
+    return hint;
+}
+
 static void report(const char *signature, const char *result,
-                   const char *stage, size_t evidence_count) {
+                   const char *stage, size_t evidence_count,
+                   const MusaAc1024CompatibilityHint *hint) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
-           "\"source_modified\":false}\n",
+           "\"source_modified\":false",
            signature, result, stage, evidence_count);
+    if (hint) {
+        printf(",\"ac1024_compatibility_hypothesis\":{"
+               "\"patched_signature_in_memory_only\":true,"
+               "\"validated_original_ac1024_decoder\":false,"
+               "\"page_map_header\":%s,\"physical_page_map\":%s,"
+               "\"objects_section_pages\":%s,\"handles_section_pages\":%s,"
+               "\"candidate_handle_index\":%s,\"candidate_handle_count\":%zu}",
+               hint->header ? "true" : "false",
+               hint->physical_map ? "true" : "false",
+               hint->object_pages ? "true" : "false",
+               hint->handle_pages ? "true" : "false",
+               hint->handle_index ? "true" : "false",
+               hint->candidate_handles);
+    }
+    puts("}");
 }
 
 int main(int argc, char **argv) {
@@ -85,6 +150,8 @@ int main(int argc, char **argv) {
     const char *result = "not_covered_by_this_native_probe";
     const char *stage = "signature_only";
     size_t count = 0u;
+    MusaAc1024CompatibilityHint hint = {0};
+    const MusaAc1024CompatibilityHint *hint_for_report = NULL;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -123,6 +190,14 @@ int main(int argc, char **argv) {
             result = "accepted";
             stage = "ac1018_crc_backed_handle_index";
         }
+    } else if (format == MUSA_DWG_2010) {
+        hint = ac1024_family_hint(file, bytes);
+        hint_for_report = &hint;
+        /* The compatibility hint does not authenticate an AC1024 reader.
+           Never expose candidate handles as an accepted entity index. */
+        result = "not_covered_by_this_native_probe";
+        stage = "ac1024_family_hypothesis_only";
+        count = 0u;
     } else if (format == MUSA_DWG_2018_2026) {
         MusaDwgAc1032FileMapHeader header = {0};
         size_t locations = 0u;
@@ -150,7 +225,7 @@ int main(int argc, char **argv) {
         result = "rejected";
         stage = "invalid_signature";
     }
-    report(name, result, stage, count);
+    report(name, result, stage, count, hint_for_report);
     free(file);
     return 0;
 }
