@@ -267,6 +267,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t mc_ot_raw_51, mc_ot_raw_77;
     size_t core_frame_verified, core_frame_probe_failed;
     size_t core_raw_ot_or_span_mismatch;
+    size_t core_payload_bounds_verified, core_payload_bounds_rejected;
+    size_t core_payload_bounds_mismatch;
+    size_t mc_unreadable_invalid_ms, mc_unreadable_short_or_boundary;
+    size_t mc_unreadable_other, mc_unreadable_first_half;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -526,6 +530,30 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                              mc_bytes, &raw_ot) ||
                                         core.raw_object_type != raw_ot)
                                         hint.core_raw_ot_or_span_mismatch += group;
+                                    MusaDwgAc1024DataBounds bounds = {0};
+                                    if (!musa_dwg_ac1024_record_data_bounds(
+                                            objects, nb, offsets[start],
+                                            &bounds)) {
+                                        hint.core_payload_bounds_rejected += group;
+                                    } else {
+                                        hint.core_payload_bounds_verified += group;
+                                        const size_t data_at =
+                                            (size_t)offsets[start] +
+                                            core.ms_marker_bytes +
+                                            core.mc_marker_bytes;
+                                        const size_t type_end =
+                                            (objects[data_at] >> 6u) >= 2u ?
+                                            18u : 10u;
+                                        if (bounds.payload_start_byte != data_at ||
+                                            bounds.payload_bytes != core.ms_object_bytes ||
+                                            bounds.payload_end_bit !=
+                                                core.ms_object_bytes * 8u ||
+                                            bounds.type_end_bit != type_end ||
+                                            bounds.raw_object_type !=
+                                                core.raw_object_type ||
+                                            !bounds.record_crc16_verified)
+                                            hint.core_payload_bounds_mismatch += group;
+                                    }
                                 }
                             } else
                                 hint.mc_frame_crc_mismatch += group;
@@ -550,6 +578,15 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 ++hint.mc_frame_next_exact;
                         } else {
                             hint.mc_frame_unreadable += group;
+                            if (status == AC1024_FRAME_INVALID_MS)
+                                hint.mc_unreadable_invalid_ms += group;
+                            else if (status == AC1024_FRAME_TOO_SHORT ||
+                                     status == AC1024_FRAME_EXCEEDS_SECTION)
+                                hint.mc_unreadable_short_or_boundary += group;
+                            else
+                                hint.mc_unreadable_other += group;
+                            if (start < legacy_count / 2u)
+                                hint.mc_unreadable_first_half += group;
                         }
                         /* Fixed deterministic <=2048 offset sample
                            for shift hypotheses. The FULL source still
@@ -701,7 +738,14 @@ static void report(const char *signature, const char *result,
                "\"mc_ot_raw_77\":%zu,"
                "\"core_frame_verified\":%zu,"
                "\"core_frame_probe_failed\":%zu,"
-               "\"core_raw_ot_or_span_mismatch\":%zu}",
+               "\"core_raw_ot_or_span_mismatch\":%zu,"
+               "\"core_payload_bounds_verified\":%zu,"
+               "\"core_payload_bounds_rejected\":%zu,"
+               "\"core_payload_bounds_mismatch\":%zu,"
+               "\"mc_unreadable_invalid_ms\":%zu,"
+               "\"mc_unreadable_short_or_boundary\":%zu,"
+               "\"mc_unreadable_other\":%zu,"
+               "\"mc_unreadable_first_half\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -777,7 +821,14 @@ static void report(const char *signature, const char *result,
                hint->mc_ot_raw_77,
                hint->core_frame_verified,
                hint->core_frame_probe_failed,
-               hint->core_raw_ot_or_span_mismatch);
+               hint->core_raw_ot_or_span_mismatch,
+               hint->core_payload_bounds_verified,
+               hint->core_payload_bounds_rejected,
+               hint->core_payload_bounds_mismatch,
+               hint->mc_unreadable_invalid_ms,
+               hint->mc_unreadable_short_or_boundary,
+               hint->mc_unreadable_other,
+               hint->mc_unreadable_first_half);
     }
     puts("}");
 }
