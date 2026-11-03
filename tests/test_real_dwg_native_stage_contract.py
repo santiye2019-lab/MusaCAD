@@ -72,6 +72,16 @@ def ac1024_probe_record():
             "legacy_short_gap_5to16": 0,
             "legacy_short_gap_17to64": 0,
             "legacy_short_gap_over64": 0,
+            "mc_frame_probe_completed": False,
+            "mc_frame_crc_pass": 0,
+            "mc_frame_crc_mismatch": 0,
+            "mc_frame_unreadable": 0,
+            "mc_frame_next_exact": 0,
+            "mc_byte_len_matches_short_gap": 0,
+            "mc_bytes_1": 0,
+            "mc_bytes_2": 0,
+            "mc_bytes_3": 0,
+            "mc_bytes_over3": 0,
         }
     }
 
@@ -231,6 +241,14 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_next_frame_overlaps": 0,
             "legacy_crc_ok_next_frame_exact": 1,
             "legacy_short_gap_over64": 314,
+            "mc_frame_probe_completed": True,
+            "mc_frame_crc_pass": 100,
+            "mc_frame_crc_mismatch": 145177,
+            "mc_frame_unreadable": 2,
+            "mc_frame_next_exact": 100,
+            "mc_byte_len_matches_short_gap": 100,
+            "mc_bytes_1": 130000,
+            "mc_bytes_2": 15277,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -251,6 +269,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("legacy_crc_ok_next_frame_exact", 11),
             ("legacy_next_frame_unavailable", 100001),
             ("legacy_short_gap_over64", 1),
+            ("mc_frame_crc_pass", 1),
+            ("mc_frame_next_exact", 145279),
+            ("mc_byte_len_matches_short_gap", 315),
+            ("mc_bytes_1", 1),
+            ("mc_frame_probe_completed", False),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -281,6 +304,15 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_next_frame_overlaps": 0,
             "legacy_crc_ok_next_frame_exact": 0,
             "legacy_short_gap_2": 145276,
+            "mc_frame_probe_completed": True,
+            "mc_frame_crc_pass": 145277,
+            "mc_frame_crc_mismatch": 0,
+            "mc_frame_unreadable": 2,
+            "mc_frame_next_exact": 145276,
+            "mc_byte_len_matches_short_gap": 145276,
+            "mc_bytes_1": 135600,
+            "mc_bytes_2": 9600,
+            "mc_bytes_3": 77,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
