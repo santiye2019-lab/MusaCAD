@@ -504,7 +504,9 @@ static void nested_insert_repeated_instance_isolation(void) {
         for (size_t i=0u;i<4u;++i)
             assert(child[i]==(uint8_t)(visible && expected_on[i]));
     }
-    const uint8_t preserved[]={0u,0u,0u,0u};
+    /* The final iteration is visible (7 % 2 == 1): retain its exact
+     * published output before testing a failed later-page update. */
+    const uint8_t preserved[]={1u,1u,1u,0u};
     assert(memcmp(child,preserved,sizeof(child))==0);
     /* A malformed late record cannot partially publish its page. */
     uint8_t bad_on[]={0u,1u,0u,2u};
