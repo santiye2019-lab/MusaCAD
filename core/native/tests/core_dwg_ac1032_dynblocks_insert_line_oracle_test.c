@@ -200,6 +200,53 @@ static int original(const char *filename){
         if(!ok)fprintf(stderr,
             "FAIL original CIRCLE per-child BLOCK owner/OT51/affine bounds\\n");
     }
+    /* Independent OT51 layer identity oracle: mismatched HANDLE/TU/flags
+     * cannot pass even if both upstream decoders reported CRC success. */
+    if(ok){
+        MusaDwgAc1032InsertLineLayerSource a={0};
+        MusaDwgAc1032InsertBlockChildLayerSource b={0};
+        a.insert_handle=b.insert_handle=UINT64_C(0x31);
+        a.block_header_handle=b.block_header_handle=UINT64_C(0x32);
+        a.child_handle=b.child_handle=UINT64_C(0x33);
+        a.layer_handle=b.layer_handle=UINT64_C(0x34);
+        a.source_line_layer_and_owner_verified=1u;
+        b.original_owner_layer_and_name_verified=1u;
+        b.raw_child_type=19u;
+        a.layer_name.indexed_handle=b.layer_name.indexed_handle=a.layer_handle;
+        a.layer_name.original_record_crc_verified=1u;
+        b.layer_name.original_record_crc_verified=1u;
+        a.layer_name.utf8_bytes=b.layer_name.utf8_bytes=4u;
+        a.layer_name.utf16_code_units=b.layer_name.utf16_code_units=4u;
+        a.layer_name.original_string_start_bit=
+            b.layer_name.original_string_start_bit=12u;
+        memcpy(a.layer_name.utf8,"TEST",5u);
+        memcpy(b.layer_name.utf8,"TEST",5u);
+        a.raw_layer_flags.indexed_handle=
+            b.raw_layer_flags.indexed_handle=a.layer_handle;
+        a.raw_layer_flags.source_crc_verified=1u;
+        b.raw_layer_flags.source_crc_verified=1u;
+        a.raw_layer_flags.raw_values_70_290_370=
+            b.raw_layer_flags.raw_values_70_290_370=0xe0u;
+        a.raw_layer_flags.numeric_flags_start_bit=
+            b.raw_layer_flags.numeric_flags_start_bit=42u;
+        a.raw_layer_flags.numeric_flags_end_bit=
+            b.raw_layer_flags.numeric_flags_end_bit=59u;
+        ok=musa_dwg_ac1032_line_layer_source_pair_matches(&a,&b);
+        b.layer_name.utf8[1]='X';
+        ok=ok&&!musa_dwg_ac1032_line_layer_source_pair_matches(&a,&b);
+        b.layer_name.utf8[1]='E';
+        b.layer_name.indexed_handle++;
+        ok=ok&&!musa_dwg_ac1032_line_layer_source_pair_matches(&a,&b);
+        b.layer_name.indexed_handle--;
+        b.raw_layer_flags.raw_values_70_290_370^=1u;
+        ok=ok&&!musa_dwg_ac1032_line_layer_source_pair_matches(&a,&b);
+        b.raw_layer_flags.raw_values_70_290_370^=1u;
+        b.raw_child_type=18u;
+        ok=ok&&!musa_dwg_ac1032_line_layer_source_pair_matches(&a,&b);
+        b.raw_child_type=19u;
+        b.layer_name.utf8[4]='!';
+        ok=ok&&!musa_dwg_ac1032_line_layer_source_pair_matches(&a,&b);
+    }
     uint64_t packet_source_handles[2]={0u,0u};
     size_t packet_source_lines[2]={0u,0u},packet_source_count=0u;
     size_t inserts=0u,admitted=0u,verified=0u;
