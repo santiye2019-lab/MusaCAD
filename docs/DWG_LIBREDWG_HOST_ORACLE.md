@@ -135,6 +135,24 @@ owner/layer/renk veya geometri doğrulaması değildir.
 Çizim içindeki hiçbir koordinat, handle, ofset, metin veya blok adı
 CI raporuna yazılmaz. Gerçek CAD içeriği orijinal dosyada değişmez.
 
+## AC1024 komşu kayıt ofsetlerinin tüm dosyadaki sonucu
+
+İlk pilot AC1024 Karagümrük pis su testi, **145.278** komşu farklı
+ofset çiftinden **0**'ında ödünç alınan R2004 MS çerçeve boyunun
+bir sonraki ofsete tam denk geldiğini gösterdi. **145.276** geçerli
+çerçeve boyu bir sonraki ofsetten *önce* sona erdi, **0**'ı aştı,
+**2** adayda MS alanı geçersizdi. Aynı karakteristik, indekslenebilen
+diğer AC1024 çizimlerde de gözlendi.
+Referans: GitHub Actions run `41722782988`.
+
+Ölçümü daha anlamlı hale getirmek için test artık her pozitif
+komşu-ofset boşluğunu 1, 2, 3, 4, 5–16, 17–64, 65+
+bayt aralıklarında sayıyor; aralık toplamı mutlaka kısa çerçeve
+sayısına eşit olmalı. Bu istatistikler kaynak çizim baytları, adres
+listeleri, handle değerleri, koordinatlar veya kişisel bilgiler
+yayımlanmadan hesaplanır. Bir boşluk boyu eşleşmesi dahi tek başına
+AC1024 nesne dekoderi veya render kanıtı değildir.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
