@@ -103,6 +103,12 @@ def ac1024_probe_record():
             "mc_unreadable_short_or_boundary": 0,
             "mc_unreadable_other": 0,
             "mc_unreadable_first_half": 0,
+            "mc_invalid_ms_zero": 0,
+            "mc_invalid_ms_one": 0,
+            "mc_invalid_ms_2to7": 0,
+            "mc_invalid_ms_extended_zero": 0,
+            "mc_invalid_ms_extended_reserved": 0,
+            "mc_invalid_ms_unclassified": 0,
         }
     }
 
@@ -277,6 +283,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "core_payload_bounds_verified": 100,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
+            "mc_invalid_ms_zero": 2,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -312,6 +319,8 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("core_payload_bounds_mismatch", 1),
             ("mc_unreadable_invalid_ms", 1),
             ("mc_unreadable_first_half", 3),
+            ("mc_invalid_ms_zero", 1),
+            ("mc_invalid_ms_unclassified", 1),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
