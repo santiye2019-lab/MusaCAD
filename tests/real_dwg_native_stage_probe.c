@@ -129,6 +129,52 @@ static int ac1024_candidate_frame_crc(
         objects, object_bytes, offset, NULL) == AC1024_FRAME_CRC_OK;
 }
 
+/* Read-only R2010 hypothesis from the published record framing:
+   an unsigned MC handle-stream bit-length marker follows the MS size.
+   Evaluate whether the *encoded MC byte count* accounts for the
+   observed gap, then CRC-check the corresponding expanded frame.
+   This does NOT decode object type, self handle, layer, owner or geometry.
+   Return 0 for unreadable framing; return 1 with explicit CRC outcome.
+   No input bytes are modified, and outputs are set only on full framing. */
+static int ac1024_r2010_mc_frame(
+    const uint8_t *objects, size_t object_bytes, uint64_t offset,
+    size_t *out_span, size_t *out_mc_bytes, int *out_crc_ok) {
+    if (!objects || !out_span || !out_mc_bytes || !out_crc_ok ||
+        offset >= (uint64_t)object_bytes) return 0;
+    size_t old_span = 0u;
+    (void)ac1024_candidate_frame_status(
+        objects, object_bytes, offset, &old_span);
+    if (old_span < 6u) return 0;
+    const size_t at = (size_t)offset;
+    const size_t remaining = object_bytes - at;
+    const uint8_t *p = objects + at;
+    const uint16_t first = (uint16_t)p[0] |
+                           ((uint16_t)p[1] << 8u);
+    const size_t ms_prefix = (first & 0x8000u) ? 4u : 2u;
+    if (ms_prefix >= remaining) return 0;
+    size_t mc_len = 0u;
+    for (; mc_len < 10u; mc_len++) {
+        if (mc_len >= remaining - ms_prefix) return 0;
+        if ((p[ms_prefix + mc_len] & 0x80u) == 0u) {
+            ++mc_len;
+            break;
+        }
+    }
+    if (!mc_len || mc_len > 10u || mc_len >= remaining ||
+        old_span > remaining - mc_len) return 0;
+    const size_t new_span = old_span + mc_len;
+    const size_t crc_at = new_span - 2u;
+    uint16_t computed = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, p, crc_at, &computed))
+        return 0;
+    const uint16_t stored = (uint16_t)p[crc_at] |
+                            ((uint16_t)p[crc_at + 1u] << 8u);
+    *out_span = new_span;
+    *out_mc_bytes = mc_len;
+    *out_crc_ok = computed == stored;
+    return 1;
+}
+
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
     size_t candidate_handles;
@@ -158,6 +204,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t legacy_short_gap_1, legacy_short_gap_2, legacy_short_gap_3;
     size_t legacy_short_gap_4, legacy_short_gap_5to16;
     size_t legacy_short_gap_17to64, legacy_short_gap_over64;
+    int mc_frame_probe_completed;
+    size_t mc_frame_crc_pass, mc_frame_crc_mismatch, mc_frame_unreadable;
+    size_t mc_frame_next_exact, mc_byte_len_matches_short_gap;
+    size_t mc_bytes_1, mc_bytes_2, mc_bytes_3, mc_bytes_over3;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -306,6 +356,7 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                     qsort(offsets, legacy_count, sizeof(*offsets),
                           ac1024_compare_offsets_u64);
                     hint.legacy_offset_distribution_measured = 1;
+                    hint.mc_frame_probe_completed = 1;
                     size_t start = 0u;
                     while (start < legacy_count) {
                         size_t end = start + 1u;
@@ -374,6 +425,37 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             } else {
                                 ++hint.legacy_next_frame_overlaps;
                             }
+                        }
+                        size_t mc_span = 0u, mc_bytes = 0u;
+                        int mc_crc_ok = 0;
+                        if (ac1024_r2010_mc_frame(
+                              objects, nb, offsets[start],
+                              &mc_span, &mc_bytes, &mc_crc_ok)) {
+                            if (mc_crc_ok)
+                                hint.mc_frame_crc_pass += group;
+                            else
+                                hint.mc_frame_crc_mismatch += group;
+                            if (mc_bytes == 1u)
+                                hint.mc_bytes_1 += group;
+                            else if (mc_bytes == 2u)
+                                hint.mc_bytes_2 += group;
+                            else if (mc_bytes == 3u)
+                                hint.mc_bytes_3 += group;
+                            else
+                                hint.mc_bytes_over3 += group;
+                            if (end < legacy_count && frame_span &&
+                                offsets[end] - offsets[start] >
+                                    (uint64_t)frame_span &&
+                                (uint64_t)mc_bytes ==
+                                    offsets[end] - offsets[start] -
+                                    (uint64_t)frame_span)
+                                ++hint.mc_byte_len_matches_short_gap;
+                            if (end < legacy_count && mc_span &&
+                                (uint64_t)mc_span ==
+                                    offsets[end] - offsets[start])
+                                ++hint.mc_frame_next_exact;
+                        } else {
+                            hint.mc_frame_unreadable += group;
                         }
                         /* Fixed deterministic <=2048 offset sample
                            for shift hypotheses. The FULL source still
@@ -501,7 +583,17 @@ static void report(const char *signature, const char *result,
                "\"legacy_short_gap_4\":%zu,"
                "\"legacy_short_gap_5to16\":%zu,"
                "\"legacy_short_gap_17to64\":%zu,"
-               "\"legacy_short_gap_over64\":%zu}",
+               "\"legacy_short_gap_over64\":%zu,"
+               "\"mc_frame_probe_completed\":%s,"
+               "\"mc_frame_crc_pass\":%zu,"
+               "\"mc_frame_crc_mismatch\":%zu,"
+               "\"mc_frame_unreadable\":%zu,"
+               "\"mc_frame_next_exact\":%zu,"
+               "\"mc_byte_len_matches_short_gap\":%zu,"
+               "\"mc_bytes_1\":%zu,"
+               "\"mc_bytes_2\":%zu,"
+               "\"mc_bytes_3\":%zu,"
+               "\"mc_bytes_over3\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -553,7 +645,17 @@ static void report(const char *signature, const char *result,
                hint->legacy_short_gap_4,
                hint->legacy_short_gap_5to16,
                hint->legacy_short_gap_17to64,
-               hint->legacy_short_gap_over64);
+               hint->legacy_short_gap_over64,
+               hint->mc_frame_probe_completed ? "true" : "false",
+               hint->mc_frame_crc_pass,
+               hint->mc_frame_crc_mismatch,
+               hint->mc_frame_unreadable,
+               hint->mc_frame_next_exact,
+               hint->mc_byte_len_matches_short_gap,
+               hint->mc_bytes_1,
+               hint->mc_bytes_2,
+               hint->mc_bytes_3,
+               hint->mc_bytes_over3);
     }
     puts("}");
 }
