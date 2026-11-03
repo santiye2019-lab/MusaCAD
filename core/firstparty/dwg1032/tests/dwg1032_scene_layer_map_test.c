@@ -123,5 +123,37 @@ int main(void) {
     assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
         large, BIG, source, BIG, 0u, SIZE_MAX, resolved, scratch, BIG));
     assert(resolved[first] == 257u && resolved[BIG - 1u] == 0u);
+    /* Deliberately oversized spans are rejected before any pointer access,
+     * including on 32-bit builds. No output may be published. */
+    const size_t oversized = (size_t)PTRDIFF_MAX / sizeof(uint64_t) + 1u;
+    assert(!musa_dwg1032_scene_layer_map_valid_scratch(
+        large, 1u, scratch, oversized));
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, oversized, resolved, scratch, oversized));
+    assert(resolved[first] == 257u && resolved[BIG - 1u] == 0u);
+
+    /* Exercise many independent page transactions with nonmonotonic source
+     * handles: the map is sorted, but a drawing's entity order need not be. */
+    for (size_t i = 0; i < BIG; ++i) {
+        source[i] = ((uint64_t)i * 73u) % BIG + 1u;
+        resolved[i] = UINT64_MAX;
+    }
+    for (size_t offset = 0; offset < BIG; offset += 127u) {
+        const size_t n = BIG - offset < 127u ? BIG - offset : 127u;
+        assert(musa_dwg1032_scene_layer_map_find_page_scratch(
+            large, BIG, source, BIG, offset, n, resolved + offset,
+            scratch, BIG));
+    }
+    for (size_t i = 0; i < BIG; ++i) {
+        const uint64_t h = source[i];
+        assert(resolved[i] == (h == BIG ? 0u : (uint64_t)BIG - h + 1u));
+    }
+    const size_t tail = BIG - 127u;
+    const uint64_t previous_tail = resolved[tail];
+    source[BIG - 1u] = 0u;
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, tail, 127u, resolved + tail,
+        scratch, BIG));
+    assert(resolved[tail] == previous_tail);
     return 0;
 }
