@@ -149,6 +149,9 @@ if(BUILD_TESTING)
     add_executable(musacad_firstparty_dwg1032_affine2_cull_scratch_test tests/dwg1032_affine2_cull_scratch_test.c)
     target_link_libraries(musacad_firstparty_dwg1032_affine2_cull_scratch_test PRIVATE musacad_firstparty_dwg1032_cursor)
     add_test(NAME firstparty_dwg1032_atomic_affine_cull_20k COMMAND musacad_firstparty_dwg1032_affine2_cull_scratch_test)
+    add_executable(musacad_firstparty_dwg1032_release_assert_test tests/dwg1032_release_assert_test.c)
+    target_link_libraries(musacad_firstparty_dwg1032_release_assert_test PRIVATE musacad_firstparty_dwg1032_cursor)
+    add_test(NAME firstparty_dwg1032_release_assertions_active COMMAND musacad_firstparty_dwg1032_release_assert_test)
     # CMake Release defines NDEBUG. Keep every C assert() in our regression
     # executables active, otherwise ctest may report empty tests as passing.
     # Scope this to tests: production library compilation remains unchanged.
