@@ -80,6 +80,25 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if (type(handles) is not int or handles < 0 or handles > 1_000_000
                 or bool(handles) != hint["candidate_handle_index"]):
             raise ValueError("invalid_ac1024_candidate_count")
+        complete = hint.get("legacy_frame_probe_completed")
+        if type(complete) is not bool:
+            raise ValueError("invalid_ac1024_legacy_probe_state")
+        fields = ("legacy_frame_crc_ok", "legacy_frame_crc_failed",
+                  "legacy_raw_type_17_arc", "legacy_raw_type_18_circle",
+                  "legacy_raw_type_19_line", "legacy_raw_type_77_lwpolyline")
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in fields):
+            raise ValueError("invalid_ac1024_frame_count")
+        if complete:
+            if (not hint["candidate_handle_index"]
+                    or handles > 400_000
+                    or hint["legacy_frame_crc_ok"] +
+                    hint["legacy_frame_crc_failed"] != handles):
+                raise ValueError("invalid_ac1024_frame_coverage")
+        elif any(hint[k] for k in fields):
+            raise ValueError("unsupported_ac1024_raw_record_claim")
+        if sum(hint[k] for k in fields[2:]) > hint["legacy_frame_crc_ok"]:
+            raise ValueError("invalid_ac1024_type_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
