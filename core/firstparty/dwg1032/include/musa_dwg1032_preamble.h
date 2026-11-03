@@ -34,8 +34,10 @@ int musa_dwg1032_read_preamble_prefix(const uint8_t *prefix,
                                       MusaDwg1032Preamble *out);
 /* Strictly checks the 0x80-byte unencrypted fixed preamble of a bounded
  * AC1032 file, plus the minimum 0x100-byte initial header extent.
- * Checks reserved bytes, the known 0x80 header pointer and nonzero
- * preview/summary/VBA offsets against the supplied file length.
+ * Checks reserved bytes at 0x44..0x7f, the known 0x80 header pointer,
+ * and nonzero preview/summary/VBA/AppInfo offsets against the supplied
+ * file length. Modern writer metadata at 0x30..0x43 is opaque, never
+ * presumed zero or mistaken for authenticated object/section data.
  * It deliberately does NOT decrypt/verify the 0x6c-byte header at 0x80,
  * authenticate CRCs, find sections/pages, decode objects or enable JNI.
  * Security flags are reported, NOT interpreted as an authorization to

@@ -66,7 +66,46 @@ static void streaming_prefix(void) {
         file,0x100u,UINT64_C(0x100000100),&actual));
     assert(actual.preview_offset==0x220u);
 }
+/* Metadata layout reproduced from two independently inspected AC1032
+ * engineering files. Only fixed preamble bytes are represented here:
+ * this is NOT a model/object/rendering acceptance fixture. */
+static void modern_metadata_regression(void) {
+    uint8_t prefix[0x100]={0};
+    memcpy(prefix,"AC1032",6u);
+    prefix[0x0cu]=3u;
+    prefix[0x0du]=0xc0u; prefix[0x0eu]=1u;
+    prefix[0x11u]=0x21u; prefix[0x13u]=0x21u;
+    prefix[0x20u]=0x20u; prefix[0x21u]=1u;
+    prefix[0x28u]=0x80u;
+    const uint8_t writer_metadata[0x18]={
+        0xe0u,0x11u,0x00u,0x00u,0x00u,0x15u,0x00u,0x00u,
+        0x02u,0x02u,0x00u,0x00u,0xacu,0x01u,0x00u,0x00u,
+        0x7au,0x01u,0x00u,0x00u,0x7au,0x01u,0x00u,0x00u
+    };
+    memcpy(prefix+0x2cu,writer_metadata,sizeof writer_metadata);
+    MusaDwg1032Preamble out={0};
+    assert(musa_dwg1032_read_preamble_prefix(prefix,sizeof prefix,
+                                             UINT64_C(7410775),&out));
+    assert(out.preview_offset==448u && out.summary_offset==288u);
+    assert(musa_dwg1032_read_preamble_prefix(prefix,sizeof prefix,
+                                             UINT64_C(7280163),&out));
+    const MusaDwg1032Preamble before=out;
+    prefix[0x2cu]=0x40u; prefix[0x2du]=0u;
+    assert(!musa_dwg1032_read_preamble_prefix(prefix,sizeof prefix,
+                                              UINT64_C(7410775),&out));
+    assert(memcmp(&out,&before,sizeof out)==0);
+    prefix[0x2cu]=0xe0u; prefix[0x2du]=0x11u;
+    prefix[0x2fu]=0x7fu;
+    assert(!musa_dwg1032_read_preamble_prefix(prefix,sizeof prefix,
+                                              UINT64_C(7410775),&out));
+    assert(memcmp(&out,&before,sizeof out)==0);
+    prefix[0x2fu]=0u; prefix[0x44u]=1u;
+    assert(!musa_dwg1032_read_preamble_prefix(prefix,sizeof prefix,
+                                              UINT64_C(7410775),&out));
+    assert(memcmp(&out,&before,sizeof out)==0);
+}
 int main(void) {
+    modern_metadata_regression();
     streaming_prefix();
     uint8_t file[0x180];
     fixture(file);

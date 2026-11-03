@@ -38,7 +38,11 @@ int musa_dwg1032_read_preamble_prefix(const uint8_t *file,
     for (size_t i=0x15u;i<0x18u;++i)
         if (file[i]!=0u) return 0;
     if (le32(file+0x28u)!=0x80u) return 0;
-    for (size_t i=0x2cu;i<0x80u;++i)
+    /* AC1032 uses modern metadata: 0x2c is the AppInfo offset, and
+     * 0x30..0x43 may contain writer metadata. These are NOT the zero
+     * reserved bytes of the older R2004 preamble. Keep the unverified
+     * writer metadata opaque; 0x44..0x7f remains strictly reserved. */
+    for (size_t i=0x44u;i<0x80u;++i)
         if (file[i]!=0u) return 0;
     MusaDwg1032Preamble next={0};
     next.maintenance_version=file[0x0bu];
@@ -52,7 +56,8 @@ int musa_dwg1032_read_preamble_prefix(const uint8_t *file,
     next.vba_offset=le32(file+0x24u);
     if (!address_ok(next.preview_offset,file_bytes) ||
         !address_ok(next.summary_offset,file_bytes) ||
-        !address_ok(next.vba_offset,file_bytes)) return 0;
+        !address_ok(next.vba_offset,file_bytes) ||
+        !address_ok(le32(file+0x2cu),file_bytes)) return 0;
     *out=next;
     return 1;
 }
