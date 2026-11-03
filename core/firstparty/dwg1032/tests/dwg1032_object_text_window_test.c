@@ -176,6 +176,35 @@ static void surrogate_pair_across_physical_seam(void) {
     assert(written==expected_bytes && utf8[written]=='\0');
     assert((unsigned char)utf8[seam_utf8]==0xf0u);
     assert((unsigned char)utf8[seam_utf8+3u]==0x80u);
+    /* Reject a high surrogate followed by a non-low code unit at the
+     * page seam without publishing any prefix or changing the byte count. */
+    put_logical(4u+2u*(seam_unit+1u),0xac);
+    put_logical(5u+2u*(seam_unit+1u),0x20);
+    written=123u;
+    memset(utf8,0x5a,sizeof(utf8));
+    assert(!musa_dwg1032_object_ms_utf16le_text(
+        file,FILE_BYTES,pages,2,&index,11,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==123u && utf8[0]=='Z' &&
+           utf8[seam_utf8]=='Z' && utf8[expected_bytes]=='Z');
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,sizeof(utf8),&written));
+    assert(written==123u && utf8[0]=='Z' &&
+           utf8[seam_utf8]=='Z' && utf8[expected_bytes]=='Z');
+    put_logical(4u+2u*(seam_unit+1u),0x00);
+    put_logical(5u+2u*(seam_unit+1u),0xde);
+    /* Capacity is measured in UTF-8 bytes INCLUDING the NUL terminator.
+     * One byte short must fail atomically, exact capacity must succeed. */
+    assert(!musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,expected_bytes,&written));
+    assert(written==123u && utf8[0]=='Z' &&
+           utf8[seam_utf8]=='Z' && utf8[expected_bytes]=='Z');
+    assert(musa_dwg1032_object_ms_utf16le_text_at_position(
+        file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
+        scratch,sizeof(scratch),utf8,expected_bytes+1u,&written));
+    assert(written==expected_bytes && utf8[written]=='\\0');
 }
 
 int main(void) {
