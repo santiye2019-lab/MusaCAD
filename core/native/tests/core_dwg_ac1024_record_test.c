@@ -9,7 +9,7 @@
 #include <string.h>
 
 static int test_one(size_t mc_bytes) {
-    uint8_t frame[64] = {0};
+    _Alignas(MusaDwgAc1024RecordFrame) uint8_t frame[64] = {0};
     frame[0] = 8u; /* MS payload length excludes separate unsigned MC */
     for (size_t i = 0u; i < mc_bytes; i++)
         frame[2u + i] = (uint8_t)(
@@ -55,7 +55,7 @@ static int test_one(size_t mc_bytes) {
     /* A caller-owned output pointing INTO source is always refused. */
     if (musa_dwg_ac1024_record_probe(
           frame, crc_at + 2u, 0u,
-          (MusaDwgAc1024RecordFrame *)(void *)(frame + 1u)) ||
+          (MusaDwgAc1024RecordFrame *)(void *)frame) ||
         memcmp(frame, untouched, sizeof(frame)))
         return 0;
     return 1;
