@@ -204,7 +204,7 @@ static void surrogate_pair_across_physical_seam(void) {
     assert(musa_dwg1032_object_ms_utf16le_text_at_position(
         file,FILE_BYTES,pages,2,&index,0,0,PAYLOAD,PAYLOAD,
         scratch,sizeof(scratch),utf8,expected_bytes+1u,&written));
-    assert(written==expected_bytes && utf8[written]=='\\0');
+    assert(written==expected_bytes && utf8[written]=='\0');
 }
 
 int main(void) {
