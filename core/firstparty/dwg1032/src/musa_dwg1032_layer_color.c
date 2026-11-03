@@ -304,3 +304,38 @@ int musa_dwg1032_layer_color_select_page(
         &page_index,entity_layer_handles+first,entity_colors+first,
         layers,layer_count,page_resolved,page_scratch,scratch_capacity);
 }
+
+/* A large definition may be shared by thousands of INSERTs. Resolve only
+ * the requested page in the current instance's layer/color context while
+ * protecting every original source page, including pages not yet visited.
+ * The underlying context resolver validates before publishing this page. */
+int musa_dwg1032_layer_color_apply_insert_context_page(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles, size_t total_count,
+    size_t first, size_t page_count, uint64_t layer_zero_handle,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    MusaDwg1032ResolvedColor *page_resolved) {
+    if (!definition_colors || !source_colors || !source_layer_handles ||
+        !insert_color || !insert_layer_color || !page_resolved ||
+        !page_count || first>total_count ||
+        page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_colors) ||
+        total_count>PTRDIFF_MAX/sizeof(*source_colors) ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        page_count>PTRDIFF_MAX/sizeof(*page_resolved))
+        return 0;
+    const size_t output_bytes=page_count*sizeof(*page_resolved);
+    if (overlaps(page_resolved,output_bytes,definition_colors,
+                 total_count*sizeof(*definition_colors)) ||
+        overlaps(page_resolved,output_bytes,source_colors,
+                 total_count*sizeof(*source_colors)) ||
+        overlaps(page_resolved,output_bytes,source_layer_handles,
+                 total_count*sizeof(*source_layer_handles)))
+        return 0;
+    return musa_dwg1032_layer_color_apply_insert_context(
+        definition_colors+first,source_colors+first,
+        source_layer_handles+first,page_count,layer_zero_handle,
+        insert_color,insert_layer_color,page_resolved);
+}
