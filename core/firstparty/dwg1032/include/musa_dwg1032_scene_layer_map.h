@@ -68,8 +68,8 @@ static inline int musa_dwg1032_scene_layer_map_valid_scratch(
     const MusaDwg1032SceneLayerMap *maps, size_t count,
     uint64_t *scratch, size_t scratch_count) {
     if (!maps || !scratch || !count || scratch_count < count ||
-        count > SIZE_MAX / sizeof(*maps) ||
-        scratch_count > SIZE_MAX / sizeof(*scratch) ||
+        count > PTRDIFF_MAX / sizeof(*maps) ||
+        scratch_count > PTRDIFF_MAX / sizeof(*scratch) ||
         musa_dwg1032_scene_layer_map_ranges_overlap(
             maps, count * sizeof(*maps), scratch,
             scratch_count * sizeof(*scratch))) return 0;
@@ -131,9 +131,9 @@ static inline int musa_dwg1032_scene_layer_map_find_many_scratch(
     const uint64_t *source_handles, size_t query_count,
     uint64_t *scene_layers, uint64_t *scratch, size_t scratch_count) {
     if (!source_handles || !scene_layers || !scratch || !query_count ||
-        query_count > SIZE_MAX / sizeof(*source_handles) ||
+        query_count > PTRDIFF_MAX / sizeof(*source_handles) ||
         scratch_count < query_count ||
-        scratch_count > SIZE_MAX / sizeof(*scratch)) return 0;
+        scratch_count > PTRDIFF_MAX / sizeof(*scratch)) return 0;
     const size_t qbytes = query_count * sizeof(*source_handles);
     const size_t sbytes = scratch_count * sizeof(*scratch);
     if (musa_dwg1032_scene_layer_map_ranges_overlap(
