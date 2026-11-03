@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int MAX_OPEN_PROJECTS=4;
     private static final int CLOUD_AI_INDEX_MAX_ITEMS=5000;
     private static final String AI_PRIVACY_PREFS="musacad_ai_privacy",K_CLOUD_CONSENT="cloud_cad_json_v1",K_CLOUD_PACKAGE_CONSENT="cloud_cad_package_v1",K_CLOUD_VISUAL_CONSENT="cloud_visual_views_v3",K_CLOUD_CHAT_CONSENT="cloud_chat_no_drawing_v1";
-    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_ORIGINAL_DWG_2D_TEST=12;
+    private static final int MENU_OPEN=1,MENU_LAYERS=2,MENU_FIT=3,MENU_SHARE=4,MENU_INFO=5,MENU_ABOUT=6,MENU_SAVE_DXF=7,MENU_PRINT=8,MENU_LAYOUTS=9,MENU_NEW_PROJECT=10,MENU_MY_LICENSE=11,MENU_ORIGINAL_DWG_2D_TEST=12,MENU_AUTO_REPORTS=13;
     private final ExecutorService loader=Executors.newSingleThreadExecutor();
     private final ExecutorService recoveryExecutor=Executors.newSingleThreadExecutor();
     // Dedicated executor: downloading/reading a 741-page price book must not
@@ -164,6 +164,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override protected void onCreate(Bundle b){
         super.onCreate(b);WindowCompat.setDecorFitsSystemWindows(getWindow(),false);setContentView(R.layout.activity_main);
+        MusaCadDiagnosticReports.flush(getApplicationContext());
         getOnBackPressedDispatcher().addCallback(this,new androidx.activity.OnBackPressedCallback(true){
             @Override public void handleOnBackPressed(){handleBackNavigation();}
         });
@@ -4010,8 +4011,34 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMainMenu(View anchor){
         anchor.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);PopupMenu popup=new PopupMenu(this,anchor);Menu menu=popup.getMenu();
-        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");menu.add(0,MENU_ORIGINAL_DWG_2D_TEST,11,"Bağımsız DWG 2B test görünümü (kısmi)");
-        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_ORIGINAL_DWG_2D_TEST:showOriginalFirstPartyPreview();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+        menu.add(0,MENU_NEW_PROJECT,0,"Yeni Proje Aç");menu.add(0,MENU_OPEN,1,"Dosya aç");menu.add(0,MENU_LAYERS,2,"Katmanlar").setEnabled(activeDxf!=null);menu.add(0,MENU_LAYOUTS,3,"Model / Layout").setEnabled(activeDxf!=null&&activeDxf.layoutNames.size()>1);menu.add(0,MENU_FIT,4,"Ekrana sığdır").setEnabled(currentFile!=null);menu.add(0,MENU_SAVE_DXF,5,"Kaydet / DXF dışa aktar").setEnabled(canEdit());menu.add(0,MENU_PRINT,6,"Yazdır").setEnabled(currentFile!=null);menu.add(0,MENU_SHARE,7,"Paylaş").setEnabled(currentFile!=null);menu.add(0,MENU_INFO,8,"Çizim bilgileri").setEnabled(activeDxf!=null);menu.add(0,MENU_MY_LICENSE,9,"Lisans Bilgilerim");menu.add(0,MENU_ABOUT,10,"Geliştirici / Hakkında");menu.add(0,MENU_ORIGINAL_DWG_2D_TEST,11,"Bağımsız DWG 2B test görünümü (kısmi)");menu.add(0,MENU_AUTO_REPORTS,12,"Otomatik Test Raporları");
+        popup.setOnMenuItemClickListener(item->{switch(item.getItemId()){case MENU_NEW_PROJECT:showNewProjectSheet();return true;case MENU_OPEN:open();return true;case MENU_LAYERS:showLayers();return true;case MENU_LAYOUTS:showLayouts();return true;case MENU_FIT:cad.fitToScreen();return true;case MENU_SAVE_DXF:requestEditedDxfSave();return true;case MENU_PRINT:printDrawing();return true;case MENU_SHARE:showShare();return true;case MENU_INFO:showDrawingInfo();return true;case MENU_ORIGINAL_DWG_2D_TEST:showOriginalFirstPartyPreview();return true;case MENU_AUTO_REPORTS:showDiagnosticReportsSettings();return true;case MENU_MY_LICENSE:showMyLicenseInfo();return true;case MENU_ABOUT:startActivity(new Intent(this,AboutActivity.class));return true;default:return false;}});popup.show();
+    }
+
+    /** Always log locally; remote sharing needs explicit device permission. */
+    private void showDiagnosticReportsSettings(){
+        final boolean enabled=MusaCadDiagnosticReports.autoUploadEnabled(this);
+        final boolean configured=MusaCadDiagnosticReports.serverConfigured();
+        String message="Her DWG/DXF açılışında teknik rapor telefonun özel alanına kaydedilir. "+
+            "DWG, proje adı, dosya yolu, çizim metni, koordinatlar ve ekran görüntüsü paylaşılmaz. "+
+            "Sunucu gönderimi yalnızca onayınla yapılır.\\n\\n"+
+            "Otomatik gönderim: "+(enabled?"AÇIK":"KAPALI")+
+            "\\nGüvenli sunucu bağlantısı: "+(configured?"APK içinde tanımlı":"YAPILANDIRILMAMIŞ")+
+            "\\nYerel rapor kuyruğu: "+MusaCadDiagnosticReports.pendingCount(this)+
+            "\\n\\nÖzel GitHub deposu doğrulanmadan hiçbir rapor gönderilmez.";
+        new AlertDialog.Builder(this).setTitle("MusaCAD • Otomatik Test Raporları")
+            .setMessage(message)
+            .setPositiveButton(enabled?"GÖNDERİMİ KAPAT":"GÖNDERİME İZİN VER",(d,w)->{
+                MusaCadDiagnosticReports.setAutoUpload(this,!enabled);
+                Toast.makeText(this,!enabled?
+                    (configured?"Otomatik gönderim izni açıldı":"İzin kaydedildi; sunucu kurulana kadar raporlar yalnız telefonda"):
+                    "Otomatik gönderim kapatıldı",Toast.LENGTH_LONG).show();
+            })
+            .setNeutralButton("YEREL RAPORLARI TEMİZLE",(d,w)->{
+                MusaCadDiagnosticReports.clearPending(this);
+                Toast.makeText(this,"Yerel rapor temizliği başlatıldı",Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("KAPAT",null).show();
     }
 
     /** Read-only licensing status from any CAD screen, without reactivating a trial. */
@@ -4298,6 +4325,7 @@ public class MainActivity extends AppCompatActivity {
                             // Mesh3dActivity owns this private cache DXF until it finishes.
                             // Never dispose or mutate the original SAF source document.
                         });
+                        MusaCadDiagnosticReports.recordOpen(getApplicationContext(),loaded.file,openTrace,true,"open_3d",0,"none");
                         RecentFileStore.record(getApplicationContext(),uri,loaded.name,null);
                         return;
                     }
@@ -4309,6 +4337,8 @@ public class MainActivity extends AppCompatActivity {
                         openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
                         project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount);
                         android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
+                        MusaCadDiagnosticReports.recordOpen(getApplicationContext(),loaded.file,openTrace,loaded.dxf,
+                            "open_success",project.parsed.entityCount,"none");
                     });
                     RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
                     return;
@@ -4471,6 +4501,8 @@ public class MainActivity extends AppCompatActivity {
                         openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
                         project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),0);
                         android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
+                        MusaCadDiagnosticReports.recordOpen(getApplicationContext(),loaded.file,openTrace,loaded.dxf,
+                            "open_3d",0,"none");
                         scheduleRecentMetadataRecord(uri,loaded.name);
                     });
                     return;
@@ -4496,6 +4528,8 @@ public class MainActivity extends AppCompatActivity {
                         openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
                         project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),parsed.entityCount);
                         android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
+                        MusaCadDiagnosticReports.recordOpen(getApplicationContext(),loaded.file,openTrace,loaded.dxf,
+                            "open_success",project.parsed.entityCount,"none");
                         // Metadata/thumbnail persistence is secondary to showing the complete model.
                         scheduleRecentMetadataRecord(uri,loaded.name);
                     });
@@ -4512,9 +4546,14 @@ public class MainActivity extends AppCompatActivity {
                     openTrace.mark(CadOpenTrace.Phase.VIEW_HANDOFF);
                     project.loadDiagnostics=openTrace.safeSummary(loaded.file.length(),project.parsed.entityCount);
                     android.util.Log.i("MusaCAD-CadLoad",project.loadDiagnostics);
+                    MusaCadDiagnosticReports.recordOpen(getApplicationContext(),loaded.file,openTrace,loaded.dxf,
+                        "open_success",project.parsed.entityCount,"none");
                 });
                 RecentFileStore.record(getApplicationContext(),uri,loaded.name,recentPreview);
             }catch(Exception|OutOfMemoryError e){
+                MusaCadDiagnosticReports.recordOpen(getApplicationContext(),loaded.file,openTrace,loaded.dxf,
+                    loaded.handedOff?"open_partial":"open_failure",0,
+                    e instanceof OutOfMemoryError?"memory":e instanceof IOException?"io":"runtime");
                 if(loaded.handedOff&&loaded.project!=null){
                     ProjectSession project=loaded.project;String message=e.getMessage()==null?"Tam vektör model hazırlanamadı":e.getMessage();
                     if(loaded.workingDxf!=null&&loaded.workingDxf!=project.workingDxf)loaded.workingDxf.delete();
