@@ -1,3 +1,4 @@
+import { handleDiagnosticUpload } from "./diagnostic-upload.js";
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_PROMPT_CHARS = 12000;
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -8,6 +9,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return json({ status: "ok", service: "musacad-ai-worker" });
+    if (url.pathname === "/v1/diagnostics") {
+      if (!env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM)
+        return json({status:"not_configured"}, 503);
+      const session = await verifySession(request.headers.get("authorization"),
+        env.MUSACAD_AI_SESSION_PUBLIC_KEY_PEM);
+      return handleDiagnosticUpload(request, env, session);
+    }
     if (url.pathname === "/v1/analyze" || (url.pathname === "/" && request.method === "POST")) return handleAnalyze(request, env);
     return json({ status: "not_found" }, 404);
   }
