@@ -93,6 +93,9 @@ def ac1024_probe_record():
             "mc_ot_raw_49": 0,
             "mc_ot_raw_51": 0,
             "mc_ot_raw_77": 0,
+            "core_frame_verified": 0,
+            "core_frame_probe_failed": 0,
+            "core_raw_ot_or_span_mismatch": 0,
         }
     }
 
@@ -263,6 +266,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_ot_decoded": 100,
             "mc_ot_unreadable": 0,
             "mc_ot_raw_19": 25,
+            "core_frame_verified": 100,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -290,6 +294,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("mc_frame_probe_completed", False),
             ("mc_ot_decoded", 101),
             ("mc_ot_raw_19", 101),
+            ("core_frame_verified", 99),
+            ("core_frame_probe_failed", 1),
+            ("core_raw_ot_or_span_mismatch", 1),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -336,6 +343,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_ot_raw_49": 659,
             "mc_ot_raw_51": 175,
             "mc_ot_raw_77": 13987,
+            "core_frame_verified": 145277,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
