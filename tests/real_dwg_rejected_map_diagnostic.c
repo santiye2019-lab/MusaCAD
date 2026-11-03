@@ -36,6 +36,20 @@ static int load_readonly(const char *path, uint8_t **out, size_t *size) {
     *out = data; *size = (size_t)n; return 1;
 }
 
+/* Diagnostic checksum for an already authenticated SYSTEM page. This
+ * reports whether it matches the strict existing decoder; it never
+ * bypasses a failed checksum or admits the file for rendering. */
+static uint32_t diag_adler(uint32_t seed,const uint8_t *p,size_t n) {
+    uint64_t low=seed&65535u,high=seed>>16u;
+    size_t at=0u;
+    while(at<n) {
+        const size_t chunk=n-at<0x15b0u?n-at:0x15b0u;
+        for(size_t i=0u;i<chunk;i++) {low+=p[at+i];high+=low;}
+        low%=65521u;high%=65521u;at+=chunk;
+    }
+    return ((uint32_t)high<<16u)|(uint32_t)low;
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) return 2;
     uint8_t *file = NULL;
@@ -138,6 +152,61 @@ int main(int argc, char **argv) {
     if (n >= 108u)
         eof_header_copy = memcmp(file + n - 108u, file + 0x80u, 108u) == 0;
 
+    int system_found=0, system_envelope_ok=0;
+    int system_adler_ok=0, system_lz_ok=0;
+    uint32_t system_kind=0u,system_codec=0u,system_expanded=0u;
+    uint32_t system_section_count=0u;
+    if(locations_ok && native_pages && native_pages <= 131072u) {
+        MusaDwgAc1018PageLocation *pages=
+            calloc(native_pages,sizeof(*pages));
+        if(pages) {
+            size_t actual_pages=0u;
+            const int ok=modern?
+                musa_dwg_ac1032_page_locations(
+                    file,n,pages,native_pages,&actual_pages):
+                musa_dwg_ac1018_page_locations(
+                    file,n,pages,native_pages,&actual_pages);
+            if(ok && actual_pages==native_pages) {
+                for(size_t i=0u;i<native_pages;i++) {
+                    if(pages[i].page_id!=header.section_map_id)continue;
+                    system_found=1;
+                    const size_t pos=(size_t)pages[i].file_offset;
+                    if(pages[i].file_offset>n || n-pos<20u ||
+                       pages[i].file_span_bytes<20u)break;
+                    const uint8_t *sys=file+pos;
+                    system_kind=read32(sys);
+                    system_expanded=read32(sys+4u);
+                    const uint32_t packed=read32(sys+8u);
+                    system_codec=read32(sys+12u);
+                    const uint32_t stored=read32(sys+16u);
+                    if(system_kind!=UINT32_C(0x4163003b)||
+                       system_codec!=2u||!packed||
+                       !system_expanded||
+                       system_expanded>MUSA_DIAG_MAX_MAP||
+                       packed>n-pos-20u||
+                       packed>pages[i].file_span_bytes-20u)break;
+                    system_envelope_ok=1;
+                    uint8_t clean[20];
+                    memcpy(clean,sys,20u);
+                    memset(clean+16u,0,4u);
+                    system_adler_ok=
+                        diag_adler(diag_adler(0u,clean,20u),
+                                   sys+20u,packed)==stored;
+                    if(!system_adler_ok)break;
+                    uint8_t *buf=malloc(system_expanded);
+                    if(!buf)break;
+                    size_t used=0u;
+                    system_lz_ok=musa_dwg_ac1018_lz_decode(
+                        sys+20u,packed,buf,system_expanded,&used);
+                    if(system_lz_ok && system_expanded>=4u)
+                        system_section_count=read32(buf);
+                    free(buf);
+                    break;
+                }
+            }
+            free(pages);
+        }
+    }
     /* Numbers are only allocation/format metadata. No untrusted source
        strings, coordinates, entity bytes or page bodies are emitted. */
     printf("{\"diagnostic\":\"authenticated_header_exploration\","
@@ -158,6 +227,14 @@ int main(int argc, char **argv) {
            "\"contains_section_map_id\":%s,"
            "\"physical_end_vs_file_end\":%lld,"
            "\"eof_header_copy\":%s,"
+           "\"system_section_map_found\":%s,"
+           "\"system_envelope_ok\":%s,"
+           "\"system_adler_ok\":%s,"
+           "\"system_lz_ok\":%s,"
+           "\"system_descriptor_count\":%u,"
+           "\"system_kind_code\":%u,"
+           "\"system_codec\":%u,"
+           "\"system_uncompressed_bytes\":%u,"
            "\"geometry_verified\":false,"
            "\"mutates_source\":false}\n",
            modern ? "AC1032" : "AC1018", header.page_count,
@@ -171,7 +248,13 @@ int main(int argc, char **argv) {
            found_map ? "true" : "false",
            found_section_map ? "true" : "false",
            (long long)((int64_t)physical_end - (int64_t)n),
-           eof_header_copy ? "true" : "false");
+           eof_header_copy ? "true" : "false",
+           system_found ? "true" : "false",
+           system_envelope_ok ? "true" : "false",
+           system_adler_ok ? "true" : "false",
+           system_lz_ok ? "true" : "false",
+           system_section_count,system_kind,system_codec,
+           system_expanded);
     free(file);
     return 0;
 }
