@@ -113,6 +113,28 @@ nesne sınıfı/handle self/owner/layer/renk doğrulaması ya da
 normal uygulama açılışı değildir. Yanlış ofset profilini
 başarıya yükseltmek yasaktır.
 
+## AC1024 komşu kayıt çerçevesi / indeks ofseti karşılaştırması
+
+Karagümrük pis su AC1024 orijinalinde **392 nesne veri sayfası** ve
+**14 handle veri sayfası** doğrulanmıştır. Bu değerler, önceki
+558/145.279 R2004-kayıt CRC geçişiyle aynı değildir; sayfa sayısı
+ile CRC başarısı arasında basit bir sayısal eşleşme bulunmamaktadır.
+
+Yeni salt-okunur, uygulama dışı tanı; CRC doğrulanmış `AcDb:Handles`
+indeksinden alınmış *farklı* nesne ofsetlerini sıralayıp komşu ofset
+farkını inceler. İlgili adresteki R2004 tipi MS uzunluk önekinden
+hesaplanan geçici kayıt boyu, sonraki farklı ofsetin başlangıcıyla
+tam eşleşiyor mu, kısa mı kalıyor, yoksa onu aşıyor mu sayılır.
+Uzunluk öneki geçersiz veya bölüm dışına taşıyorsa ayrıca sayılır.
+Toplam her zaman `farklı_ofset_sayısı - 1` olmalıdır.
+
+Bu deneme yalnızca **kayıt çerçevesi yerleşimi hipotezidir**.
+Bir komşu ofset ve uzunluk eşleşmesi tek başına CRC doğrulaması,
+embedded self-handle eşleşmesi, gerçek AC1024 nesne türü,
+owner/layer/renk veya geometri doğrulaması değildir.
+Çizim içindeki hiçbir koordinat, handle, ofset, metin veya blok adı
+CI raporuna yazılmaz. Gerçek CAD içeriği orijinal dosyada değişmez.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
