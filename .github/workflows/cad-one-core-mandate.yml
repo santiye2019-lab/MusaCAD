@@ -29,6 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_android_firstparty_runtime.py' -v
+          python3 -m unittest discover -s tests -p 'test_firstparty_normal_open_isolation.py' -v
           python3 -m unittest discover -s tests -p 'test_firstparty_no_cad_sdk.py' -v
           python3 -m unittest discover -s tests -p 'test_one_cad_engine_mandate.py' -v
           python3 -m unittest discover -s tests -p 'test_shared_core_portability_contract.py' -v

@@ -1,0 +1,31 @@
+name: MusaCAD first-party bounded DWG cursor proof
+on:
+  push:
+    branches:
+      - feature/musacad-mainline-dwg-recovery-20261028
+    paths:
+      - 'core/firstparty/dwg1032/**'
+      - '.github/workflows/musacad-firstparty-dwg1032.yml'
+  pull_request:
+    paths:
+      - 'core/firstparty/dwg1032/**'
+      - '.github/workflows/musacad-firstparty-dwg1032.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-cursor-c11:
+    name: Independent binary cursor (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure isolated C11 target
+        run: cmake -S core/firstparty/dwg1032 -B dwg1032-cursor-build -DBUILD_TESTING=ON
+      - name: Compile
+        run: cmake --build dwg1032-cursor-build --config Release --parallel
+      - name: Run bounds and rollback regressions
+        run: ctest --test-dir dwg1032-cursor-build -C Release --output-on-failure

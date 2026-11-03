@@ -1,0 +1,31 @@
+name: MusaCAD independent 2D scene proof
+on:
+  push:
+    branches:
+      - feature/musacad-mainline-dwg-recovery-20261028
+    paths:
+      - 'core/firstparty/scene2d/**'
+      - '.github/workflows/musacad-firstparty-scene2d.yml'
+  pull_request:
+    paths:
+      - 'core/firstparty/scene2d/**'
+      - '.github/workflows/musacad-firstparty-scene2d.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-c11:
+    name: Standalone scene2d (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure isolated C11 target
+        run: cmake -S core/firstparty/scene2d -B scene2d-build -DBUILD_TESTING=ON
+      - name: Compile
+        run: cmake --build scene2d-build --config Release --parallel
+      - name: Run safety and deep-ownership tests
+        run: ctest --test-dir scene2d-build -C Release --output-on-failure
