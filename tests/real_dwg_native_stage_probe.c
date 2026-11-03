@@ -13,6 +13,7 @@
 #include "musacad_dwg_ac1018_scene.h"
 #include "musacad_dwg_ac1018_handles.h"
 #include "musacad_crc16.h"
+#include "musacad_dwg_ac1015_values.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
@@ -177,6 +178,55 @@ static int ac1024_r2010_mc_frame(
     return 1;
 }
 
+/* AC1024/R2010 OT declaration from the authenticated DATA stream:
+   bit-pair selector; 0 -> raw byte; 1 -> byte + 0x1f0;
+   2/3 -> two little-endian raw bytes. The caller MUST first verify
+   record-frame CRC. This is a raw type DECLARATION only, not entity
+   geometry, CLASSES, owner/self handle or renderer acceptance. */
+static int ac1024_r2010_declared_ot(
+    const uint8_t *objects, size_t object_bytes, uint64_t offset,
+    size_t mc_bytes, uint16_t *out_type) {
+    if (!objects || !out_type || !mc_bytes || mc_bytes > 10u ||
+        offset >= (uint64_t)object_bytes) return 0;
+    const size_t at = (size_t)offset;
+    const size_t left = object_bytes - at;
+    if (left < 6u) return 0;
+    const uint8_t *p = objects + at;
+    const uint16_t first = (uint16_t)p[0] |
+                           ((uint16_t)p[1] << 8u);
+    size_t ms_prefix = 2u;
+    size_t payload = (size_t)first;
+    if (first & 0x8000u) {
+        if (left < 6u) return 0;
+        const uint16_t hi = (uint16_t)p[2] |
+                            ((uint16_t)p[3] << 8u);
+        if (!hi || (hi & 0x8000u)) return 0;
+        ms_prefix = 4u;
+        payload = (size_t)(first & 0x7fffu) | ((size_t)hi << 15u);
+    }
+    if (payload < 3u || ms_prefix > left ||
+        mc_bytes > left - ms_prefix ||
+        payload > left - ms_prefix - mc_bytes ||
+        payload > SIZE_MAX / 8u) return 0;
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, p + ms_prefix + mc_bytes, payload, 0u,
+            payload * 8u)) return 0;
+    uint32_t selector = 0u, low = 0u, high = 0u;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 2u, &selector) ||
+        !musa_dwg_ac1015_bits_read_u(&bits, 8u, &low)) return 0;
+    uint32_t raw = low;
+    if (selector == 1u) raw += 0x1f0u;
+    else if (selector >= 2u) {
+        if (!musa_dwg_ac1015_bits_read_u(&bits, 8u, &high))
+            return 0;
+        raw |= high << 8u;
+    }
+    if (raw > UINT16_MAX) return 0;
+    *out_type = (uint16_t)raw;
+    return 1;
+}
+
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
     size_t candidate_handles;
@@ -210,6 +260,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t mc_frame_crc_pass, mc_frame_crc_mismatch, mc_frame_unreadable;
     size_t mc_frame_next_exact, mc_byte_len_matches_short_gap;
     size_t mc_bytes_1, mc_bytes_2, mc_bytes_3, mc_bytes_over3;
+    size_t mc_ot_decoded, mc_ot_unreadable;
+    size_t mc_ot_raw_1, mc_ot_raw_7, mc_ot_raw_17, mc_ot_raw_18;
+    size_t mc_ot_raw_19, mc_ot_raw_44, mc_ot_raw_49;
+    size_t mc_ot_raw_51, mc_ot_raw_77;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -433,9 +487,29 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         if (ac1024_r2010_mc_frame(
                               objects, nb, offsets[start],
                               &mc_span, &mc_bytes, &mc_crc_ok)) {
-                            if (mc_crc_ok)
+                            if (mc_crc_ok) {
                                 hint.mc_frame_crc_pass += group;
-                            else
+                                uint16_t raw_ot = 0u;
+                                if (ac1024_r2010_declared_ot(
+                                      objects, nb, offsets[start],
+                                      mc_bytes, &raw_ot)) {
+                                    hint.mc_ot_decoded += group;
+                                    switch (raw_ot) {
+                                    case 1u: hint.mc_ot_raw_1 += group; break;
+                                    case 7u: hint.mc_ot_raw_7 += group; break;
+                                    case 17u: hint.mc_ot_raw_17 += group; break;
+                                    case 18u: hint.mc_ot_raw_18 += group; break;
+                                    case 19u: hint.mc_ot_raw_19 += group; break;
+                                    case 44u: hint.mc_ot_raw_44 += group; break;
+                                    case 49u: hint.mc_ot_raw_49 += group; break;
+                                    case 51u: hint.mc_ot_raw_51 += group; break;
+                                    case 77u: hint.mc_ot_raw_77 += group; break;
+                                    default: break;
+                                    }
+                                } else {
+                                    hint.mc_ot_unreadable += group;
+                                }
+                            } else
                                 hint.mc_frame_crc_mismatch += group;
                             if (mc_bytes == 1u)
                                 hint.mc_bytes_1 += group;
@@ -595,7 +669,18 @@ static void report(const char *signature, const char *result,
                "\"mc_bytes_1\":%zu,"
                "\"mc_bytes_2\":%zu,"
                "\"mc_bytes_3\":%zu,"
-               "\"mc_bytes_over3\":%zu}",
+               "\"mc_bytes_over3\":%zu,"
+               "\"mc_ot_decoded\":%zu,"
+               "\"mc_ot_unreadable\":%zu,"
+               "\"mc_ot_raw_1\":%zu,"
+               "\"mc_ot_raw_7\":%zu,"
+               "\"mc_ot_raw_17\":%zu,"
+               "\"mc_ot_raw_18\":%zu,"
+               "\"mc_ot_raw_19\":%zu,"
+               "\"mc_ot_raw_44\":%zu,"
+               "\"mc_ot_raw_49\":%zu,"
+               "\"mc_ot_raw_51\":%zu,"
+               "\"mc_ot_raw_77\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -657,7 +742,18 @@ static void report(const char *signature, const char *result,
                hint->mc_bytes_1,
                hint->mc_bytes_2,
                hint->mc_bytes_3,
-               hint->mc_bytes_over3);
+               hint->mc_bytes_over3,
+               hint->mc_ot_decoded,
+               hint->mc_ot_unreadable,
+               hint->mc_ot_raw_1,
+               hint->mc_ot_raw_7,
+               hint->mc_ot_raw_17,
+               hint->mc_ot_raw_18,
+               hint->mc_ot_raw_19,
+               hint->mc_ot_raw_44,
+               hint->mc_ot_raw_49,
+               hint->mc_ot_raw_51,
+               hint->mc_ot_raw_77);
     }
     puts("}");
 }
