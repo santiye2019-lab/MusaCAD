@@ -59,6 +59,12 @@ def ac1024_probe_record():
             "legacy_shift_plus_one_crc_pass": 0,
             "legacy_shift_plus_two_crc_pass": 0,
             "legacy_shift_samples_tested": 0,
+            "legacy_next_offset_pairs": 0,
+            "legacy_next_frame_unavailable": 0,
+            "legacy_next_frame_exact": 0,
+            "legacy_next_frame_short": 0,
+            "legacy_next_frame_overlaps": 0,
+            "legacy_crc_ok_next_frame_exact": 0,
         }
     }
 
@@ -211,6 +217,12 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_shift_plus_one_crc_pass": 6,
             "legacy_shift_plus_two_crc_pass": 5,
             "legacy_shift_samples_tested": 128,
+            "legacy_next_offset_pairs": 324,
+            "legacy_next_frame_unavailable": 0,
+            "legacy_next_frame_exact": 10,
+            "legacy_next_frame_short": 314,
+            "legacy_next_frame_overlaps": 0,
+            "legacy_crc_ok_next_frame_exact": 1,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -226,6 +238,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("legacy_frame_crc_mismatch", 1),
             ("legacy_shift_plus_one_crc_pass", 145280),
             ("legacy_shift_samples_tested", 0),
+            ("legacy_next_offset_pairs", 323),
+            ("legacy_next_frame_exact", 324),
+            ("legacy_crc_ok_next_frame_exact", 11),
+            ("legacy_next_frame_unavailable", 100001),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -249,6 +265,12 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_frame_exceeds_section": 4000,
             "legacy_frame_crc_mismatch": 979,
             "legacy_shift_samples_tested": 2048,
+            "legacy_next_offset_pairs": 145278,
+            "legacy_next_frame_unavailable": 2,
+            "legacy_next_frame_exact": 0,
+            "legacy_next_frame_short": 145276,
+            "legacy_next_frame_overlaps": 0,
+            "legacy_crc_ok_next_frame_exact": 0,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
