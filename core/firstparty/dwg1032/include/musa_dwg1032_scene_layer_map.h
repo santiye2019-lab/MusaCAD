@@ -165,4 +165,36 @@ static inline int musa_dwg1032_scene_layer_map_find_many_scratch(
     return 1;
 }
 
+/* Resolve one bounded page while protecting ALL original source handles.
+ * The caller authenticates the source table and layer mapping separately.
+ * A page must never overwrite handles belonging to a later page: the
+ * many-query API only checks its selected slice, so validate the entire
+ * source range here before forwarding to its transactional publication.
+ * Scratch must still hold at least map_count entries for table validation.
+ * No allocation, DWG parsing or implicit layer-zero inference. */
+static inline int musa_dwg1032_scene_layer_map_find_page_scratch(
+    const MusaDwg1032SceneLayerMap *maps, size_t map_count,
+    const uint64_t *all_source_handles, size_t total_count,
+    size_t first, size_t page_count, uint64_t *page_scene_layers,
+    uint64_t *scratch, size_t scratch_count) {
+    if (!all_source_handles || !page_scene_layers || !scratch ||
+        !page_count || first > total_count ||
+        page_count > total_count - first ||
+        total_count > PTRDIFF_MAX / sizeof(*all_source_handles) ||
+        page_count > PTRDIFF_MAX / sizeof(*page_scene_layers) ||
+        scratch_count > PTRDIFF_MAX / sizeof(*scratch))
+        return 0;
+    const size_t all_bytes = total_count * sizeof(*all_source_handles);
+    if (musa_dwg1032_scene_layer_map_ranges_overlap(
+            page_scene_layers, page_count * sizeof(*page_scene_layers),
+            all_source_handles, all_bytes) ||
+        musa_dwg1032_scene_layer_map_ranges_overlap(
+            scratch, scratch_count * sizeof(*scratch),
+            all_source_handles, all_bytes))
+        return 0;
+    return musa_dwg1032_scene_layer_map_find_many_scratch(
+        maps, map_count, all_source_handles + first, page_count,
+        page_scene_layers, scratch, scratch_count);
+}
+
 #endif
