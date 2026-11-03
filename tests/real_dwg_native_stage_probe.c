@@ -147,6 +147,7 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t legacy_frame_exceeds_section, legacy_frame_crc_mismatch;
     size_t legacy_shift_minus_two_crc_pass, legacy_shift_minus_one_crc_pass;
     size_t legacy_shift_plus_one_crc_pass, legacy_shift_plus_two_crc_pass;
+    size_t legacy_shift_samples_tested;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -325,22 +326,30 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             hint.legacy_repeated_crc_pass_entries += group;
                             break;
                         }
-                        /* Observe ±1/±2-byte hypotheses without EVER
-                           selecting a shifted offset for rendering. */
-                        const uint64_t offset = offsets[start];
-                        if (offset >= 2u && ac1024_candidate_frame_crc(
-                                objects, nb, offset - 2u))
-                            hint.legacy_shift_minus_two_crc_pass += group;
-                        if (offset >= 1u && ac1024_candidate_frame_crc(
-                                objects, nb, offset - 1u))
-                            hint.legacy_shift_minus_one_crc_pass += group;
-                        if (offset < UINT64_MAX && ac1024_candidate_frame_crc(
-                                objects, nb, offset + 1u))
-                            hint.legacy_shift_plus_one_crc_pass += group;
-                        if (offset <= UINT64_MAX - 2u &&
-                            ac1024_candidate_frame_crc(
-                                objects, nb, offset + 2u))
-                            hint.legacy_shift_plus_two_crc_pass += group;
+                        /* Fixed deterministic <=2048 offset sample
+                           for shift hypotheses. The FULL source still
+                           receives the original frame-reason accounting. */
+                        size_t step = legacy_count / 2048u;
+                        if (step == 0u) step = 1u;
+                        if ((start % step) == 0u &&
+                            hint.legacy_shift_samples_tested < 2048u) {
+                            ++hint.legacy_shift_samples_tested;
+                            const uint64_t offset = offsets[start];
+                            if (offset >= 2u && ac1024_candidate_frame_crc(
+                                    objects, nb, offset - 2u))
+                                ++hint.legacy_shift_minus_two_crc_pass;
+                            if (offset >= 1u && ac1024_candidate_frame_crc(
+                                    objects, nb, offset - 1u))
+                                ++hint.legacy_shift_minus_one_crc_pass;
+                            if (offset < UINT64_MAX &&
+                                ac1024_candidate_frame_crc(
+                                    objects, nb, offset + 1u))
+                                ++hint.legacy_shift_plus_one_crc_pass;
+                            if (offset <= UINT64_MAX - 2u &&
+                                ac1024_candidate_frame_crc(
+                                    objects, nb, offset + 2u))
+                                ++hint.legacy_shift_plus_two_crc_pass;
+                        }
                         start = end;
                     }
                 }
@@ -427,7 +436,8 @@ static void report(const char *signature, const char *result,
                "\"legacy_shift_minus_two_crc_pass\":%zu,"
                "\"legacy_shift_minus_one_crc_pass\":%zu,"
                "\"legacy_shift_plus_one_crc_pass\":%zu,"
-               "\"legacy_shift_plus_two_crc_pass\":%zu}",
+               "\"legacy_shift_plus_two_crc_pass\":%zu,"
+               "\"legacy_shift_samples_tested\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -463,7 +473,8 @@ static void report(const char *signature, const char *result,
                hint->legacy_shift_minus_two_crc_pass,
                hint->legacy_shift_minus_one_crc_pass,
                hint->legacy_shift_plus_one_crc_pass,
-               hint->legacy_shift_plus_two_crc_pass);
+               hint->legacy_shift_plus_two_crc_pass,
+               hint->legacy_shift_samples_tested);
     }
     puts("}");
 }
