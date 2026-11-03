@@ -88,7 +88,8 @@ enum Ac1024FrameStatus {
 };
 
 static enum Ac1024FrameStatus ac1024_candidate_frame_status(
-    const uint8_t *objects, size_t object_bytes, uint64_t offset) {
+    const uint8_t *objects, size_t object_bytes, uint64_t offset,
+    size_t *out_frame_span) {
     if (!objects || offset >= (uint64_t)object_bytes)
         return AC1024_FRAME_TOO_SHORT;
     const size_t at = (size_t)offset;
@@ -109,6 +110,8 @@ static enum Ac1024FrameStatus ac1024_candidate_frame_status(
         return AC1024_FRAME_INVALID_MS;
     if (prefix > remaining - 2u || payload > remaining - prefix - 2u)
         return AC1024_FRAME_EXCEEDS_SECTION;
+    if (out_frame_span)
+        *out_frame_span = prefix + payload + 2u;
     uint16_t computed = 0u;
     if (!musa_core_crc16_arc(
           0xc0c1u, p, prefix + payload, &computed))
@@ -123,7 +126,7 @@ static enum Ac1024FrameStatus ac1024_candidate_frame_status(
 static int ac1024_candidate_frame_crc(
     const uint8_t *objects, size_t object_bytes, uint64_t offset) {
     return ac1024_candidate_frame_status(
-        objects, object_bytes, offset) == AC1024_FRAME_CRC_OK;
+        objects, object_bytes, offset, NULL) == AC1024_FRAME_CRC_OK;
 }
 
 typedef struct MusaAc1024CompatibilityHint {
@@ -149,6 +152,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t legacy_shift_minus_two_crc_pass, legacy_shift_minus_one_crc_pass;
     size_t legacy_shift_plus_one_crc_pass, legacy_shift_plus_two_crc_pass;
     size_t legacy_shift_samples_tested;
+    size_t legacy_next_offset_pairs, legacy_next_frame_unavailable;
+    size_t legacy_next_frame_exact, legacy_next_frame_short;
+    size_t legacy_next_frame_overlaps, legacy_crc_ok_next_frame_exact;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -310,9 +316,10 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             hint.legacy_zero_offset_entries = group;
                         if (group > hint.legacy_max_offset_multiplicity)
                             hint.legacy_max_offset_multiplicity = group;
+                        size_t frame_span = 0u;
                         const enum Ac1024FrameStatus status =
                             ac1024_candidate_frame_status(
-                                objects, nb, offsets[start]);
+                                objects, nb, offsets[start], &frame_span);
                         switch (status) {
                         case AC1024_FRAME_TOO_SHORT:
                             hint.legacy_frame_too_short += group;
@@ -330,6 +337,24 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             ++hint.legacy_distinct_frame_crc_pass;
                             hint.legacy_repeated_crc_pass_entries += group;
                             break;
+                        }
+                        if (end < legacy_count) {
+                            /* Adjacent offsets, not adjacent HANDLES:
+                               this tests whether each old-style MS
+                               length reaches the next candidate frame.
+                               No object parsing, owner or spatial claims. */
+                            ++hint.legacy_next_offset_pairs;
+                            const uint64_t gap = offsets[end] - offsets[start];
+                            if (!frame_span)
+                                ++hint.legacy_next_frame_unavailable;
+                            else if ((uint64_t)frame_span == gap) {
+                                ++hint.legacy_next_frame_exact;
+                                if (status == AC1024_FRAME_CRC_OK)
+                                    ++hint.legacy_crc_ok_next_frame_exact;
+                            } else if ((uint64_t)frame_span < gap)
+                                ++hint.legacy_next_frame_short;
+                            else
+                                ++hint.legacy_next_frame_overlaps;
                         }
                         /* Fixed deterministic <=2048 offset sample
                            for shift hypotheses. The FULL source still
@@ -444,7 +469,13 @@ static void report(const char *signature, const char *result,
                "\"legacy_shift_minus_one_crc_pass\":%zu,"
                "\"legacy_shift_plus_one_crc_pass\":%zu,"
                "\"legacy_shift_plus_two_crc_pass\":%zu,"
-               "\"legacy_shift_samples_tested\":%zu}",
+               "\"legacy_shift_samples_tested\":%zu,"
+               "\"legacy_next_offset_pairs\":%zu,"
+               "\"legacy_next_frame_unavailable\":%zu,"
+               "\"legacy_next_frame_exact\":%zu,"
+               "\"legacy_next_frame_short\":%zu,"
+               "\"legacy_next_frame_overlaps\":%zu,"
+               "\"legacy_crc_ok_next_frame_exact\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -483,7 +514,13 @@ static void report(const char *signature, const char *result,
                hint->legacy_shift_minus_one_crc_pass,
                hint->legacy_shift_plus_one_crc_pass,
                hint->legacy_shift_plus_two_crc_pass,
-               hint->legacy_shift_samples_tested);
+               hint->legacy_shift_samples_tested,
+               hint->legacy_next_offset_pairs,
+               hint->legacy_next_frame_unavailable,
+               hint->legacy_next_frame_exact,
+               hint->legacy_next_frame_short,
+               hint->legacy_next_frame_overlaps,
+               hint->legacy_crc_ok_next_frame_exact);
     }
     puts("}");
 }
