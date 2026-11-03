@@ -27,5 +27,60 @@ int main(void) {
     m[2].source_handle = 44;
     m[0].source_handle = 0;
     assert(!musa_dwg1032_scene_layer_map_valid(m, 3));
+
+    /* Large, deliberately permuted scene IDs exercise the O(n log n)
+     * scratch path and one-pass atomic page resolution. */
+    enum { BIG = 20000 };
+    static MusaDwg1032SceneLayerMap large[BIG];
+    static uint64_t source[BIG], resolved[BIG], scratch[BIG];
+    for (size_t i = 0; i < BIG; ++i) {
+        large[i].source_handle = (uint64_t)i + 1u;
+        large[i].scene_layer = (uint64_t)(BIG - i);
+        large[i].is_layer_zero = 0;
+        source[i] = (uint64_t)i + 1u;
+        resolved[i] = UINT64_MAX;
+    }
+    assert(musa_dwg1032_scene_layer_map_valid_scratch(
+        large, BIG, scratch, BIG));
+    assert(musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, resolved, scratch, BIG));
+    for (size_t i = 0; i < BIG; ++i)
+        assert(resolved[i] == (uint64_t)(BIG - i));
+    /* An invalid final handle must not partially publish a page. */
+    source[BIG - 1] = UINT64_MAX;
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, resolved, scratch, BIG));
+    assert(resolved[0] == BIG && resolved[BIG - 1] == 1u);
+    source[BIG - 1] = BIG;
+    /* Nonadjacent duplicate scene IDs must be rejected. */
+    large[BIG - 1].scene_layer = large[0].scene_layer;
+    assert(!musa_dwg1032_scene_layer_map_valid_scratch(
+        large, BIG, scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, resolved, scratch, BIG));
+    assert(resolved[0] == BIG && resolved[BIG - 1] == 1u);
+    large[BIG - 1].scene_layer = 1u;
+    /* A zero scene ID requires an explicit layer-zero designation. */
+    large[BIG - 1].scene_layer = 0u;
+    assert(!musa_dwg1032_scene_layer_map_valid_scratch(
+        large, BIG, scratch, BIG));
+    large[BIG - 1].is_layer_zero = 1u;
+    assert(musa_dwg1032_scene_layer_map_valid_scratch(
+        large, BIG, scratch, BIG));
+    assert(musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, resolved, scratch, BIG));
+    assert(resolved[BIG - 1] == 0u);
+    /* Reject aliases into the map, source handles or scratch capacity. */
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, source, scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, resolved, resolved, BIG));
+    assert(!musa_dwg1032_scene_layer_map_valid_scratch(
+        large, BIG, &large[0].scene_layer, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, &large[0].scene_layer, scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
+        large, BIG, source, BIG, resolved, scratch, BIG - 1));
+    assert(resolved[BIG - 1] == 0u);
     return 0;
 }
