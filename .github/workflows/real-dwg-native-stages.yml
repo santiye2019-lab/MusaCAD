@@ -7,6 +7,8 @@ on:
     paths:
       - 'Projeler/**'
       - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/test_ac1024_mc_frame_probe.c'
+      - 'tests/test_real_dwg_native_stage_contract.py'
       - 'tests/real_dwg_rejected_map_diagnostic.c'
       - 'tests/real_dwg_rejected_map_triage.py'
       - 'tests/test_real_dwg_rejected_map_diagnostic.py'
@@ -20,6 +22,8 @@ on:
     paths:
       - 'Projeler/**'
       - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/test_ac1024_mc_frame_probe.c'
+      - 'tests/test_real_dwg_native_stage_contract.py'
       - 'tests/real_dwg_rejected_map_diagnostic.c'
       - 'tests/real_dwg_rejected_map_triage.py'
       - 'tests/test_real_dwg_rejected_map_diagnostic.py'
@@ -55,6 +59,16 @@ jobs:
             -Icore/native/include tests/real_dwg_native_stage_probe.c \
             /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
             -o /tmp/musacad-real-stage-probe
+      - name: Verify synthetic R2010 MC frame and CRC failure cases
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include tests/test_ac1024_mc_frame_probe.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-mc-frame-test
+          /tmp/musacad-ac1024-mc-frame-test
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_native_stage_contract.py' -v
       - name: Reject fake and unsupported container signatures
         env:
           MUSACAD_NATIVE_STAGE_PROBE: /tmp/musacad-real-stage-probe
