@@ -143,17 +143,28 @@ static int ac1024_r2010_mc_frame(
     size_t *out_span, size_t *out_mc_bytes, int *out_crc_ok) {
     if (!objects || !out_span || !out_mc_bytes || !out_crc_ok ||
         offset >= (uint64_t)object_bytes) return 0;
-    size_t old_span = 0u;
-    (void)ac1024_candidate_frame_status(
-        objects, object_bytes, offset, &old_span);
-    if (old_span < 6u) return 0;
     const size_t at = (size_t)offset;
     const size_t remaining = object_bytes - at;
+    if (remaining < 6u) return 0;
     const uint8_t *p = objects + at;
     const uint16_t first = (uint16_t)p[0] |
                            ((uint16_t)p[1] << 8u);
-    const size_t ms_prefix = (first & 0x8000u) ? 4u : 2u;
-    if (ms_prefix >= remaining) return 0;
+    size_t ms_prefix = 2u;
+    size_t payload = (size_t)first;
+    if (first & 0x8000u) {
+        if (remaining < 8u) return 0;
+        const uint16_t hi = (uint16_t)p[2] |
+                            ((uint16_t)p[3] << 8u);
+        if (!hi || (hi & 0x8000u)) return 0;
+        ms_prefix = 4u;
+        payload = (size_t)(first & 0x7fffu) |
+                  ((size_t)hi << 15u);
+    }
+    /* Do not borrow AC1018's arbitrary 8-byte minimum: the actual
+       AC1024 CRC and OT must validate independently for short records. */
+    if (payload < 2u || ms_prefix > remaining - 2u ||
+        payload > remaining - ms_prefix - 2u) return 0;
+    const size_t old_span = ms_prefix + payload + 2u;
     size_t mc_len = 0u;
     int terminated = 0;
     for (; mc_len < 10u; mc_len++) {
@@ -205,7 +216,7 @@ static int ac1024_r2010_declared_ot(
         ms_prefix = 4u;
         payload = (size_t)(first & 0x7fffu) | ((size_t)hi << 15u);
     }
-    if (payload < 3u || ms_prefix > left ||
+    if (payload < 2u || ms_prefix > left ||
         mc_bytes > left - ms_prefix ||
         payload > left - ms_prefix - mc_bytes ||
         payload > SIZE_MAX / 8u) return 0;
