@@ -196,6 +196,30 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("invalid_ac1024_shift_probe_count")
         elif samples or any(hint[k] for k in status_fields):
             raise ValueError("unmeasured_ac1024_frame_reason_claim")
+        next_fields = (
+            "legacy_next_offset_pairs",
+            "legacy_next_frame_unavailable",
+            "legacy_next_frame_exact",
+            "legacy_next_frame_short",
+            "legacy_next_frame_overlaps",
+            "legacy_crc_ok_next_frame_exact",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in next_fields):
+            raise ValueError("invalid_ac1024_next_frame_counts")
+        (pairs, unavailable, exact, short, overlaps, crc_exact) = (
+            hint[k] for k in next_fields)
+        if measured:
+            if (pairs != distinct - 1 or
+                    unavailable + exact + short + overlaps != pairs or
+                    crc_exact > exact or
+                    crc_exact > distinct_crc or
+                    unavailable > hint["legacy_frame_too_short"] +
+                        hint["legacy_frame_invalid_ms"] +
+                        hint["legacy_frame_exceeds_section"]):
+                raise ValueError("inconsistent_ac1024_frame_adjacency")
+        elif any(hint[k] for k in next_fields):
+            raise ValueError("unmeasured_ac1024_frame_adjacency")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
