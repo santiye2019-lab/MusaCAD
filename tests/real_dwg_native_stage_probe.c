@@ -11,6 +11,8 @@
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_scene.h"
+#include "musacad_dwg_ac1018_handles.h"
+#include "musacad_crc16.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
@@ -66,6 +68,35 @@ static const char *signature_name(MusaCoreDwgSignature format) {
  * native page-map checks. This is NOT a decoder and NEVER accepted evidence.
  * The 6 signature bytes are restored before the caller continues.
  */
+/* Diagnostic-only R2004-family MS envelope/CRC: NO type or geometry
+   decoding. Offset belongs to an independently CRC-checked handle map.
+   Return false for malformed ranges instead of reading out of bounds. */
+static int ac1024_candidate_frame_crc(
+    const uint8_t *objects, size_t object_bytes, uint64_t offset) {
+    if (!objects || offset >= (uint64_t)object_bytes) return 0;
+    const size_t at = (size_t)offset;
+    const size_t remaining = object_bytes - at;
+    if (remaining < 6u) return 0;
+    const uint8_t *p = objects + at;
+    const uint16_t first = (uint16_t)p[0] | ((uint16_t)p[1] << 8u);
+    size_t prefix = 2u, payload = (size_t)first;
+    if ((first & 0x8000u) != 0u) {
+        const uint16_t hi = (uint16_t)p[2] | ((uint16_t)p[3] << 8u);
+        if (!hi || (hi & 0x8000u)) return 0;
+        prefix = 4u;
+        payload = (size_t)(first & 0x7fffu) | ((size_t)hi << 15u);
+    }
+    if (payload < 8u || prefix > remaining - 2u ||
+        payload > remaining - prefix - 2u) return 0;
+    uint16_t computed = 0u;
+    if (!musa_core_crc16_arc(
+          0xc0c1u, p, prefix + payload, &computed)) return 0;
+    const size_t at_crc = prefix + payload;
+    const uint16_t stored = (uint16_t)p[at_crc] |
+                            ((uint16_t)p[at_crc + 1u] << 8u);
+    return computed == stored;
+}
+
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
     size_t candidate_handles;
@@ -73,6 +104,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t legacy_frame_crc_ok, legacy_frame_crc_failed;
     size_t raw_type_17_arc, raw_type_18_circle;
     size_t raw_type_19_line, raw_type_77_lwpolyline;
+    int continuous_offset_candidate_index;
+    size_t continuous_candidate_handles;
+    size_t continuous_frame_crc_ok, continuous_frame_crc_failed;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -138,6 +172,63 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
         }
         musa_dwg_ac1018_scene_close(scene);
     }
+    /* The 2010 handle map may use continuously advancing logical
+       AcDbObjects offsets instead of the legacy R2004 per-map-page
+       reset. Compare this ALTERNATE CRC-checked map in isolation.
+       Do not choose either profile for the actual application yet. */
+    if (hint.handle_index && length <= 12u * 1024u * 1024u &&
+        hint.candidate_handles <= 400000u) {
+        MusaDwgAc1018SectionDescriptor obj_info = {0}, h_info = {0};
+        size_t obj_pages2 = 0u, h_pages2 = 0u;
+        if (musa_dwg_ac1018_section_pages(
+                scratch, length, MUSA_DWG_AC1018_OBJECTS,
+                NULL, 0u, &obj_info, &obj_pages2) &&
+            musa_dwg_ac1018_section_pages(
+                scratch, length, MUSA_DWG_AC1018_HANDLES,
+                NULL, 0u, &h_info, &h_pages2) &&
+            obj_pages2 && h_pages2 && obj_info.logical_bytes > 0u &&
+            h_info.logical_bytes > 0u &&
+            obj_info.logical_bytes <= 96u * 1024u * 1024u &&
+            h_info.logical_bytes <= 16u * 1024u * 1024u) {
+            const size_t nb = (size_t)obj_info.logical_bytes;
+            const size_t hb = (size_t)h_info.logical_bytes;
+            uint8_t *objects = (uint8_t *)malloc(nb);
+            uint8_t *handles = (uint8_t *)malloc(hb);
+            size_t got_obj = 0u, got_h = 0u, candidate_count = 0u;
+            if (objects && handles &&
+                musa_dwg_ac1018_extract_section(
+                    scratch, length, MUSA_DWG_AC1018_OBJECTS,
+                    objects, nb, &got_obj) && got_obj == nb &&
+                musa_dwg_ac1018_extract_section(
+                    scratch, length, MUSA_DWG_AC1018_HANDLES,
+                    handles, hb, &got_h) && got_h == hb &&
+                musa_dwg_ac1018_handles_index_continuous_offsets(
+                    handles, hb, nb, NULL, 0u, &candidate_count) &&
+                candidate_count == hint.candidate_handles &&
+                candidate_count <= SIZE_MAX / sizeof(MusaDwgAc1018HandleEntry)) {
+                MusaDwgAc1018HandleEntry *entries =
+                    (MusaDwgAc1018HandleEntry *)malloc(
+                        candidate_count * sizeof(*entries));
+                size_t actual = 0u;
+                if (entries &&
+                    musa_dwg_ac1018_handles_index_continuous_offsets(
+                        handles, hb, nb, entries, candidate_count, &actual) &&
+                    actual == candidate_count) {
+                    hint.continuous_offset_candidate_index = 1;
+                    hint.continuous_candidate_handles = actual;
+                    for (size_t i = 0u; i < actual; i++) {
+                        if (ac1024_candidate_frame_crc(
+                              objects, nb, entries[i].object_offset))
+                            hint.continuous_frame_crc_ok++;
+                        else hint.continuous_frame_crc_failed++;
+                    }
+                }
+                free(entries);
+            }
+            free(handles);
+            free(objects);
+        }
+    }
     memcpy(scratch, "AC1024", 6u);
     return hint;
 }
@@ -162,7 +253,11 @@ static void report(const char *signature, const char *result,
                "\"legacy_raw_type_17_arc\":%zu,"
                "\"legacy_raw_type_18_circle\":%zu,"
                "\"legacy_raw_type_19_line\":%zu,"
-               "\"legacy_raw_type_77_lwpolyline\":%zu}",
+               "\"legacy_raw_type_77_lwpolyline\":%zu,"
+               "\"continuous_offset_candidate_index\":%s,"
+               "\"continuous_candidate_handles\":%zu,"
+               "\"continuous_frame_crc_ok\":%zu,"
+               "\"continuous_frame_crc_failed\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -175,7 +270,11 @@ static void report(const char *signature, const char *result,
                hint->raw_type_17_arc,
                hint->raw_type_18_circle,
                hint->raw_type_19_line,
-               hint->raw_type_77_lwpolyline);
+               hint->raw_type_77_lwpolyline,
+               hint->continuous_offset_candidate_index ? "true" : "false",
+               hint->continuous_candidate_handles,
+               hint->continuous_frame_crc_ok,
+               hint->continuous_frame_crc_failed);
     }
     puts("}");
 }
