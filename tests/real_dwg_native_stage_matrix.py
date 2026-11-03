@@ -161,6 +161,25 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("false_unique_ac1024_offset_claim")
         elif any(hint[k] for k in offset_fields):
             raise ValueError("unmeasured_ac1024_offset_evidence")
+        status_fields = (
+            "legacy_frame_too_short", "legacy_frame_invalid_ms",
+            "legacy_frame_exceeds_section", "legacy_frame_crc_mismatch",
+            "legacy_shift_minus_two_crc_pass",
+            "legacy_shift_minus_one_crc_pass",
+            "legacy_shift_plus_one_crc_pass",
+            "legacy_shift_plus_two_crc_pass",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in status_fields):
+            raise ValueError("invalid_ac1024_frame_reason_contract")
+        if measured:
+            if (sum(hint[k] for k in status_fields[:4]) +
+                    hint["legacy_repeated_crc_pass_entries"] != handles):
+                raise ValueError("incomplete_ac1024_frame_reason_accounting")
+            if any(hint[k] > handles for k in status_fields[4:]):
+                raise ValueError("invalid_ac1024_shift_probe_count")
+        elif any(hint[k] for k in status_fields):
+            raise ValueError("unmeasured_ac1024_frame_reason_claim")
     elif hint is not None:
         raise ValueError("ac1024_hint_on_wrong_version")
     return result
