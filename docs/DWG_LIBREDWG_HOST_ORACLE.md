@@ -56,6 +56,36 @@ Bu doğrudan host yardımcı aracı GPL LibreDWG kütüphanesine **sadece
 geçici GitHub Actions bilgisayarında** bağlanır. MusaCAD'in özgün
 çekirdeğine, Android APK'sına veya dağıtım çıktısına eklenmez.
 
+## AC1024 Karagümrük: ilk özgün okuyucu karşılaştırması
+
+GitHub'daki Karagümrük pis su çizimi **AC1024** biçimindedir ve mevcut
+MusaCAD native sürüm sondasının gerçek AC1024 parser kabulü yoktur.
+Bu nedenle test-only `real_dwg_native_stage_probe.c`, disk üzerindeki
+kaynak dosyayı değiştirmeden, geçici RAM kopyasının ilk altı baytını
+yalnızca tanı amacıyla `AC1018` biçimine alıp mevcut doğrulayıcılar ile
+korumalı bölüm haritası, sayfa haritası, bölüm sayfaları ve CRC tabanlı
+handle indeksini sınar. Çıkmadan önce bellek kopyasının imzası geri
+yüklenir. Bu giriş `ac1024_family_hypothesis_only` aşamasıdır; gerçek
+AC1024 biçimi olarak **asla accepted raporlanmaz**.
+
+Karagümrük pis su dosyasında bu test **145.279 aday indeks** buldu;
+ayrı LibreDWG host sayacı da **145.279 referans nesne kaydı** bildirdi.
+Sayı eşleşmesi tesadüfi veya kısmi indeks / sınıflandırma hatalarını
+dışlamaz. 10 AC1024 çizimden 9'u aday indeks aşamasına ulaştı;
+otomasyon çizimi korumalı dosya başlığından sonra fiziksel sayfa
+haritasında durdu. Bunlar henüz AC1024 tam okuyucu uyumluluğu değildir.
+
+İzleyen *ayrı* testte aynı geçici RAM kopyasıyla, geçerli aday indeksi
+olan ve kaynak boyutu en çok 12 MiB olan çizimlerde mevcut R2004
+kayıt-çerçeve CRC okuyucusu bütün indeksleri sınar. Sadece ham numerik
+BS türleri 17, 18, 19, 77 için aday sayımlar çıkarılır; bunlar tek
+başına sınıf/nesne adı, gövde koordinatı, embedded self handle,
+owner/layer bağlantısı veya AutoCAD eşdeğerliği kanıtı değildir.
+Eşleşen sayılar bile raporda yalnızca **candidate count correlation**
+olarak kalır; `entity_parity=NOT_MEASURABLE` değişmez.
+Yetersiz veya yanlış indeks/CRC durumunda kesin eşdeğerlik iddiası
+üretilmez. Çizim kaynağı SHA-256 değeri iki kez denetlenir.
+
 ## Kesinlikle kanıtlanmayan şeyler
 
 MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
