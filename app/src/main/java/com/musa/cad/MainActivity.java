@@ -4021,11 +4021,11 @@ public class MainActivity extends AppCompatActivity {
         final boolean configured=MusaCadDiagnosticReports.serverConfigured();
         String message="Her DWG/DXF açılışında teknik rapor telefonun özel alanına kaydedilir. "+
             "DWG, proje adı, dosya yolu, çizim metni, koordinatlar ve ekran görüntüsü paylaşılmaz. "+
-            "Sunucu gönderimi yalnızca onayınla yapılır.\\n\\n"+
+            "Sunucu gönderimi yalnızca onayınla yapılır.\n\n"+
             "Otomatik gönderim: "+(enabled?"AÇIK":"KAPALI")+
-            "\\nGüvenli sunucu bağlantısı: "+(configured?"APK içinde tanımlı":"YAPILANDIRILMAMIŞ")+
-            "\\nYerel rapor kuyruğu: "+MusaCadDiagnosticReports.pendingCount(this)+
-            "\\n\\nÖzel GitHub deposu doğrulanmadan hiçbir rapor gönderilmez.";
+            "\nGüvenli sunucu bağlantısı: "+(configured?"APK içinde tanımlı":"YAPILANDIRILMAMIŞ")+
+            "\nYerel rapor kuyruğu: "+MusaCadDiagnosticReports.pendingCount(this)+
+            "\n\nÖzel GitHub deposu doğrulanmadan hiçbir rapor gönderilmez.";
         new AlertDialog.Builder(this).setTitle("MusaCAD • Otomatik Test Raporları")
             .setMessage(message)
             .setPositiveButton(enabled?"GÖNDERİMİ KAPAT":"GÖNDERİME İZİN VER",(d,w)->{
