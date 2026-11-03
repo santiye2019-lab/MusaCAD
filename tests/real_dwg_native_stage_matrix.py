@@ -339,6 +339,16 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("invalid_ac1024_first_handle_sample")
         elif any(hint[k] for k in stream_fields + sample_fields):
             raise ValueError("unmeasured_ac1024_handle_stream_claim")
+        hcode_fields = (
+            "sampled_first_h_code0_mismatch",
+            "sampled_first_h_absolute_other_code",
+            "sampled_first_h_relative_code",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in hcode_fields):
+            raise ValueError("invalid_ac1024_first_h_code_counts")
+        if sum(hint[k] for k in hcode_fields) != other_h:
+            raise ValueError("incomplete_ac1024_first_h_code_breakdown")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
