@@ -94,3 +94,39 @@ int musa_dwg_ac1024_record_probe(
     *out = candidate;
     return 1;
 }
+
+/* One safe payload window, with no decoded entity fields or pointers.
+ * The whole record's CRC16 is checked anew before any offsets are exposed.
+ * This must not be mistaken for proof that common header bits have ended. */
+int musa_dwg_ac1024_record_data_bounds(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024DataBounds *out) {
+    if (!objects || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024RecordFrame frame = {0};
+    if (!musa_dwg_ac1024_record_probe(
+            objects, object_bytes, indexed_offset, &frame))
+        return 0;
+    if (indexed_offset >= (uint64_t)object_bytes ||
+        frame.ms_marker_bytes > object_bytes - (size_t)indexed_offset ||
+        frame.mc_marker_bytes > object_bytes -
+            (size_t)indexed_offset - frame.ms_marker_bytes)
+        return 0;
+    const size_t start = (size_t)indexed_offset +
+                         frame.ms_marker_bytes + frame.mc_marker_bytes;
+    if (start >= object_bytes ||
+        frame.ms_object_bytes > object_bytes - start ||
+        frame.ms_object_bytes > SIZE_MAX / 8u)
+        return 0;
+    const unsigned selector = (unsigned)(objects[start] >> 6u);
+    const size_t ot_bits = selector >= 2u ? 18u : 10u;
+    const size_t available_bits = frame.ms_object_bytes * 8u;
+    if (ot_bits > available_bits) return 0;
+    const MusaDwgAc1024DataBounds next = {
+        indexed_offset, start, frame.ms_object_bytes, ot_bits,
+        available_bits, frame.raw_object_type, 1u
+    };
+    *out = next;
+    return 1;
+}
