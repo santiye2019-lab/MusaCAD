@@ -41,9 +41,23 @@ static int test_one(size_t mc_bytes) {
            mc_bytes == 2u ? 129u : 16513u) ||
         memcmp(frame, untouched, sizeof(frame)))
         return 0;
+    MusaDwgAc1024DataBounds bounds = {0};
+    if (!musa_dwg_ac1024_record_data_bounds(
+          frame, crc_at + 2u, 0u, &bounds) ||
+        !bounds.record_crc16_verified ||
+        bounds.raw_object_type != 19u ||
+        bounds.payload_start_byte != 2u + mc_bytes ||
+        bounds.payload_bytes != 8u ||
+        bounds.type_end_bit != 10u ||
+        bounds.payload_end_bit != 64u)
+        return 0;
+    const MusaDwgAc1024DataBounds saved_bounds = bounds;
     const MusaDwgAc1024RecordFrame saved = evidence;
     frame[crc_at] ^= 0x10u;
-    if (musa_dwg_ac1024_record_probe(
+    if (musa_dwg_ac1024_record_data_bounds(
+          frame, crc_at + 2u, 0u, &bounds) ||
+        memcmp(&saved_bounds, &bounds, sizeof(saved_bounds)) ||
+        musa_dwg_ac1024_record_probe(
           frame, crc_at + 2u, 0u, &evidence) ||
         memcmp(&saved, &evidence, sizeof(saved)))
         return 0;
@@ -56,6 +70,9 @@ static int test_one(size_t mc_bytes) {
     if (musa_dwg_ac1024_record_probe(
           frame, crc_at + 2u, 0u,
           (MusaDwgAc1024RecordFrame *)(void *)frame) ||
+        musa_dwg_ac1024_record_data_bounds(
+          frame, crc_at + 2u, 0u,
+          (MusaDwgAc1024DataBounds *)(void *)frame) ||
         memcmp(frame, untouched, sizeof(frame)))
         return 0;
     return 1;
@@ -74,8 +91,12 @@ static int test_ot_variants(void) {
         frame[11] = (uint8_t)crc;
         frame[12] = (uint8_t)(crc >> 8u);
         MusaDwgAc1024RecordFrame out = {0};
+        MusaDwgAc1024DataBounds bounds = {0};
         if (!musa_dwg_ac1024_record_probe(frame, 13u, 0u, &out) ||
-            out.raw_object_type != expected[i])
+            out.raw_object_type != expected[i] ||
+            !musa_dwg_ac1024_record_data_bounds(frame, 13u, 0u, &bounds) ||
+            bounds.type_end_bit != (selectors[i] >= 2u ? 18u : 10u) ||
+            bounds.raw_object_type != expected[i])
             return 0;
     }
     return 1;
