@@ -341,9 +341,18 @@ static int original(const char *filename){
                        produced!=complete_lines.line_count){ok=0;break;}
                     for(size_t si=0u;si<produced;si++){
                         const MusaDwgAc1032LineSceneItem *item=&scene_items[si];
-                        if(item->insert_handle!=entry.handle||
+                        MusaDwgAc1032EntityBlockOwnerLayerSource original_layer={0};
+                        if(!musa_dwg_ac1032_scene_index_entity_block_owner_layer_source(
+                               scene,complete_lines.child_handles[si],
+                               &original_layer)||
+                           !musa_dwg_ac1032_block_child_owner_edge_matches(
+                               &original_layer,complete_lines.child_handles[si],
+                               coverage.block_header_handle,19u)||
+                           item->insert_handle!=entry.handle||
                            item->block_header_handle!=coverage.block_header_handle||
-                           item->line_handle!=complete_lines.child_handles[si]){
+                           item->line_handle!=complete_lines.child_handles[si]||
+                           !item->layer_handle||
+                           item->layer_handle!=original_layer.layer_handle){
                             ok=0;break;
                         }
                         for(unsigned axis=0u;axis<4u;axis++)
