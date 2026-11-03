@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from real_dwg_reference_compare import (observable_inventory, observable_inventory_stream, reference_read)
+from real_dwg_reference_compare import (ac1024_candidate_alignment, observable_inventory, observable_inventory_stream, reference_read)
 
 
 class ObservableReferenceTest(unittest.TestCase):
@@ -137,6 +137,50 @@ class ObservableReferenceTest(unittest.TestCase):
             self.assertEqual(result["reference_decoder_warning_mask"], 4)
             self.assertEqual(result["reference_typed_entity_count"], 2)
             self.assertEqual(result["reference_layer_record_count"], 1)
+
+
+    def test_ac1024_candidate_count_match_is_not_entity_parity(self):
+        reference = {
+            "reference_status": "libredwg_typed_inventory_only",
+            "reference_total_object_records": 145279,
+            "reference_entities_by_type": {
+                "ARC": 4360, "CIRCLE": 9543,
+                "LINE": 44941, "LWPOLYLINE": 13987,
+            },
+        }
+        native = {
+            "signature": "AC1024",
+            "ac1024_compatibility_hypothesis": {
+                "candidate_handle_index": True,
+                "candidate_handle_count": 145279,
+                "legacy_frame_probe_completed": True,
+                "legacy_frame_crc_ok": 145279,
+                "legacy_frame_crc_failed": 0,
+                "legacy_raw_type_17_arc": 4360,
+                "legacy_raw_type_18_circle": 9543,
+                "legacy_raw_type_19_line": 44941,
+                "legacy_raw_type_77_lwpolyline": 13987,
+            }
+        }
+        report = ac1024_candidate_alignment(reference, native)
+        self.assertEqual(report["state"],
+                         "CANDIDATE_HANDLE_COUNT_EQUAL_NOT_ENTITY_PARITY")
+        self.assertEqual(report["entity_parity"], "NOT_MEASURABLE")
+        self.assertFalse(report["type_parity_verified"])
+        self.assertFalse(report["layer_owner_color_parity_verified"])
+        self.assertTrue(report["legacy_raw_code_count_correlations"]["19"]["count_equal_only"])
+        native["ac1024_compatibility_hypothesis"]["legacy_raw_type_19_line"] = 12
+        mismatch = ac1024_candidate_alignment(reference, native)
+        self.assertFalse(mismatch["legacy_raw_code_count_correlations"]["19"]["count_equal_only"])
+        native["ac1024_compatibility_hypothesis"]["candidate_handle_count"] = 17
+        self.assertEqual(ac1024_candidate_alignment(reference, native)["state"],
+                         "CANDIDATE_HANDLE_COUNT_MISMATCH")
+        native["ac1024_compatibility_hypothesis"]["candidate_handle_index"] = False
+        self.assertEqual(ac1024_candidate_alignment(reference, native)["state"],
+                         "FIRSTPARTY_CANDIDATE_UNAVAILABLE")
+        native["signature"] = "AC1032"
+        self.assertEqual(ac1024_candidate_alignment(reference, native)["state"],
+                         "NOT_APPLICABLE")
 
     def test_bounded_cli_success_and_nonzero_are_distinct(self):
         with tempfile.TemporaryDirectory() as temp:
