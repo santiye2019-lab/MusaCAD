@@ -107,5 +107,15 @@ int main(void){
     assert(!musa_dwg_ac1032_page_locations(
                  sparse,sizeof(sparse),gp,2u,&ng));
     assert(ng==old_ng&&!memcmp(gp,saved_g,sizeof(saved_g)));
+    /* Even a newly authenticated map cannot reuse absolute page 1 as
+     * both a real page and a signed free gap. */
+    le32(lz+10u,UINT32_C(0xffffffff)); /* signed gap -1 aliases page 1 */
+    le32(sparse+400u,0u);
+    le32(sparse+400u,checksum(checksum(0u,sparse+384u,20u),
+                                lz,43u));
+    assert(musa_dwg_ac1032_page_map_header(sparse,sizeof(sparse),&g));
+    assert(!musa_dwg_ac1032_page_locations(
+                   sparse,sizeof(sparse),gp,2u,&ng));
+    assert(ng==old_ng&&!memcmp(gp,saved_g,sizeof(saved_g)));
     return 0;
 }
