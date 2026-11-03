@@ -96,6 +96,13 @@ def ac1024_probe_record():
             "core_frame_verified": 0,
             "core_frame_probe_failed": 0,
             "core_raw_ot_or_span_mismatch": 0,
+            "core_payload_bounds_verified": 0,
+            "core_payload_bounds_rejected": 0,
+            "core_payload_bounds_mismatch": 0,
+            "mc_unreadable_invalid_ms": 0,
+            "mc_unreadable_short_or_boundary": 0,
+            "mc_unreadable_other": 0,
+            "mc_unreadable_first_half": 0,
         }
     }
 
@@ -267,6 +274,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_ot_unreadable": 0,
             "mc_ot_raw_19": 25,
             "core_frame_verified": 100,
+            "core_payload_bounds_verified": 100,
+            "mc_unreadable_invalid_ms": 2,
+            "mc_unreadable_first_half": 1,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -297,6 +307,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("core_frame_verified", 99),
             ("core_frame_probe_failed", 1),
             ("core_raw_ot_or_span_mismatch", 1),
+            ("core_payload_bounds_verified", 99),
+            ("core_payload_bounds_rejected", 1),
+            ("core_payload_bounds_mismatch", 1),
+            ("mc_unreadable_invalid_ms", 1),
+            ("mc_unreadable_first_half", 3),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -344,6 +359,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_ot_raw_51": 175,
             "mc_ot_raw_77": 13987,
             "core_frame_verified": 145277,
+            "core_payload_bounds_verified": 145277,
+            "mc_unreadable_invalid_ms": 2,
+            "mc_unreadable_first_half": 1,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
