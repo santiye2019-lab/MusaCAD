@@ -122,10 +122,47 @@ static int test_bad_prefix(void) {
     return 1;
 }
 
+/* Genuine short frame shape: 2-byte MS body + 1-byte unsigned MC.
+ * A selector 0/1 fits in 10 body bits; 2/3 needs 18 and is rejected. */
+static int test_short_ot_only(void) {
+    uint8_t data[16] = {0};
+    data[0] = 2u; data[2] = 1u;
+    data[3] = 0x04u; data[4] = 0xc0u; /* raw LINE OT (19) */
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, data, 5u, &crc))
+        return 0;
+    data[5] = (uint8_t)crc;
+    data[6] = (uint8_t)(crc >> 8u);
+    MusaDwgAc1024RecordFrame frame = {0};
+    MusaDwgAc1024DataBounds bounds = {0};
+    if (!musa_dwg_ac1024_record_probe(data, 7u, 0u, &frame) ||
+        !musa_dwg_ac1024_record_data_bounds(data, 7u, 0u, &bounds) ||
+        frame.raw_object_type != 19u || frame.framed_bytes != 7u ||
+        frame.ms_object_bytes != 2u || bounds.payload_start_byte != 3u ||
+        bounds.type_end_bit != 10u || bounds.payload_end_bit != 16u)
+        return 0;
+    for (unsigned selector = 2u; selector <= 3u; ++selector) {
+        data[3] = (uint8_t)(selector << 6u);
+        if (!musa_core_crc16_arc(0xc0c1u, data, 5u, &crc))
+            return 0;
+        data[5] = (uint8_t)crc;
+        data[6] = (uint8_t)(crc >> 8u);
+        const MusaDwgAc1024RecordFrame saved = frame;
+        const MusaDwgAc1024DataBounds saved_bounds = bounds;
+        if (musa_dwg_ac1024_record_probe(data, 7u, 0u, &frame) ||
+            musa_dwg_ac1024_record_data_bounds(data, 7u, 0u, &bounds) ||
+            memcmp(&saved, &frame, sizeof(saved)) ||
+            memcmp(&saved_bounds, &bounds, sizeof(saved_bounds)))
+            return 0;
+    }
+    return 1;
+}
+
 int main(void) {
     for (size_t i = 1u; i <= 3u; i++)
         if (!test_one(i)) return 1;
-    if (!test_ot_variants() || !test_bad_prefix()) return 2;
+    if (!test_ot_variants() || !test_bad_prefix() ||
+        !test_short_ot_only()) return 2;
     puts("First-party AC1024 record-envelope and raw OT: pass");
     return 0;
 }
