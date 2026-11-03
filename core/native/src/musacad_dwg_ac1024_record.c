@@ -36,7 +36,10 @@ int musa_dwg_ac1024_record_probe(
         body_len = (size_t)(first & 0x7fffu) |
                    ((size_t)second << 15u);
     }
-    if (body_len < 3u || ms_len > available ||
+    /* A valid one-byte OT selector and one-byte raw type need only
+       ten bits, i.e. two payload bytes. Selector 2/3 still requires
+       eighteen bits and is rejected by the bounded bit reader. */
+    if (body_len < 2u || ms_len > available ||
         body_len > available - ms_len - 2u) return 0;
 
     size_t mc_len = 0u;
