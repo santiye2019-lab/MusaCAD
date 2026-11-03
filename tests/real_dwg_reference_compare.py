@@ -237,6 +237,55 @@ def reference_read(executable: Path, source: Path, timeout: int, host_probe: Pat
                 "reference_attempts": attempts}
 
 
+def ac1024_candidate_alignment(reference: dict, native: dict) -> dict:
+    """Report count correlations, NEVER an AC1024 entity or drawing parity."""
+    if (native.get("signature") != "AC1024" or
+            reference.get("reference_status") != "libredwg_typed_inventory_only"):
+        return {"state": "NOT_APPLICABLE", "entity_parity": "NOT_MEASURABLE"}
+    hint = native.get("ac1024_compatibility_hypothesis", {})
+    if not hint.get("candidate_handle_index"):
+        return {"state": "FIRSTPARTY_CANDIDATE_UNAVAILABLE",
+                "entity_parity": "NOT_MEASURABLE"}
+    total = reference["reference_total_object_records"]
+    count = hint["candidate_handle_count"]
+    result = {
+        "state": ("CANDIDATE_HANDLE_COUNT_EQUAL_NOT_ENTITY_PARITY"
+                  if count == total else "CANDIDATE_HANDLE_COUNT_MISMATCH"),
+        "reference_records": total,
+        "firstparty_legacy_candidate_handles": count,
+        "type_parity_verified": False,
+        "layer_owner_color_parity_verified": False,
+        "render_parity_verified": False,
+        "entity_parity": "NOT_MEASURABLE",
+    }
+    if hint.get("legacy_frame_probe_completed"):
+        raw = {
+            "17": hint["legacy_raw_type_17_arc"],
+            "18": hint["legacy_raw_type_18_circle"],
+            "19": hint["legacy_raw_type_19_line"],
+            "77": hint["legacy_raw_type_77_lwpolyline"],
+        }
+        result["legacy_frame_crc_verified_records"] = hint["legacy_frame_crc_ok"]
+        result["legacy_frame_crc_rejected_records"] = hint["legacy_frame_crc_failed"]
+        result["raw_numeric_type_codes_not_entity_names"] = raw
+        # This only compares historical numeric associations as *hints*;
+        # a matching count is not identity/class/owner or render parity.
+        if hint["legacy_frame_crc_failed"] == 0:
+            entities = reference["reference_entities_by_type"]
+            labels = {"17": "ARC", "18": "CIRCLE",
+                      "19": "LINE", "77": "LWPOLYLINE"}
+            result["legacy_raw_code_count_correlations"] = {
+                code: {
+                    "legacy_raw_code_count": value,
+                    "reference_named_entity_count": entities.get(name, 0),
+                    "count_equal_only": value == entities.get(name, 0),
+                } for code, value in raw.items()
+                for name in (labels[code],)
+            }
+    return result
+
+
+
 def audit_source(repo: Path, relative: str) -> tuple[Path, str, int]:
     source = repo / relative
     if not relative.startswith("Projeler/") or source.is_symlink() or not source.is_file():
@@ -291,6 +340,8 @@ def main() -> int:
             row["source_bytes"] = byte_count
             row["libredwg"] = reference_read(executable, source, args.timeout_seconds, host_probe)
             row["musacad"] = run_probe(probe, source, float(args.timeout_seconds))
+            row["ac1024_candidate_alignment"] = ac1024_candidate_alignment(
+                row["libredwg"], row["musacad"])
             after_digest, after_size, _ = file_digest(source)
             if (after_digest, after_size) != (digest, byte_count):
                 raise ValueError("source_was_modified")
