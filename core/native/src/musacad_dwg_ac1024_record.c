@@ -57,7 +57,7 @@ int musa_dwg_ac1024_record_probe(
         }
     }
     if (!terminated || !mc_len || mc_len > UINT8_MAX ||
-        mc_len > available - ms_len ||
+        mc_len > available - ms_len - 2u ||
         body_len > available - ms_len - mc_len - 2u)
         return 0;
     const size_t crc_at = ms_len + mc_len + body_len;
