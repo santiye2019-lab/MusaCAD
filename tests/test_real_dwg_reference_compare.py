@@ -77,6 +77,41 @@ class ObservableReferenceTest(unittest.TestCase):
         self.assertEqual(result["reference_layer_record_count"], 1)
         self.assertEqual(result["reference_unclassified_count"], 0)
 
+
+    def test_malformed_pretty_json_uses_valid_minjson_fallback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "fake.dwg"
+            source.write_bytes(b"AC1024")
+            reader = root / "fake-reader"
+            reader.write_text(
+                "#!/usr/bin/env python3\\n"
+                "import sys\\n"
+                "if sys.argv[2] == 'JSON':\\n"
+                "    print('{ malformed reference')\\n"
+                "else:\\n"
+                "    print('{\\\"OBJECTS\\\":[{\\\"entity\\\":\\\"LINE\\\"}]}')\\n",
+                encoding="utf-8",
+            )
+            reader.chmod(0o755)
+            observed = reference_read(reader, source, 10)
+            self.assertEqual(observed["reference_status"], "libredwg_typed_inventory_only")
+            self.assertEqual(observed["reference_output_mode"], "minJSON")
+            self.assertEqual(observed["reference_typed_entity_count"], 1)
+
+    def test_both_malformed_json_variants_fail_without_false_green(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "fake.dwg"
+            source.write_bytes(b"AC1024")
+            reader = root / "fake-reader"
+            reader.write_text("#!/usr/bin/env python3\\nprint('{ malformed')\\n",
+                              encoding="utf-8")
+            reader.chmod(0o755)
+            failure = reference_read(reader, source, 10)
+            self.assertEqual(failure["reference_status"], "libredwg_unusable_json")
+            self.assertEqual(len(failure["reference_attempts"]), 2)
+
     def test_bounded_cli_success_and_nonzero_are_distinct(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
