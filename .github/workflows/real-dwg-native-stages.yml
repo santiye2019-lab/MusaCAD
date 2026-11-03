@@ -59,6 +59,15 @@ jobs:
             -Icore/native/include tests/real_dwg_native_stage_probe.c \
             /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
             -o /tmp/musacad-real-stage-probe
+      - name: Verify shared-core AC1024 frame ABI, atomic output and source immutability
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include core/native/tests/core_dwg_ac1024_record_test.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-core-record-test
+          /tmp/musacad-ac1024-core-record-test
+
       - name: Verify synthetic R2010 MC frame and CRC failure cases
         run: |
           set -euo pipefail
