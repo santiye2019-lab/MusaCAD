@@ -82,5 +82,42 @@ int main(void) {
     assert(!musa_dwg1032_scene_layer_map_find_many_scratch(
         large, BIG, source, BIG, resolved, scratch, BIG - 1));
     assert(resolved[BIG - 1] == 0u);
+
+    /* A 257-child tail page must match the full-map result, including
+     * authenticated layer zero. This is synthetic post-decode evidence. */
+    const size_t first = BIG - 257u;
+    for (size_t i = first; i < BIG; ++i) resolved[i] = UINT64_MAX;
+    assert(musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, first, 257u, resolved + first,
+        scratch, BIG));
+    for (size_t i = first; i < BIG; ++i)
+        assert(resolved[i] == (i == BIG - 1u ? 0u : (uint64_t)(BIG - i)));
+    /* Late bad source handle rejects the whole page without publishing. */
+    source[BIG - 1u] = UINT64_MAX;
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, first, 257u, resolved + first,
+        scratch, BIG));
+    assert(resolved[first] == 257u && resolved[BIG - 1u] == 0u);
+    source[BIG - 1u] = BIG;
+    /* The selected page is disjoint from these destinations, but a
+     * future page is not. Neither output nor scratch may overwrite it. */
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, 0u, 17u, source + 1000u,
+        scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, 0u, 17u, resolved,
+        source, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, 0u, 17u, resolved,
+        resolved, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, BIG, 1u, resolved, scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, 0u, 0u, resolved, scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, BIG - 1u, 2u, resolved, scratch, BIG));
+    assert(!musa_dwg1032_scene_layer_map_find_page_scratch(
+        large, BIG, source, BIG, 0u, SIZE_MAX, resolved, scratch, BIG));
+    assert(resolved[first] == 257u && resolved[BIG - 1u] == 0u);
     return 0;
 }
