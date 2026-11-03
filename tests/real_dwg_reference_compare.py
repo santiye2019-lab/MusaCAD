@@ -202,6 +202,7 @@ def main() -> int:
     paths = tracked if args.all else [PILOT]
     rows = []
     infra_failures = 0
+    reference_failures = 0
     for relative in paths:
         row: dict = {
             "source": relative,
@@ -223,9 +224,13 @@ def main() -> int:
             if (after_digest, after_size) != (digest, byte_count):
                 raise ValueError("source_was_modified")
             row["source_unchanged"] = True
+            reference_observed = (row["libredwg"]["reference_status"]
+                                  == "libredwg_typed_inventory_only")
+            if not reference_observed:
+                reference_failures += 1
             row["comparison_state"] = (
                 "REFERENCE_OBSERVED_NATIVE_STAGE_ONLY_NO_ENTITY_PARITY"
-                if row["libredwg"]["reference_status"] == "libredwg_typed_inventory_only"
+                if reference_observed
                 else "REFERENCE_UNAVAILABLE_NATIVE_STAGE_ONLY"
             )
         except (OSError, ValueError, subprocess.SubprocessError, json.JSONDecodeError) as error:
@@ -250,6 +255,7 @@ def main() -> int:
         "raw_drawings_in_report": False,
         "files_checked": len(rows),
         "infrastructure_failures": infra_failures,
+        "reference_failures": reference_failures,
         "files": rows,
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
@@ -261,7 +267,7 @@ def main() -> int:
         print(f"{row['source']}: LibreDWG={reference}; MusaCAD={stage}; "
               f"entity_parity={row['entity_parity']}")
     print("WARNING: native stage success does not prove entity, layer, color, block or render parity.")
-    return 1 if infra_failures or not rows else 0
+    return 1 if infra_failures or reference_failures or not rows else 0
 
 
 if __name__ == "__main__":
