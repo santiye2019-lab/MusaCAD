@@ -14,6 +14,7 @@
 #include "musacad_dwg_ac1018_handles.h"
 #include "musacad_crc16.h"
 #include "musacad_dwg_ac1015_values.h"
+#include "musacad_dwg_ac1024_record.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
@@ -264,6 +265,8 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t mc_ot_raw_1, mc_ot_raw_7, mc_ot_raw_17, mc_ot_raw_18;
     size_t mc_ot_raw_19, mc_ot_raw_44, mc_ot_raw_49;
     size_t mc_ot_raw_51, mc_ot_raw_77;
+    size_t core_frame_verified, core_frame_probe_failed;
+    size_t core_raw_ot_or_span_mismatch;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -509,6 +512,21 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 } else {
                                     hint.mc_ot_unreadable += group;
                                 }
+                                MusaDwgAc1024RecordFrame core = {0};
+                                if (!musa_dwg_ac1024_record_probe(
+                                      objects, nb, offsets[start], &core)) {
+                                    hint.core_frame_probe_failed += group;
+                                } else {
+                                    hint.core_frame_verified += group;
+                                    if (core.framed_bytes != mc_span ||
+                                        core.mc_marker_bytes != mc_bytes ||
+                                        !core.original_crc16_verified ||
+                                        !ac1024_r2010_declared_ot(
+                                             objects, nb, offsets[start],
+                                             mc_bytes, &raw_ot) ||
+                                        core.raw_object_type != raw_ot)
+                                        hint.core_raw_ot_or_span_mismatch += group;
+                                }
                             } else
                                 hint.mc_frame_crc_mismatch += group;
                             if (mc_bytes == 1u)
@@ -680,7 +698,10 @@ static void report(const char *signature, const char *result,
                "\"mc_ot_raw_44\":%zu,"
                "\"mc_ot_raw_49\":%zu,"
                "\"mc_ot_raw_51\":%zu,"
-               "\"mc_ot_raw_77\":%zu}",
+               "\"mc_ot_raw_77\":%zu,"
+               "\"core_frame_verified\":%zu,"
+               "\"core_frame_probe_failed\":%zu,"
+               "\"core_raw_ot_or_span_mismatch\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -753,7 +774,10 @@ static void report(const char *signature, const char *result,
                hint->mc_ot_raw_44,
                hint->mc_ot_raw_49,
                hint->mc_ot_raw_51,
-               hint->mc_ot_raw_77);
+               hint->mc_ot_raw_77,
+               hint->core_frame_verified,
+               hint->core_frame_probe_failed,
+               hint->core_raw_ot_or_span_mismatch);
     }
     puts("}");
 }
