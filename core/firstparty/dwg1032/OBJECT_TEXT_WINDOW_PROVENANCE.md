@@ -21,3 +21,19 @@ existing MIT first-party MusaCAD modules and generic bounded arithmetic.
 No LibreDWG, GPL/AGPL/LGPL implementation, SDK source, or unknown-origin
 code was copied, adapted or linked. `main`, `MusaCAD2/`, JNI production
 import and existing 3D code are not modified.
+
+## Ordinal viewport fast path (2026-11-03)
+
+`musa_dwg1032_object_ms_utf16le_text_at_position` accepts a previously
+validated object-index ordinal instead of performing another binary handle
+lookup for each text field. It shares the same RAW-page/MS candidate and
+strict UTF-16LE conversion boundaries as the handle-based API. The new
+synthetic test checks cross-page surrogate parity, invalid ordinal rejection
+and output-metadata alias rollback. This is a post-location optimization:
+it does not recognize actual DWG TEXT/MTEXT object types, validate an
+untrusted index from scratch, or enable production import.
+
+The ordinal function and regression assertions were independently authored
+for MusaCAD's MIT first-party C11 core, without copying or linking copyleft
+or uncertain-provenance code. Existing 3D functionality, `MusaCAD2/` and
+`main` remain outside this change.
