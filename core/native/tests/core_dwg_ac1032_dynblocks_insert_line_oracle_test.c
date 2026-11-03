@@ -133,6 +133,49 @@ static int original(const char *filename){
             for(unsigned j=0u;ok&&j<4u;j++)
                 if(one[j]!=batch.bounds[i][j])ok=0;
         }
+        /* Multi-INSERT API is checked with an authentic C1A1 source.
+         * The original block remains partial (one unresolved sibling);
+         * no rendering/visibility or complete drawing is authorized. */
+        MusaDwgAc1032CircleSceneItem grouped[
+            MUSACAD_AC1032_OT49_CHILD_LIMIT]={0};
+        size_t grouped_count=SIZE_MAX,grouped_unresolved=SIZE_MAX;
+        ok=ok&&musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+                  scene,&insert_handle,1u,grouped,
+                  MUSACAD_AC1032_OT49_CHILD_LIMIT,
+                  &grouped_count,&grouped_unresolved)&&
+           grouped_count==batch.circle_count&&
+           grouped_unresolved==batch.unsupported_sibling_count&&
+           grouped_unresolved==1u;
+        for(size_t gi=0u;ok&&gi<grouped_count;gi++){
+            const MusaDwgAc1032CircleSceneItem *item=&grouped[gi];
+            ok=item->insert_handle==insert_handle&&
+               item->block_header_handle==batch.block_header_handle&&
+               item->circle_handle==batch.circle_handles[gi]&&
+               item->layer_handle==batch.layer_handles[gi];
+            for(unsigned axis=0u;ok&&axis<4u;axis++)
+                if(item->bounds[axis]!=batch.bounds[gi][axis])ok=0;
+        }
+        MusaDwgAc1032CircleSceneItem denied[5];
+        memset(denied,0xa5,sizeof(denied));
+        MusaDwgAc1032CircleSceneItem denied_before[5];
+        memcpy(denied_before,denied,sizeof(denied));
+        size_t denied_count=SIZE_MAX,denied_unresolved=SIZE_MAX;
+        const uint64_t duplicates[2]={insert_handle,insert_handle};
+        const uint64_t zero_handle=0u;
+        ok=ok&&!musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+                  scene,duplicates,2u,denied,5u,
+                  &denied_count,&denied_unresolved)&&
+           !musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+                  scene,&insert_handle,1u,denied,3u,
+                  &denied_count,&denied_unresolved)&&
+           !musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+                  scene,&zero_handle,1u,denied,5u,
+                  &denied_count,&denied_unresolved)&&
+           !musa_dwg_ac1032_scene_index_build_circle_scene_packet(
+                  NULL,&insert_handle,1u,denied,5u,
+                  &denied_count,&denied_unresolved)&&
+           denied_count==SIZE_MAX&&denied_unresolved==SIZE_MAX&&
+           !memcmp(denied,denied_before,sizeof(denied));
         MusaDwgAc1032InsertBlockCircleBoundsBatch rejected;
         memset(&rejected,0xa5,sizeof(rejected));
         const MusaDwgAc1032InsertBlockCircleBoundsBatch before_batch=
