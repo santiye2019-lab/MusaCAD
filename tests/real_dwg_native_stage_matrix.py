@@ -280,8 +280,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             raise ValueError("invalid_ac1024_core_probe_contract")
         core_ok, core_failed, core_mismatch = (hint[k] for k in core_fields)
         if measured:
-            if core_ok + core_failed != mc_ok or
-                    core_mismatch > core_ok:
+            if (core_ok + core_failed != mc_ok or
+                    core_mismatch > core_ok):
                 raise ValueError("inconsistent_ac1024_core_probe_counts")
             if core_failed or core_mismatch:
                 raise ValueError("firstparty_ac1024_core_disagrees_with_diagnostic")
