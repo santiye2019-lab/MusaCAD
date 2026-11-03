@@ -450,7 +450,37 @@ static void insert_instance_single_record_invalid_flags(void) {
     assert(output==1u);
 }
 
+/* Nested INSERTs on separate page boundaries must propagate the actual
+ * parent-instance visibility, never a cached definition-wide state. */
+static void nested_insert_paged_boundary_visibility(void) {
+    const uint64_t outer_layers[]={100u,200u,100u,200u};
+    const uint8_t outer_owners[]={1u,1u,1u,1u};
+    const uint8_t outer_on[]={0u,1u,0u,1u};
+    const uint64_t inner_layers[]={100u,300u,100u};
+    const uint8_t inner_owners[]={1u,1u,1u};
+    const uint8_t inner_on[]={0u,1u,0u};
+    uint8_t parent=9u, child[2]={9u,9u};
+    for (uint8_t instance_visible=0u;instance_visible<=1u;++instance_visible) {
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            outer_layers,outer_owners,outer_on,4u,2u,1u,
+            100u,instance_visible,&parent));
+        assert(parent==instance_visible);
+        assert(musa_dwg1032_owner_graph_apply_insert_context_page(
+            inner_layers,inner_owners,inner_on,3u,1u,2u,
+            100u,parent,child));
+        assert(child[0]==instance_visible && child[1]==instance_visible);
+    }
+    parent=1u;
+    child[0]=7u;
+    child[1]=8u;
+    assert(!musa_dwg1032_owner_graph_apply_insert_context_page(
+        inner_layers,inner_owners,inner_on,3u,2u,2u,
+        100u,parent,child));
+    assert(child[0]==7u && child[1]==8u);
+}
+
 int main(void) {
+    nested_insert_paged_boundary_visibility();
     insert_instance_single_record_invalid_flags();
     insert_instance_single_record_pages();
     insert_instance_paged_visibility();
