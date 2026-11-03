@@ -282,6 +282,38 @@ def ac1024_candidate_alignment(reference: dict, native: dict) -> dict:
                 } for code, value in raw.items()
                 for name in (labels[code],)
             }
+    if hint.get("mc_frame_probe_completed"):
+        result["r2010_frame_crc_verified_records"] = hint["mc_frame_crc_pass"]
+        result["r2010_frame_unreadable_records"] = hint["mc_frame_unreadable"]
+        result["r2010_raw_ot_declared_records"] = hint["mc_ot_decoded"]
+        # Raw OT declaration correlations are never object identity or
+        # geometry proof. This isolated reference is not AutoCAD parity.
+        ot_map = {
+            "1": ("mc_ot_raw_1", "TEXT", "entity"),
+            "7": ("mc_ot_raw_7", "INSERT", "entity"),
+            "17": ("mc_ot_raw_17", "ARC", "entity"),
+            "18": ("mc_ot_raw_18", "CIRCLE", "entity"),
+            "19": ("mc_ot_raw_19", "LINE", "entity"),
+            "44": ("mc_ot_raw_44", "MTEXT", "entity"),
+            "49": ("mc_ot_raw_49", "BLOCK_HEADER", "object"),
+            "51": ("mc_ot_raw_51", "LAYER", "object"),
+            "77": ("mc_ot_raw_77", "LWPOLYLINE", "entity"),
+        }
+        entity_counts = reference.get("reference_entities_by_type", {})
+        object_counts = reference.get("reference_nonentities_by_type", {})
+        result["r2010_raw_ot_count_correlations"] = {
+            code: {
+                "firstparty_crc_backed_raw_ot_count": hint[key],
+                "reference_type_count": (
+                    entity_counts if kind == "entity" else object_counts
+                ).get(name, 0),
+                "counts_equal_only": hint[key] == (
+                    entity_counts if kind == "entity" else object_counts
+                ).get(name, 0),
+                "verified_entity_identity": False,
+            }
+            for code, (key, name, kind) in ot_map.items()
+        }
     return result
 
 
