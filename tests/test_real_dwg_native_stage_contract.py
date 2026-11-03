@@ -65,6 +65,13 @@ def ac1024_probe_record():
             "legacy_next_frame_short": 0,
             "legacy_next_frame_overlaps": 0,
             "legacy_crc_ok_next_frame_exact": 0,
+            "legacy_short_gap_1": 0,
+            "legacy_short_gap_2": 0,
+            "legacy_short_gap_3": 0,
+            "legacy_short_gap_4": 0,
+            "legacy_short_gap_5to16": 0,
+            "legacy_short_gap_17to64": 0,
+            "legacy_short_gap_over64": 0,
         }
     }
 
@@ -223,6 +230,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_next_frame_short": 314,
             "legacy_next_frame_overlaps": 0,
             "legacy_crc_ok_next_frame_exact": 1,
+            "legacy_short_gap_over64": 314,
         })
         self.assertEqual(validate_fake_result(record), record)
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
@@ -242,6 +250,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("legacy_next_frame_exact", 324),
             ("legacy_crc_ok_next_frame_exact", 11),
             ("legacy_next_frame_unavailable", 100001),
+            ("legacy_short_gap_over64", 1),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -271,6 +280,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "legacy_next_frame_short": 145276,
             "legacy_next_frame_overlaps": 0,
             "legacy_crc_ok_next_frame_exact": 0,
+            "legacy_short_gap_2": 145276,
         })
         self.assertEqual(validate_fake_result(record), record)
         hint["legacy_max_offset_multiplicity"] = 2
