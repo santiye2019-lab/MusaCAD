@@ -153,14 +153,16 @@ static int ac1024_r2010_mc_frame(
     const size_t ms_prefix = (first & 0x8000u) ? 4u : 2u;
     if (ms_prefix >= remaining) return 0;
     size_t mc_len = 0u;
+    int terminated = 0;
     for (; mc_len < 10u; mc_len++) {
         if (mc_len >= remaining - ms_prefix) return 0;
         if ((p[ms_prefix + mc_len] & 0x80u) == 0u) {
             ++mc_len;
+            terminated = 1;
             break;
         }
     }
-    if (!mc_len || mc_len > 10u || mc_len >= remaining ||
+    if (!terminated || !mc_len || mc_len > 10u || mc_len >= remaining ||
         old_span > remaining - mc_len) return 0;
     const size_t new_span = old_span + mc_len;
     const size_t crc_at = new_span - 2u;
