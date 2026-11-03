@@ -142,31 +142,66 @@ def observable_inventory_stream(stream) -> dict:
 
 
 def reference_read(executable: Path, source: Path, timeout: int) -> dict:
+    """Try strict JSON, then LibreDWG's independently formatted minJSON.
+
+    A successful exit code is never mistaken for successful parsing. Each
+    candidate must be structurally valid and contain typed CAD object records.
+    No raw output, drawing text, geometry or parser excerpts enter the report.
+    """
+    import ijson
+
     with tempfile.TemporaryDirectory(prefix="musacad-oracle-") as folder:
         output = Path(folder) / "reference.json"
-        with output.open("wb") as stream:
+        attempts = []
+        for mode in ("JSON", "minJSON"):
+            with output.open("wb") as stream:
+                try:
+                    process = subprocess.run(
+                        [str(executable), "-O", mode, str(source)],
+                        stdout=stream, stderr=subprocess.DEVNULL,
+                        check=False, timeout=timeout,
+                    )
+                except subprocess.TimeoutExpired:
+                    attempts.append({"mode": mode, "status": "timeout"})
+                    continue
+            if process.returncode != 0:
+                attempts.append({"mode": mode, "status": "exit_nonzero",
+                                 "exit_code": process.returncode})
+                continue
+            byte_count = output.stat().st_size
             try:
-                process = subprocess.run(
-                    [str(executable), "-O", "JSON", str(source)],
-                    stdout=stream, stderr=subprocess.DEVNULL,
-                    check=False, timeout=timeout,
-                )
-            except subprocess.TimeoutExpired:
-                return {"reference_status": "libredwg_timeout"}
-        if process.returncode != 0:
+                with output.open("rb") as stream:
+                    inventory = observable_inventory_stream(stream)
+                inventory["reference_json_bytes"] = byte_count
+                inventory["reference_output_mode"] = mode
+                return inventory
+            except (OSError, UnicodeError, json.JSONDecodeError,
+                    ValueError, ijson.JSONError) as error:
+                message = str(error).lower()
+                if "premature eof" in message or "incomplete json" in message:
+                    kind = "premature_eof"
+                elif "lexical error" in message:
+                    kind = "invalid_json_token"
+                elif isinstance(error, ValueError) and str(error) in (
+                    "unsupported_libredwg_json_schema",
+                    "reference_has_no_typed_objects",
+                    "unbounded_reference_objects",
+                ):
+                    kind = str(error)
+                else:
+                    kind = "invalid_json_structure"
+                attempts.append({"mode": mode, "status": kind,
+                                 "output_bytes": byte_count})
+
+        if all(item["status"] == "exit_nonzero" for item in attempts):
             return {"reference_status": "libredwg_rejected_or_failed",
-                    "reference_exit_code": process.returncode}
-        try:
-            import ijson
-            with output.open("rb") as stream:
-                inventory = observable_inventory_stream(stream)
-            inventory["reference_json_bytes"] = output.stat().st_size
-            return inventory
-        except (OSError, UnicodeError, json.JSONDecodeError, ValueError,
-                ijson.JSONError) as error:
-            return {"reference_status": "libredwg_unusable_json",
-                    "reference_reason": str(error)[:80] if isinstance(error, ValueError)
-                    else type(error).__name__}
+                    "reference_exit_code": attempts[0]["exit_code"],
+                    "reference_attempts": attempts}
+        if all(item["status"] == "timeout" for item in attempts):
+            return {"reference_status": "libredwg_timeout",
+                    "reference_attempts": attempts}
+        return {"reference_status": "libredwg_unusable_json",
+                "reference_attempts": attempts}
 
 
 def audit_source(repo: Path, relative: str) -> tuple[Path, str, int]:
