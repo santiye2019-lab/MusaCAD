@@ -5,6 +5,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 /* Portable first-party C11 ORIGINAL R2018 INSERT->LINE source packet.
  * Exact H/type/order joins of the separately authenticated INSERT placement,
@@ -197,6 +198,48 @@ typedef struct MusaDwgAc1032CompleteBlockLineLayerSource {
     uint8_t complete_block_reverse_owners_verified;
     uint8_t final_display_accepted; /* ALWAYS ZERO */
 } MusaDwgAc1032CompleteBlockLineLayerSource;
+/* Two independently authenticated original OT51 layer reads must
+ * identify the same source record, exact TU name and raw LAYER numeric
+ * evidence before a LINE can enter complete-BLOCK source diagnostics.
+ * These bits and raw color are not effective viewport or paint state. */
+static inline int musa_dwg_ac1032_line_layer_source_pair_matches(
+    const MusaDwgAc1032InsertLineLayerSource *line,
+    const MusaDwgAc1032InsertBlockChildLayerSource *layer){
+    if(!line||!layer||!line->insert_handle||!line->block_header_handle||
+       !line->child_handle||!line->layer_handle||
+       !line->source_line_layer_and_owner_verified||
+       line->final_visibility_color_and_paint_accepted||
+       !layer->original_owner_layer_and_name_verified||
+       layer->final_visibility_color_and_paint_accepted||
+       layer->raw_child_type!=19u||
+       line->insert_handle!=layer->insert_handle||
+       line->block_header_handle!=layer->block_header_handle||
+       line->child_handle!=layer->child_handle||
+       line->layer_handle!=layer->layer_handle)return 0;
+    const MusaDwgAc1032LayerName *a=&line->layer_name;
+    const MusaDwgAc1032LayerName *b=&layer->layer_name;
+    if(!a->original_record_crc_verified||
+       !b->original_record_crc_verified||
+       a->indexed_handle!=line->layer_handle||
+       b->indexed_handle!=line->layer_handle||
+       !a->utf8_bytes||a->utf8_bytes>=sizeof(a->utf8)||
+       !b->utf8_bytes||b->utf8_bytes>=sizeof(b->utf8)||
+       a->utf8_bytes!=b->utf8_bytes||
+       a->utf16_code_units!=b->utf16_code_units||
+       a->original_string_start_bit!=b->original_string_start_bit||
+       memcmp(a->utf8,b->utf8,(size_t)a->utf8_bytes+1u))return 0;
+    const MusaDwgAc1032LayerFlagsEvidence *x=&line->raw_layer_flags;
+    const MusaDwgAc1032LayerFlagsEvidence *y=&layer->raw_layer_flags;
+    return x->source_crc_verified&&y->source_crc_verified&&
+           x->indexed_handle==line->layer_handle&&
+           y->indexed_handle==line->layer_handle&&
+           x->numeric_flags_start_bit==y->numeric_flags_start_bit&&
+           x->numeric_flags_end_bit==y->numeric_flags_end_bit&&
+           x->xref_index_plus_one==y->xref_index_plus_one&&
+           x->raw_values_70_290_370==y->raw_values_70_290_370&&
+           x->entry_64_flag==y->entry_64_flag&&
+           x->xref_dependent==y->xref_dependent;
+}
 static inline int musa_dwg_ac1032_complete_block_line_layer_source(
     const MusaDwgAc1032SceneIndex *scene,uint64_t insert_handle,
     uint64_t line_handle,MusaDwgAc1032CompleteBlockLineLayerSource *out){
@@ -210,17 +253,10 @@ static inline int musa_dwg_ac1032_complete_block_line_layer_source(
            scene,insert_handle,line_handle,&line)||
        !musa_dwg_ac1032_scene_index_insert_block_child_layer_source(
            scene,insert_handle,line_handle,&layer)||
-       !line.source_line_layer_and_owner_verified||
-       line.final_visibility_color_and_paint_accepted||
-       !layer.original_owner_layer_and_name_verified||
-       layer.final_visibility_color_and_paint_accepted||
        line.insert_handle!=insert_handle||
        line.child_handle!=line_handle||
-       line.block_header_handle!=layer.block_header_handle||
-       line.layer_handle!=layer.layer_handle||
-       line.layer_name.indexed_handle!=layer.layer_name.indexed_handle||
-       line.raw_layer_flags.indexed_handle!=
-           layer.raw_layer_flags.indexed_handle)return 0;
+       !musa_dwg_ac1032_line_layer_source_pair_matches(&line,&layer))
+        return 0;
     const double observed[4]={
         line.world_start[0],line.world_start[1],
         line.world_end[0],line.world_end[1]};
