@@ -26,6 +26,8 @@ def ac1024_probe_record():
             "handles_section_pages": True,
             "candidate_handle_index": True,
             "candidate_handle_count": 145279,
+            "object_section_page_count": 558,
+            "handle_section_page_count": 77,
             "legacy_frame_probe_completed": False,
             "legacy_frame_crc_ok": 0,
             "legacy_frame_crc_failed": 0,
@@ -90,6 +92,23 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             with self.subTest(mutation=mutation):
                 record = ac1024_probe_record()
                 record.update(mutation)
+                with self.assertRaises(ValueError):
+                    validate_fake_result(record)
+
+
+    def test_page_count_evidence_requires_authenticated_section_pages(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for field, invalid_value in (
+            ("object_section_page_count", 0),
+            ("object_section_page_count", -1),
+            ("object_section_page_count", 70000),
+            ("handle_section_page_count", 0),
+            ("handle_section_page_count", "77"),
+        ):
+            with self.subTest(field=field):
+                record = deepcopy(original)
+                record["ac1024_compatibility_hypothesis"][field] = invalid_value
                 with self.assertRaises(ValueError):
                     validate_fake_result(record)
 
