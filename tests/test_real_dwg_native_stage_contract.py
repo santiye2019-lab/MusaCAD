@@ -41,6 +41,13 @@ def ac1024_probe_record():
             "page_absolute_candidate_handles": 0,
             "page_absolute_frame_crc_ok": 0,
             "page_absolute_frame_crc_failed": 0,
+            "legacy_offset_distribution_measured": False,
+            "legacy_distinct_offsets": 0,
+            "legacy_duplicate_offset_entries": 0,
+            "legacy_zero_offset_entries": 0,
+            "legacy_max_offset_multiplicity": 0,
+            "legacy_distinct_frame_crc_pass": 0,
+            "legacy_repeated_crc_pass_entries": 0,
         }
     }
 
@@ -154,6 +161,54 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
                 corrupt["ac1024_compatibility_hypothesis"][key] = value
                 with self.assertRaises(ValueError):
                     validate_fake_result(corrupt)
+
+
+    def test_duplicate_offset_evidence_is_not_a_decoded_object_count(self):
+        record = ac1024_probe_record()
+        hint = record["ac1024_compatibility_hypothesis"]
+        hint.update({
+            "legacy_offset_distribution_measured": True,
+            "legacy_distinct_offsets": 325,
+            "legacy_duplicate_offset_entries": 144954,
+            "legacy_zero_offset_entries": 1,
+            "legacy_max_offset_multiplicity": 1300,
+            "legacy_distinct_frame_crc_pass": 2,
+            "legacy_repeated_crc_pass_entries": 558,
+        })
+        self.assertEqual(validate_fake_result(record), record)
+        self.assertEqual(record["result"], "not_covered_by_this_native_probe")
+        self.assertFalse(record["geometry_verified"])
+        for field, bad_value in (
+            ("legacy_distinct_offsets", 326),
+            ("legacy_duplicate_offset_entries", 144953),
+            ("legacy_zero_offset_entries", 1400),
+            ("legacy_max_offset_multiplicity", 0),
+            ("legacy_distinct_frame_crc_pass", 326),
+            ("legacy_repeated_crc_pass_entries", 1),
+            ("legacy_offset_distribution_measured", False),
+        ):
+            with self.subTest(field=field):
+                invalid = deepcopy(record)
+                invalid["ac1024_compatibility_hypothesis"][field] = bad_value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(invalid)
+
+    def test_unique_offsets_cannot_claim_repeated_records(self):
+        record = ac1024_probe_record()
+        hint = record["ac1024_compatibility_hypothesis"]
+        hint.update({
+            "legacy_offset_distribution_measured": True,
+            "legacy_distinct_offsets": 145279,
+            "legacy_duplicate_offset_entries": 0,
+            "legacy_zero_offset_entries": 1,
+            "legacy_max_offset_multiplicity": 1,
+            "legacy_distinct_frame_crc_pass": 300,
+            "legacy_repeated_crc_pass_entries": 300,
+        })
+        self.assertEqual(validate_fake_result(record), record)
+        hint["legacy_max_offset_multiplicity"] = 2
+        with self.assertRaises(ValueError):
+            validate_fake_result(record)
 
     def test_hint_never_applies_to_another_dwg_version(self):
         record = ac1024_probe_record()
