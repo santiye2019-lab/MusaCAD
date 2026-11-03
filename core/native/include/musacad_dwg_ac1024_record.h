@@ -65,6 +65,32 @@ int musa_dwg_ac1024_record_data_bounds(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024DataBounds *out);
 
+
+/* R2010 declared handle-stream window, bit offsets relative to payload.
+ * MC is the stream's bit length (INCLUDING its final padding bits).
+ * The stream begins at payload_bits - declared_handle_stream_bits.
+ * It must be disjoint from the already-decoded OT bit prefix.
+ * This does NOT decode self-H, owner/layer links, or handle references.
+ * Source untouched; output atomic; caller must independently validate
+ * the candidate offset against the protected section handle map. */
+typedef struct MusaDwgAc1024StreamBounds {
+    uint64_t indexed_object_offset;
+    size_t payload_start_byte;
+    size_t data_after_ot_bit;
+    size_t handle_stream_start_bit;
+    size_t handle_stream_end_bit;
+    uint64_t handle_stream_bits;
+    uint16_t raw_object_type;
+    uint8_t record_crc16_verified;
+} MusaDwgAc1024StreamBounds;
+
+/* Return 1 only when full MS+MC+OT+CRC16 frame is authenticated and
+ * the declared handle stream fits entirely AFTER the OT prefix.
+ * Return 0 without modifying *out on any invalid or aliased output. */
+int musa_dwg_ac1024_record_stream_bounds(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024StreamBounds *out);
+
 #ifdef __cplusplus
 }
 #endif
