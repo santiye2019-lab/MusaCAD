@@ -38,6 +38,33 @@ int musa_dwg_ac1024_record_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024RecordFrame *out);
 
+
+/* Immutable bounded DATA-stream locations after full record CRC16 + raw OT.
+ * Offsets are into the caller's independently verified, decompressed
+ * AcDbObjects buffer, not into the original DWG file. No pointer is returned.
+ * type_end_bit is the first bit AFTER OT, relative to payload_start_byte.
+ * payload_end_bit is the exclusive end of the whole object payload; it is
+ * NOT a verified common-entity header end or LINE field beginning.
+ * R2010's separate text/handle streams are NOT interpreted here.
+ * This function does NOT decode a point, line, entity, layer or block. */
+typedef struct MusaDwgAc1024DataBounds {
+    uint64_t indexed_object_offset;
+    size_t payload_start_byte;
+    size_t payload_bytes;
+    size_t type_end_bit;
+    size_t payload_end_bit;
+    uint16_t raw_object_type;
+    uint8_t record_crc16_verified;
+} MusaDwgAc1024DataBounds;
+
+/* Atomic, read-only; output must be disjoint from the source. Only accepts
+ * records that the original first-party record_probe fully verifies.
+ * This is the safe entry to a future AC1024 common-entity stream reader,
+ * NOT authority to guess geometry starting at type_end_bit. */
+int musa_dwg_ac1024_record_data_bounds(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024DataBounds *out);
+
 #ifdef __cplusplus
 }
 #endif
