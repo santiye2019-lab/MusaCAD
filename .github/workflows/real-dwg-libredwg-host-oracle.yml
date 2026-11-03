@@ -15,6 +15,7 @@ on:
     branches: [main]
     paths:
       - 'tests/real_dwg_reference_compare.py'
+      - 'tests/libredwg_host_type_inventory.c'
       - 'tests/test_real_dwg_reference_compare.py'
       - '.github/workflows/real-dwg-libredwg-host-oracle.yml'
       - 'docs/DWG_LIBREDWG_HOST_ORACLE.md'
@@ -74,6 +75,17 @@ jobs:
           "$RUNNER_TEMP/reference-build/dwgread" --version
           test -x "$RUNNER_TEMP/reference-build/dwgread"
 
+      - name: Compile separate LibreDWG decoded-type host probe (never MusaCAD runtime)
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            -Ireference-tools/libredwg/include \
+            tests/libredwg_host_type_inventory.c \
+            -L"$RUNNER_TEMP/reference-build" -lredwg -lm \
+            -Wl,-rpath,"$RUNNER_TEMP/reference-build" \
+            -o "$RUNNER_TEMP/libredwg-host-types"
+          test -x "$RUNNER_TEMP/libredwg-host-types"
+
       - name: Hydrate real drawings without altering originals
         run: |
           set -euo pipefail
@@ -101,6 +113,7 @@ jobs:
           python3 tests/real_dwg_reference_compare.py \
             --repository . \
             --dwgread "$RUNNER_TEMP/reference-build/dwgread" \
+            --reference-probe "$RUNNER_TEMP/libredwg-host-types" \
             --probe "$RUNNER_TEMP/musacad-stage-probe" \
             --timeout-seconds 90 \
             --report "$RUNNER_TEMP/dwg-observable-oracle.json" \
