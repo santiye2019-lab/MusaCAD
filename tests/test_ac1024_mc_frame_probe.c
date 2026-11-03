@@ -78,12 +78,42 @@ static int check_ot_encoding_variants(void) {
     return 1;
 }
 
+static int test_short_r2010_mc_frame(void) {
+    uint8_t record[16] = {0};
+    record[0] = 2u; record[2] = 1u;
+    record[3] = 0x04u; record[4] = 0xc0u;
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 5u, &crc))
+        return 0;
+    record[5] = (uint8_t)crc;
+    record[6] = (uint8_t)(crc >> 8u);
+    size_t span = 0u, mc_bytes = 0u;
+    int valid_crc = 0;
+    uint16_t type = 0u;
+    if (!ac1024_r2010_mc_frame(
+            record, 7u, 0u, &span, &mc_bytes, &valid_crc) ||
+        !valid_crc || span != 7u || mc_bytes != 1u ||
+        !ac1024_r2010_declared_ot(
+            record, 7u, 0u, mc_bytes, &type) || type != 19u)
+        return 0;
+    record[5] ^= 1u; valid_crc = 1;
+    if (!ac1024_r2010_mc_frame(
+            record, 7u, 0u, &span, &mc_bytes, &valid_crc) ||
+        valid_crc)
+        return 0;
+    return 1;
+}
+
 int main(void) {
     for (size_t length = 1u; length <= 3u; length++) {
         if (!check_r2010_mc_fixture(length)) {
             fputs("synthetic R2010 MS+MC frame regression failed\n", stderr);
             return 1;
         }
+    }
+    if (!test_short_r2010_mc_frame()) {
+        fputs("short R2010 MS payload regression failed\n", stderr);
+        return 4;
     }
     if (!check_ot_encoding_variants()) {
         fputs("synthetic R2010 OT selector regression failed\n", stderr);
