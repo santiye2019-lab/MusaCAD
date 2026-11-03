@@ -77,30 +77,53 @@ static int ac1024_compare_offsets_u64(const void *left, const void *right) {
     return (a > b) - (a < b);
 }
 
-static int ac1024_candidate_frame_crc(
+/* These statuses are only evidence about a borrowed R2004-style
+   record frame at a candidate offset, NOT supported AC1024 geometry. */
+enum Ac1024FrameStatus {
+    AC1024_FRAME_TOO_SHORT = 1,
+    AC1024_FRAME_INVALID_MS = 2,
+    AC1024_FRAME_EXCEEDS_SECTION = 3,
+    AC1024_FRAME_CRC_MISMATCH = 4,
+    AC1024_FRAME_CRC_OK = 5
+};
+
+static enum Ac1024FrameStatus ac1024_candidate_frame_status(
     const uint8_t *objects, size_t object_bytes, uint64_t offset) {
-    if (!objects || offset >= (uint64_t)object_bytes) return 0;
+    if (!objects || offset >= (uint64_t)object_bytes)
+        return AC1024_FRAME_TOO_SHORT;
     const size_t at = (size_t)offset;
     const size_t remaining = object_bytes - at;
-    if (remaining < 6u) return 0;
+    if (remaining < 6u)
+        return AC1024_FRAME_TOO_SHORT;
     const uint8_t *p = objects + at;
     const uint16_t first = (uint16_t)p[0] | ((uint16_t)p[1] << 8u);
     size_t prefix = 2u, payload = (size_t)first;
     if ((first & 0x8000u) != 0u) {
         const uint16_t hi = (uint16_t)p[2] | ((uint16_t)p[3] << 8u);
-        if (!hi || (hi & 0x8000u)) return 0;
+        if (!hi || (hi & 0x8000u))
+            return AC1024_FRAME_INVALID_MS;
         prefix = 4u;
         payload = (size_t)(first & 0x7fffu) | ((size_t)hi << 15u);
     }
-    if (payload < 8u || prefix > remaining - 2u ||
-        payload > remaining - prefix - 2u) return 0;
+    if (payload < 8u)
+        return AC1024_FRAME_INVALID_MS;
+    if (prefix > remaining - 2u || payload > remaining - prefix - 2u)
+        return AC1024_FRAME_EXCEEDS_SECTION;
     uint16_t computed = 0u;
     if (!musa_core_crc16_arc(
-          0xc0c1u, p, prefix + payload, &computed)) return 0;
+          0xc0c1u, p, prefix + payload, &computed))
+        return AC1024_FRAME_CRC_MISMATCH;
     const size_t at_crc = prefix + payload;
     const uint16_t stored = (uint16_t)p[at_crc] |
                             ((uint16_t)p[at_crc + 1u] << 8u);
-    return computed == stored;
+    return computed == stored ? AC1024_FRAME_CRC_OK :
+                                AC1024_FRAME_CRC_MISMATCH;
+}
+
+static int ac1024_candidate_frame_crc(
+    const uint8_t *objects, size_t object_bytes, uint64_t offset) {
+    return ac1024_candidate_frame_status(
+        objects, object_bytes, offset) == AC1024_FRAME_CRC_OK;
 }
 
 typedef struct MusaAc1024CompatibilityHint {
@@ -120,6 +143,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t legacy_distinct_offsets, legacy_duplicate_offset_entries;
     size_t legacy_zero_offset_entries, legacy_max_offset_multiplicity;
     size_t legacy_distinct_frame_crc_pass, legacy_repeated_crc_pass_entries;
+    size_t legacy_frame_too_short, legacy_frame_invalid_ms;
+    size_t legacy_frame_exceeds_section, legacy_frame_crc_mismatch;
+    size_t legacy_shift_minus_two_crc_pass, legacy_shift_minus_one_crc_pass;
+    size_t legacy_shift_plus_one_crc_pass, legacy_shift_plus_two_crc_pass;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -277,11 +304,43 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             hint.legacy_zero_offset_entries = group;
                         if (group > hint.legacy_max_offset_multiplicity)
                             hint.legacy_max_offset_multiplicity = group;
-                        if (ac1024_candidate_frame_crc(
-                              objects, nb, offsets[start])) {
+                        const enum Ac1024FrameStatus status =
+                            ac1024_candidate_frame_status(
+                                objects, nb, offsets[start]);
+                        switch (status) {
+                        case AC1024_FRAME_TOO_SHORT:
+                            hint.legacy_frame_too_short += group;
+                            break;
+                        case AC1024_FRAME_INVALID_MS:
+                            hint.legacy_frame_invalid_ms += group;
+                            break;
+                        case AC1024_FRAME_EXCEEDS_SECTION:
+                            hint.legacy_frame_exceeds_section += group;
+                            break;
+                        case AC1024_FRAME_CRC_MISMATCH:
+                            hint.legacy_frame_crc_mismatch += group;
+                            break;
+                        case AC1024_FRAME_CRC_OK:
                             ++hint.legacy_distinct_frame_crc_pass;
                             hint.legacy_repeated_crc_pass_entries += group;
+                            break;
                         }
+                        /* Observe ±1/±2-byte hypotheses without EVER
+                           selecting a shifted offset for rendering. */
+                        const uint64_t offset = offsets[start];
+                        if (offset >= 2u && ac1024_candidate_frame_crc(
+                                objects, nb, offset - 2u))
+                            hint.legacy_shift_minus_two_crc_pass += group;
+                        if (offset >= 1u && ac1024_candidate_frame_crc(
+                                objects, nb, offset - 1u))
+                            hint.legacy_shift_minus_one_crc_pass += group;
+                        if (offset < UINT64_MAX && ac1024_candidate_frame_crc(
+                                objects, nb, offset + 1u))
+                            hint.legacy_shift_plus_one_crc_pass += group;
+                        if (offset <= UINT64_MAX - 2u &&
+                            ac1024_candidate_frame_crc(
+                                objects, nb, offset + 2u))
+                            hint.legacy_shift_plus_two_crc_pass += group;
                         start = end;
                     }
                 }
@@ -360,7 +419,15 @@ static void report(const char *signature, const char *result,
                "\"legacy_zero_offset_entries\":%zu,"
                "\"legacy_max_offset_multiplicity\":%zu,"
                "\"legacy_distinct_frame_crc_pass\":%zu,"
-               "\"legacy_repeated_crc_pass_entries\":%zu}",
+               "\"legacy_repeated_crc_pass_entries\":%zu,"
+               "\"legacy_frame_too_short\":%zu,"
+               "\"legacy_frame_invalid_ms\":%zu,"
+               "\"legacy_frame_exceeds_section\":%zu,"
+               "\"legacy_frame_crc_mismatch\":%zu,"
+               "\"legacy_shift_minus_two_crc_pass\":%zu,"
+               "\"legacy_shift_minus_one_crc_pass\":%zu,"
+               "\"legacy_shift_plus_one_crc_pass\":%zu,"
+               "\"legacy_shift_plus_two_crc_pass\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -388,7 +455,15 @@ static void report(const char *signature, const char *result,
                hint->legacy_zero_offset_entries,
                hint->legacy_max_offset_multiplicity,
                hint->legacy_distinct_frame_crc_pass,
-               hint->legacy_repeated_crc_pass_entries);
+               hint->legacy_repeated_crc_pass_entries,
+               hint->legacy_frame_too_short,
+               hint->legacy_frame_invalid_ms,
+               hint->legacy_frame_exceeds_section,
+               hint->legacy_frame_crc_mismatch,
+               hint->legacy_shift_minus_two_crc_pass,
+               hint->legacy_shift_minus_one_crc_pass,
+               hint->legacy_shift_plus_one_crc_pass,
+               hint->legacy_shift_plus_two_crc_pass);
     }
     puts("}");
 }
