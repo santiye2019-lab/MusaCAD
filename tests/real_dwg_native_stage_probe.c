@@ -391,6 +391,8 @@ typedef struct MusaAc1024CompatibilityHint {
     int core_embedded_h_recovery_attempted, core_embedded_h_recovery_succeeded;
     size_t core_embedded_h_recovery_records;
     size_t core_embedded_h_recovery_original_index_matches;
+    size_t sampled_zero_eed_attempts, sampled_zero_eed_verified;
+    size_t sampled_zero_eed_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -870,6 +872,27 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                         legacy[k].handle)
                                     ++hint.core_embedded_h_recovery_original_index_matches;
                             }
+                            /* Bounded, reproducible 2048-record sample of
+                               the zero-EED common-data field only. Source
+                               and recovered handles never leave memory;
+                               no owner/layer/geometry inference. */
+                            size_t eed_stride = legacy_count / 2048u;
+                            if (!eed_stride) eed_stride = 1u;
+                            for (size_t k = 0u;
+                                 k < legacy_count &&
+                                 hint.sampled_zero_eed_attempts < 2048u;
+                                 k += eed_stride) {
+                                ++hint.sampled_zero_eed_attempts;
+                                MusaDwgAc1024ZeroEedPrefix zero = {0};
+                                if (musa_dwg_ac1024_record_zero_eed_prefix(
+                                        objects, nb, recovered[k].record_offset,
+                                        &zero) &&
+                                    zero.embedded_absolute_handle ==
+                                        recovered[k].embedded_absolute_handle)
+                                    ++hint.sampled_zero_eed_verified;
+                                else
+                                    ++hint.sampled_zero_eed_refused;
+                            }
                         }
                     }
                     free(recovered);
@@ -1261,7 +1284,10 @@ static void report(const char *signature, const char *result,
                "\"core_embedded_h_recovery_attempted\":%s,"
                "\"core_embedded_h_recovery_succeeded\":%s,"
                "\"core_embedded_h_recovery_records\":%zu,"
-               "\"core_embedded_h_recovery_original_index_matches\":%zu}",
+               "\"core_embedded_h_recovery_original_index_matches\":%zu,"
+               "\"sampled_zero_eed_attempts\":%zu,"
+               "\"sampled_zero_eed_verified\":%zu,"
+               "\"sampled_zero_eed_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1406,7 +1432,10 @@ static void report(const char *signature, const char *result,
                hint->core_embedded_h_recovery_attempted ? "true" : "false",
                hint->core_embedded_h_recovery_succeeded ? "true" : "false",
                hint->core_embedded_h_recovery_records,
-               hint->core_embedded_h_recovery_original_index_matches);
+               hint->core_embedded_h_recovery_original_index_matches,
+               hint->sampled_zero_eed_attempts,
+               hint->sampled_zero_eed_verified,
+               hint->sampled_zero_eed_refused);
     }
     puts("}");
 }
