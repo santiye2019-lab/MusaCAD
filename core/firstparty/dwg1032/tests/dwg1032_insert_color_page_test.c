@@ -196,6 +196,31 @@ static void retry_after_invalid_middle_record(void) {
     assert(memcmp(output,saved,sizeof(output[0]))==0);
     assert(memcmp(output+PAGE+1u,saved+PAGE+1u,sizeof(output[0]))==0);
 }
+static void failed_page_does_not_poison_other_insert_context(void) {
+    const MusaDwg1032ResolvedColor first_insert={{2u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor second_insert={{7u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{3u,0u,0u},0u};
+    MusaDwg1032ResolvedColor output[PAGE+2u], before[PAGE+2u];
+    const size_t start=PAGE*3u+1u;
+    const size_t bad=start+PAGE-1u;
+    memset(output,0x4c,sizeof(output));
+    memcpy(before,output,sizeof(before));
+    source[bad].has_truecolor=2u;
+    assert(!musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,start,PAGE,100u,
+        &first_insert,&layer,output+1u));
+    assert(memcmp(output,before,sizeof(output))==0);
+    source[bad].has_truecolor=0u;
+    assert(musa_dwg1032_layer_color_apply_insert_context(
+        definition,source,child_layers,N,100u,
+        &second_insert,&layer,reference));
+    assert(musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,start,PAGE,100u,
+        &second_insert,&layer,output+1u));
+    assert(memcmp(output+1u,reference+start,PAGE*sizeof(output[0]))==0);
+    assert(memcmp(output,before,sizeof(output[0]))==0);
+    assert(memcmp(output+PAGE+1u,before+PAGE+1u,sizeof(output[0]))==0);
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
@@ -207,5 +232,6 @@ int main(void) {
     first_record_failure_preserves_page();
     middle_record_failure_preserves_page();
     retry_after_invalid_middle_record();
+    failed_page_does_not_poison_other_insert_context();
     return 0;
 }
