@@ -2,6 +2,7 @@
  * Synthetic R2010 LINE boundary/geometry regression, not real-DWG parity.
  */
 #include "musacad_dwg_ac1024_line.h"
+#include "musacad_dwg_ac1024_self_index.h"
 #include "musacad_crc16.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -143,6 +144,36 @@ int main(void) {
         memcmp(&old_common, &common, sizeof(common)) ||
         memcmp(&old_line, &line, sizeof(line)) ||
         memcmp(saved, record, sizeof(saved))) return 8;
+
+    /* A CRC-valid original R2010 record can carry supported META syntax
+     * but still be outside the narrow LINE common-data policy. The parser
+     * must refuse it without changing previously authenticated outputs.
+     * Each case keeps the *same* LINE OT, self-H and valid frame CRC. */
+    const struct { unsigned bit; unsigned width; unsigned value; } policy[] = {
+        {29u, 2u, 1u}, /* implicit entity owner mode is not yet supported */
+        {31u, 2u, 3u}, /* BL(3): 256 reactors, not zero */
+        {33u, 1u, 0u}  /* XDictionary exists; do not invent its reference */
+    };
+    for (size_t k = 0u; k < sizeof(policy) / sizeof(policy[0]); k++) {
+        memcpy(record, saved, sizeof(saved));
+        set_bits(record + 3u, policy[k].bit,
+                 policy[k].width, policy[k].value);
+        MusaDwgAc1024EntityMetaPrefix candidate = {0};
+        if (!seal(record) ||
+            !musa_dwg_ac1024_record_entity_meta_prefix(
+                record, sizeof(saved), 0u, &candidate) ||
+            candidate.raw_ot != 19u ||
+            candidate.embedded_absolute_handle != 44u ||
+            musa_dwg_ac1024_line_common_probe(
+                record, sizeof(saved), 0u, &common) ||
+            musa_dwg_ac1024_line_fields_probe(
+                record, sizeof(saved), 0u, &line) ||
+            memcmp(&old_common, &common, sizeof(common)) ||
+            memcmp(&old_line, &line, sizeof(line)))
+            return 12 + (int)k;
+    }
+    memcpy(record, saved, sizeof(saved));
+    if (memcmp(saved, record, sizeof(saved))) return 15;
 
     /* Full XYZ 3D fixture: three genuinely different endpoints exercise
      * RD and absolute DD(3) instead of only the equal-point DD(0) path.
