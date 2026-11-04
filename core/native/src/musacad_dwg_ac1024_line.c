@@ -321,3 +321,66 @@ int musa_dwg_ac1024_line_implicit_layer_probe(
     *out = next;
     return 1;
 }
+
+/* EED-bearing LINE coordinates and original H graph are separately
+ * authenticated, then joined by exact recovered entity identity. This
+ * must never be used as proof of layer visibility or drawable placement.
+ * The existing zero-EED renderer/graph gates remain unchanged. */
+int musa_dwg_ac1024_line_eed_verified_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024LineEedJoinedEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_line_handle || !out ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity identity = {0};
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024LineEedJoinedEvidence next = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle,
+            &identity) ||
+        identity.raw_ot != 19u ||
+        !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_line_eed_meta_prefix(
+            objects, object_bytes, identity.record_offset, &meta) ||
+        meta.raw_ot != 19u ||
+        meta.embedded_absolute_handle != canonical_line_handle ||
+        !meta.original_crc16_verified ||
+        !musa_line_common_probe_impl(
+            objects, object_bytes, identity.record_offset, &common, 1, NULL) ||
+        !musa_dwg_ac1024_line_eed_fields_probe(
+            objects, object_bytes, identity.record_offset, &next.geometry) ||
+        !musa_dwg_ac1024_line_eed_handle_graph_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &next.graph) ||
+        !common.record_crc_verified ||
+        common.indexed_handle != canonical_line_handle ||
+        !next.geometry.coordinates_decoded ||
+        next.geometry.indexed_handle != canonical_line_handle ||
+        next.geometry.geometry_start_bit != common.geometry_start_bit ||
+        next.geometry.geometry_end_bit <= common.geometry_start_bit ||
+        next.geometry.geometry_end_bit > common.data_end_bit ||
+        next.graph.handles.entity_handle != canonical_line_handle ||
+        next.graph.handles.entity_raw_ot != 19u ||
+        next.graph.handles.entity_mode != meta.entity_mode ||
+        next.graph.handles.entity_record_offset != identity.record_offset ||
+        next.graph.eed.indexed_object_offset != identity.record_offset ||
+        next.graph.eed.embedded_absolute_handle != canonical_line_handle ||
+        !next.graph.eed.application_count ||
+        !next.graph.handles.layer_handle ||
+        !next.graph.handles.original_records_crc_verified ||
+        ((meta.entity_mode == 0u) !=
+             (next.graph.handles.owner_handle != 0u)) ||
+        ((meta.xdictionary_missing == 0u) !=
+             (next.graph.handles.xdictionary_handle != 0u)))
+        return 0;
+    *out = next;
+    return 1;
+}
