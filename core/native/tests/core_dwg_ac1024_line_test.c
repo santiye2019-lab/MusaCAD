@@ -151,7 +151,6 @@ int main(void) {
      * Each case keeps the *same* LINE OT, self-H and valid frame CRC. */
     const struct { unsigned bit; unsigned width; unsigned value; } policy[] = {
         {29u, 2u, 1u}, /* implicit entity owner mode is not yet supported */
-        {31u, 2u, 3u}, /* BL(3): 256 reactors, not zero */
         {33u, 1u, 0u}  /* XDictionary exists; do not invent its reference */
     };
     for (size_t k = 0u; k < sizeof(policy) / sizeof(policy[0]); k++) {
@@ -172,8 +171,30 @@ int main(void) {
             memcmp(&old_line, &line, sizeof(line)))
             return 12 + (int)k;
     }
+    /* A nonzero reactor BL is encoded as opcode 0 + raw LE32 here.
+     * Opcode 3 is RESERVED in MusaCAD's strict BL reader, not "256".
+     * Rebuild this authenticated META prefix with count=1 and xdic absent.
+     * The following geometry deliberately remains unsupported. */
     memcpy(record, saved, sizeof(saved));
-    if (memcmp(saved, record, sizeof(saved))) return 15;
+    set_bits(record + 3u, 31u, 2u, 0u);  /* BL raw32 */
+    set_bits(record + 3u, 33u, 8u, 1u);  /* count LE32 = 1 */
+    set_bits(record + 3u, 41u, 24u, 0u);
+    set_bits(record + 3u, 65u, 1u, 1u); /* XDictionary missing */
+    MusaDwgAc1024EntityMetaPrefix reactor_meta = {0};
+    if (!seal(record) ||
+        !musa_dwg_ac1024_record_entity_meta_prefix(
+            record, sizeof(saved), 0u, &reactor_meta) ||
+        reactor_meta.reactor_count != 1u ||
+        reactor_meta.entity_mode != 0u ||
+        reactor_meta.xdictionary_missing != 1u ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        musa_dwg_ac1024_line_fields_probe(
+            record, sizeof(saved), 0u, &line) ||
+        memcmp(&old_common, &common, sizeof(common)) ||
+        memcmp(&old_line, &line, sizeof(line)))
+        return 16;
+    memcpy(record, saved, sizeof(saved));
 
     /* Full XYZ 3D fixture: three genuinely different endpoints exercise
      * RD and absolute DD(3) instead of only the equal-point DD(0) path.
