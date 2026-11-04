@@ -27,7 +27,8 @@ typedef struct MusaDwgAc1024LineCommon {
     uint16_t encoded_color;
     uint16_t color_index;
     uint16_t invisibility;
-    uint32_t rgb;
+    uint32_t rgb; /* 24-bit RRGGBB, method byte stripped if present */
+    uint32_t rgb_raw; /* original BL, including any color-method byte */
     uint32_t transparency;
     double linetype_scale;
     uint8_t linetype_flags;
@@ -37,6 +38,7 @@ typedef struct MusaDwgAc1024LineCommon {
     uint8_t visualstyle_flags;
     uint8_t lineweight;
     uint8_t has_rgb;
+    uint8_t rgb_method; /* 0=legacy 24-bit, 0xC2=explicit truecolor */
     uint8_t has_color_reference;
     uint8_t has_transparency;
     uint8_t record_crc_verified;
