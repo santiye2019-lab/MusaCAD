@@ -570,6 +570,12 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_eed_xyz_verified",
             "sampled_line_eed_xyz_refused",
             "sampled_line_eed_xyz_distinct_endpoints",
+            "sampled_line_eed_join_attempts",
+            "sampled_line_eed_join_verified",
+            "sampled_line_eed_join_refused",
+            "sampled_line_eed_join_explicit_owner",
+            "sampled_line_eed_join_implicit_layer",
+            "sampled_line_eed_join_xdictionary",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -609,6 +615,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          eed_chain_apps,
          eed_xyz_attempts, eed_xyz_verified, eed_xyz_refused,
          eed_xyz_distinct,
+         eed_join_attempts, eed_join_ok, eed_join_bad,
+         eed_join_explicit_owner, eed_join_implicit_layer, eed_join_xdic,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -654,6 +662,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 eed_xyz_attempts != eed_chain_apps or
                 eed_xyz_verified + eed_xyz_refused != eed_xyz_attempts or
                 eed_xyz_distinct > eed_xyz_verified or
+                eed_join_attempts != eed_xyz_verified or
+                eed_join_ok + eed_join_bad != eed_join_attempts or
+                eed_join_explicit_owner + eed_join_implicit_layer != eed_join_ok or
+                eed_join_xdic > eed_join_ok or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
