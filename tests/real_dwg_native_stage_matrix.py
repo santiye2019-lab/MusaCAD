@@ -566,6 +566,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_eed_chain_verified",
             "sampled_line_eed_chain_refused",
             "sampled_line_eed_chain_has_applications",
+            "sampled_line_eed_xyz_attempts",
+            "sampled_line_eed_xyz_verified",
+            "sampled_line_eed_xyz_refused",
+            "sampled_line_eed_xyz_distinct_endpoints",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -596,6 +600,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          line_meta_self, line_meta_eed, line_meta_proxy, line_meta_fields,
          eed_chain_attempts, eed_chain_verified, eed_chain_refused,
          eed_chain_apps,
+         eed_xyz_attempts, eed_xyz_verified, eed_xyz_refused,
+         eed_xyz_distinct,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected, implicit_paper_xyz,
@@ -635,6 +641,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 eed_chain_attempts != line_meta_eed or
                 eed_chain_verified + eed_chain_refused != eed_chain_attempts or
                 eed_chain_apps > eed_chain_verified or
+                eed_xyz_attempts != eed_chain_apps or
+                eed_xyz_verified + eed_xyz_refused != eed_xyz_attempts or
+                eed_xyz_distinct > eed_xyz_verified or
+                eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
                 line_common_after_meta_rejected != (
