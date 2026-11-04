@@ -433,6 +433,15 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_common_reactors_unsupported;
     size_t sampled_line_common_xdic_unsupported;
     size_t sampled_line_common_fields_refused;
+    /* Exact stage of a strict, re-run shared-core LINE common decoder.
+     * Metadata-level and raw geometry acceptance remain separate. */
+    size_t sampled_line_common_stage_color;
+    size_t sampled_line_common_stage_rgb;
+    size_t sampled_line_common_stage_transparency;
+    size_t sampled_line_common_stage_ltype;
+    size_t sampled_line_common_stage_appearance;
+    size_t sampled_line_common_stage_geom_bound;
+    size_t sampled_line_common_stage_other;
     /* Provisional DATA-only LINE XYZ in implicit layout space, never owner join. */
     size_t sampled_line_implicit_paper_xyz_verified;
     size_t sampled_line_implicit_model_xyz_verified;
@@ -1023,6 +1032,25 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                         ++hint.sampled_line_common_refused;
                                         if (line_meta_ok) {
                                             ++hint.sampled_line_common_after_meta_refused;
+                                            const uint8_t failure_stage =
+                                                musa_dwg_ac1024_line_common_failure_stage(
+                                                    objects, nb, recovered[k].record_offset);
+                                            switch (failure_stage) {
+                                            case MUSA_DWG_LINE_COMMON_COLOR:
+                                                ++hint.sampled_line_common_stage_color; break;
+                                            case MUSA_DWG_LINE_COMMON_RGB:
+                                                ++hint.sampled_line_common_stage_rgb; break;
+                                            case MUSA_DWG_LINE_COMMON_TRANSPARENCY:
+                                                ++hint.sampled_line_common_stage_transparency; break;
+                                            case MUSA_DWG_LINE_COMMON_LTYPE_SCALE:
+                                                ++hint.sampled_line_common_stage_ltype; break;
+                                            case MUSA_DWG_LINE_COMMON_APPEARANCE:
+                                                ++hint.sampled_line_common_stage_appearance; break;
+                                            case MUSA_DWG_LINE_COMMON_GEOMETRY_BOUND:
+                                                ++hint.sampled_line_common_stage_geom_bound; break;
+                                            default:
+                                                ++hint.sampled_line_common_stage_other; break;
+                                            }
                                             /* First unsupported policy wins; do not conflate
                                              * it with a corrupt CRC or unreadable record. */
                                             if (meta.entity_mode > 2u)
@@ -1631,6 +1659,13 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_common_reactors_unsupported\":%zu,"
                "\"sampled_line_common_xdic_unsupported\":%zu,"
                "\"sampled_line_common_fields_refused\":%zu,"
+               "\"sampled_line_common_stage_color\":%zu,"
+               "\"sampled_line_common_stage_rgb\":%zu,"
+               "\"sampled_line_common_stage_transparency\":%zu,"
+               "\"sampled_line_common_stage_ltype\":%zu,"
+               "\"sampled_line_common_stage_appearance\":%zu,"
+               "\"sampled_line_common_stage_geom_bound\":%zu,"
+               "\"sampled_line_common_stage_other\":%zu,"
                "\"sampled_line_implicit_paper_xyz_verified\":%zu,"
                "\"sampled_line_implicit_model_xyz_verified\":%zu,"
                "\"sampled_line_graph_attempts\":%zu,"
@@ -1828,6 +1863,13 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_common_reactors_unsupported,
                hint->sampled_line_common_xdic_unsupported,
                hint->sampled_line_common_fields_refused,
+               hint->sampled_line_common_stage_color,
+               hint->sampled_line_common_stage_rgb,
+               hint->sampled_line_common_stage_transparency,
+               hint->sampled_line_common_stage_ltype,
+               hint->sampled_line_common_stage_appearance,
+               hint->sampled_line_common_stage_geom_bound,
+               hint->sampled_line_common_stage_other,
                hint->sampled_line_implicit_paper_xyz_verified,
                hint->sampled_line_implicit_model_xyz_verified,
                hint->sampled_line_graph_attempts,
