@@ -15,6 +15,7 @@
 #include "musacad_crc16.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_dwg_ac1024_record.h"
+#include "musacad_dwg_ac1024_self_index.h"
 #include "musacad_dwg_ac1015_handle_refs.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
@@ -387,6 +388,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t full_embedded_h_greater_than_index;
     size_t full_embedded_h_neighbor_pairs, full_embedded_h_increases;
     size_t full_embedded_h_decreases, full_embedded_h_equals;
+    int core_embedded_h_recovery_attempted, core_embedded_h_recovery_succeeded;
+    size_t core_embedded_h_recovery_records;
+    size_t core_embedded_h_recovery_original_index_matches;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -837,6 +841,40 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                     prior_full_h_valid = 1;
                     prior_full_h = self.target;
                 }
+                /* New shared C11 ABI, entirely separate from the
+                   exploratory bit-offset and alternative-map profiles.
+                   Full source CRC and canonical self-H MUST pass
+                   before any recovered identity array becomes visible.
+                   A successful recovered identity index does NOT
+                   establish owner/layer/geometry or DWG opening. */
+                hint.core_embedded_h_recovery_attempted = 1;
+                if (legacy_count <= SIZE_MAX / sizeof(uint64_t) &&
+                    legacy_count <=
+                       SIZE_MAX / sizeof(MusaDwgAc1024SelfIdentity)) {
+                    uint64_t *candidate_offsets =
+                        (uint64_t *)malloc(
+                            legacy_count * sizeof(*candidate_offsets));
+                    MusaDwgAc1024SelfIdentity *recovered =
+                        (MusaDwgAc1024SelfIdentity *)malloc(
+                            legacy_count * sizeof(*recovered));
+                    if (candidate_offsets && recovered) {
+                        for (size_t k = 0u; k < legacy_count; k++)
+                            candidate_offsets[k] = legacy[k].object_offset;
+                        if (musa_dwg_ac1024_recover_self_index(
+                                objects, nb, candidate_offsets,
+                                legacy_count, recovered, legacy_count)) {
+                            hint.core_embedded_h_recovery_succeeded = 1;
+                            hint.core_embedded_h_recovery_records = legacy_count;
+                            for (size_t k = 0u; k < legacy_count; k++) {
+                                if (recovered[k].embedded_absolute_handle ==
+                                        legacy[k].handle)
+                                    ++hint.core_embedded_h_recovery_original_index_matches;
+                            }
+                        }
+                    }
+                    free(recovered);
+                    free(candidate_offsets);
+                }
                 /* Separate fixed-budget exploratory H identity:
                    the public R2010 layout places a self-H immediately
                    after OT in the DATA stream. Only report aggregate
@@ -1219,7 +1257,11 @@ static void report(const char *signature, const char *result,
                "\"full_embedded_h_neighbor_pairs\":%zu,"
                "\"full_embedded_h_increases\":%zu,"
                "\"full_embedded_h_decreases\":%zu,"
-               "\"full_embedded_h_equals\":%zu}",
+               "\"full_embedded_h_equals\":%zu,"
+               "\"core_embedded_h_recovery_attempted\":%s,"
+               "\"core_embedded_h_recovery_succeeded\":%s,"
+               "\"core_embedded_h_recovery_records\":%zu,"
+               "\"core_embedded_h_recovery_original_index_matches\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1360,7 +1402,11 @@ static void report(const char *signature, const char *result,
                hint->full_embedded_h_neighbor_pairs,
                hint->full_embedded_h_increases,
                hint->full_embedded_h_decreases,
-               hint->full_embedded_h_equals);
+               hint->full_embedded_h_equals,
+               hint->core_embedded_h_recovery_attempted ? "true" : "false",
+               hint->core_embedded_h_recovery_succeeded ? "true" : "false",
+               hint->core_embedded_h_recovery_records,
+               hint->core_embedded_h_recovery_original_index_matches);
     }
     puts("}");
 }
