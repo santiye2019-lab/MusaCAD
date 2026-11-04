@@ -161,6 +161,130 @@ int musa_dwg_ac1024_record_eed_chain_probe(
     return 1;
 }
 
+/* Validate each nonempty, CRC-bounded original EED application H5
+ * against the independent source-indexed APPID OT67 record. This is
+ * intentionally stricter than merely checking EED frame boundaries.
+ * No imported GPL library, no EED semantic evaluation, no mutation. */
+int musa_dwg_ac1024_line_eed_appid_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024EedAppidEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !canonical_line_handle || !record_count ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity entity = {0};
+    MusaDwgAc1024EedChainEvidence chain = {0};
+    MusaDwgAc1024SelfPrefix original = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle, &entity) ||
+        entity.raw_ot != 19u || !entity.frame_crc16_verified ||
+        !entity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, entity.record_offset, &chain) ||
+        chain.raw_ot != 19u ||
+        chain.embedded_absolute_handle != canonical_line_handle ||
+        !chain.application_count || chain.application_count > 64u ||
+        !chain.original_crc16_verified || !chain.eed_boundaries_verified ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, entity.record_offset, &original) ||
+        original.raw_ot != 19u ||
+        original.embedded_absolute_handle != canonical_line_handle ||
+        !original.frame_crc16_verified ||
+        original.payload_start_byte >= object_bytes ||
+        original.handle_stream_end_bit / 8u >
+            object_bytes - original.payload_start_byte ||
+        original.data_after_self_bit >= chain.data_after_eed_bit)
+        return 0;
+
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + original.payload_start_byte,
+            original.handle_stream_end_bit / 8u,
+            original.data_after_self_bit, original.handle_stream_start_bit))
+        return 0;
+
+    uint64_t seen[64] = {0};
+    size_t refs = 0u, unique = 0u, sum_bytes = 0u;
+    uint64_t first_handle = 0u, first_offset = 0u;
+    for (;;) {
+        uint16_t data_bytes = 0u;
+        if (!musa_dwg_ac1015_bits_read_bs(&bits, &data_bytes))
+            return 0;
+        if (!data_bytes) break;
+        if (refs >= chain.application_count || refs >= 64u ||
+            data_bytes > 1048576u - sum_bytes)
+            return 0;
+
+        uint32_t code = 0u, size = 0u, byte = 0u;
+        if (!musa_dwg_ac1015_bits_read_u(&bits, 4u, &code) ||
+            !musa_dwg_ac1015_bits_read_u(&bits, 4u, &size) ||
+            code != 5u || size == 0u || size > 8u)
+            return 0;
+        uint64_t appid_h = 0u;
+        for (uint32_t k = 0u; k < size; ++k) {
+            if (!musa_dwg_ac1015_bits_read_u(&bits, 8u, &byte) ||
+                (k == 0u && byte == 0u))
+                return 0;
+            appid_h = (appid_h << 8u) | (uint64_t)byte;
+        }
+        if (!appid_h || appid_h == canonical_line_handle)
+            return 0;
+
+        MusaDwgAc1024SelfIdentity index_appid = {0};
+        MusaDwgAc1024SelfPrefix original_appid = {0};
+        if (!musa_dwg_ac1024_self_index_find(
+                recovered_index, record_count, appid_h, &index_appid) ||
+            index_appid.raw_ot != 67u ||
+            !index_appid.frame_crc16_verified ||
+            !index_appid.embedded_handle_code0_verified ||
+            !musa_dwg_ac1024_record_self_prefix(
+                objects, object_bytes,
+                index_appid.record_offset, &original_appid) ||
+            original_appid.raw_ot != 67u ||
+            original_appid.embedded_absolute_handle != appid_h ||
+            !original_appid.frame_crc16_verified ||
+            !original_appid.embedded_handle_code0_verified ||
+            bits.bit_pos > bits.bit_end ||
+            data_bytes > (bits.bit_end - bits.bit_pos) / 8u)
+            return 0;
+
+        if (!refs) {
+            first_handle = appid_h;
+            first_offset = index_appid.record_offset;
+        }
+        size_t k = 0u;
+        for (; k < unique; ++k) {
+            if (seen[k] == appid_h) break;
+        }
+        if (k == unique) seen[unique++] = appid_h;
+        bits.bit_pos += (size_t)data_bytes * 8u;
+        sum_bytes += (size_t)data_bytes;
+        ++refs;
+    }
+    if (refs != chain.application_count ||
+        sum_bytes != chain.application_data_bytes ||
+        bits.bit_pos != chain.data_after_eed_bit)
+        return 0;
+
+    MusaDwgAc1024EedAppidEvidence result = {0};
+    result.chain = chain;
+    result.appid_reference_count = refs;
+    result.distinct_appid_count = unique;
+    result.first_appid_handle = first_handle;
+    result.first_appid_record_offset = first_offset;
+    result.original_appid_records_crc_verified = 1u;
+    *out = result;
+    return 1;
+}
+
 /* Third bounded common DATA field: graphic-present bit, admitted only
  * as 0 after a verified zero-length EED. No payload skipping or scene. */
 int musa_dwg_ac1024_record_no_proxy_prefix(
