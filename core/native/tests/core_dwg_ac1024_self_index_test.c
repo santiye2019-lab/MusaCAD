@@ -503,8 +503,136 @@ static int test_owner_layer_bridge(void) {
 }
 
 
+/* Exercise all four relative H wire forms against authentic in-memory,
+ * CRC-backed target OT49/OT51 records. No scene or DWG writer is admitted. */
+static int make_relative_links(uint8_t src[47], uint8_t entity_h,
+                               uint8_t owner_code, uint8_t owner_count,
+                               uint8_t owner_value, uint8_t layer_code,
+                               uint8_t layer_count, uint8_t layer_value) {
+    memset(src, 0, 47u);
+    if (!make_record(src, 32u) || !make_record(src + 13u, 47u))
+        return 0;
+    set_bits(src + 3u, 2u, 8u, 51u); /* LAYER H32 */
+    set_bits(src + 16u, 2u, 8u, 49u); /* BLOCK_HEADER H47 */
+    uint16_t crc = 0u;
+    for (size_t at = 0u; at < 26u; at += 13u) {
+        if (!musa_core_crc16_arc(0xc0c1u, src + at, 11u, &crc))
+            return 0;
+        src[at + 11u] = (uint8_t)crc;
+        src[at + 12u] = (uint8_t)(crc >> 8u);
+    }
+    uint8_t *const line = src + 26u;
+    uint8_t *const payload = line + 3u;
+    line[0] = 16u; line[2] = 48u; /* 16-byte MS, 48-bit H stream */
+    set_bits(payload, 2u, 8u, 19u);
+    set_bits(payload, 14u, 4u, 1u);
+    set_bits(payload, 18u, 8u, entity_h);
+    set_bits(payload, 26u, 2u, 2u); /* no EED */
+    set_bits(payload, 31u, 2u, 2u); /* no reactors */
+    set_bits(payload, 33u, 1u, 1u); /* no XDictionary */
+    size_t at = 80u;
+    set_bits(payload, at, 4u, owner_code); at += 4u;
+    set_bits(payload, at, 4u, owner_count); at += 4u;
+    if (owner_count == 1u) {
+        set_bits(payload, at, 8u, owner_value); at += 8u;
+    }
+    set_bits(payload, at, 4u, layer_code); at += 4u;
+    set_bits(payload, at, 4u, layer_count); at += 4u;
+    if (layer_count == 1u) {
+        set_bits(payload, at, 8u, layer_value); at += 8u;
+    }
+    if (at > 128u || !musa_core_crc16_arc(0xc0c1u, line, 19u, &crc))
+        return 0;
+    line[19u] = (uint8_t)crc;
+    line[20u] = (uint8_t)(crc >> 8u);
+    return 1;
+}
+
+static int test_relative_owner_layer_codes(void) {
+    uint8_t src[47] = {0};
+    uint8_t saved_source[47] = {0};
+    MusaDwgAc1024SelfIdentity index[3] = {{0}};
+    MusaDwgAc1024OwnerLayerEvidence links = {0};
+    /* H8 means self-1 (owner 47); HC means self-16 (layer 32). */
+    if (!make_relative_links(src, 48u, 8u, 0u, 0u, 12u, 1u, 16u))
+        return 0;
+    const uint64_t backward_offsets[] = {0u, 13u, 26u};
+    if (!musa_dwg_ac1024_recover_self_index(
+            src, sizeof(src), backward_offsets, 3u, index, 3u))
+        return 0;
+    memcpy(saved_source, src, sizeof(src));
+    if (!musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 48u, &links) ||
+        links.owner_handle != 47u || links.layer_handle != 32u ||
+        links.owner_raw_h_code != 8u || links.layer_raw_h_code != 12u ||
+        links.owner_record_offset != 13u || links.layer_record_offset != 0u ||
+        links.handle_tail_unparsed_bits != 24u ||
+        !links.target_records_verified ||
+        memcmp(saved_source, src, sizeof(src)))
+        return 0;
+    const MusaDwgAc1024OwnerLayerEvidence backward = links;
+
+    /* HA adds 16 to self 31 for owner H47, H6 adds one for layer H32.
+       The recovered handle order is NOT the physical record-offset order. */
+    if (!make_relative_links(src, 31u, 10u, 1u, 16u, 6u, 0u, 0u))
+        return 0;
+    const uint64_t forward_offsets[] = {26u, 0u, 13u};
+    if (!musa_dwg_ac1024_recover_self_index(
+            src, sizeof(src), forward_offsets, 3u, index, 3u))
+        return 0;
+    memcpy(saved_source, src, sizeof(src));
+    if (!musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 31u, &links) ||
+        links.owner_handle != 47u || links.layer_handle != 32u ||
+        links.owner_raw_h_code != 10u || links.layer_raw_h_code != 6u ||
+        links.entity_record_offset != 26u ||
+        links.handle_tail_unparsed_bits != 24u ||
+        memcmp(saved_source, src, sizeof(src)))
+        return 0;
+
+    /* A zero-payload H6 with count=1 is malformed; a valid relative
+       identity pointing at a nonexistent owner is not a proven link. */
+    if (!make_relative_links(src, 31u, 6u, 1u, 47u, 6u, 0u, 0u))
+        return 0;
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 31u, &links))
+        return 0;
+    if (!make_relative_links(src, 31u, 10u, 1u, 17u, 6u, 0u, 0u))
+        return 0;
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 31u, &links))
+        return 0;
+    /* HC underflow, invalid reference code, absent referenced OT and
+       corrupt CRC never become owner/layer evidence. */
+    if (!make_relative_links(src, 31u, 12u, 1u, 32u, 6u, 0u, 0u))
+        return 0;
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 31u, &links))
+        return 0;
+    if (!make_relative_links(src, 31u, 3u, 1u, 16u, 6u, 0u, 0u))
+        return 0;
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 31u, &links))
+        return 0;
+    if (!make_relative_links(src, 31u, 10u, 1u, 16u, 6u, 0u, 0u))
+        return 0;
+    src[46u] ^= 0x40u;
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), index, 3u, 31u, &links))
+        return 0;
+    /* All rejected probes preserve last successful evidence. */
+    if (links.entity_handle != 31u || links.owner_handle != 47u ||
+        links.layer_handle != 32u ||
+        backward.entity_handle != 48u ||
+        backward.owner_raw_h_code != 8u)
+        return 0;
+    return 1;
+}
+
+
 int main(void) {
     if (!test_owner_layer_bridge()) return 11;
+    if (!test_relative_owner_layer_codes()) return 12;
     if (!test_verified_self_index_find()) return 10;
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
