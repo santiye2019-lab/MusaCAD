@@ -196,6 +196,9 @@ def ac1024_probe_record():
             "sampled_line_graph_attempts": 0,
             "sampled_line_graph_verified": 0,
             "sampled_line_graph_refused": 0,
+            "sampled_line_implicit_layer_attempts": 0,
+            "sampled_line_implicit_layer_verified": 0,
+            "sampled_line_implicit_layer_refused": 0,
         }
     }
 
@@ -330,6 +333,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("sampled_line_graph_verified", 1),
             ("sampled_line_graph_refused", 1),
             ("sampled_line_graph_verified", True),
+            ("sampled_line_implicit_layer_attempts", 1),
+            ("sampled_line_implicit_layer_verified", 1),
+            ("sampled_line_implicit_layer_refused", 1),
+            ("sampled_line_implicit_layer_attempts", True),
         ):
             with self.subTest(field=field, value=value):
                 invalid = deepcopy(original)
@@ -357,6 +364,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_line_graph_attempts",
             "sampled_line_graph_verified",
             "sampled_line_graph_refused",
+            "sampled_line_implicit_layer_attempts",
+            "sampled_line_implicit_layer_verified",
+            "sampled_line_implicit_layer_refused",
         ):
             with self.subTest(missing=missing):
                 invalid = deepcopy(original)
