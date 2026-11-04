@@ -546,6 +546,87 @@ static int test_eed_line_xyz_provisional(void) {
     return 1;
 }
 
+/* R2004+ ENC truecolor BL contains method byte C2, then RRGGBB.
+ * The extra 42 encoded bits shift the following common fields/geometry.
+ * All source bits are derived from this first-party 2D LINE fixture,
+ * not another CAD implementation or a guessed entity record. */
+static int test_r2010_tagged_truecolor(void) {
+    uint8_t plain[37] = {0};
+    uint8_t tagged[45] = {0};
+    if (!make_line(plain)) return 0;
+    tagged[0] = 40u; /* MS 40-byte payload + MC 16 handle bits */
+    tagged[2] = 16u;
+    const uint8_t *const src = plain + 3u;
+    uint8_t *const dst = tagged + 3u;
+    for (size_t bit = 0u; bit < 34u; ++bit) {
+        const uint32_t v = (uint32_t)((src[bit/8u] >>
+                             (7u - bit%8u)) & 1u);
+        set_bits(dst, bit, 1u, v);
+    }
+    set_bits(dst, 34u, 2u, 0u); /* BS raw16 */
+    set_bits(dst, 36u, 16u, 0x8000u); /* complex RGB ENC flag */
+    set_bits(dst, 52u, 2u, 0u); /* BL raw32 */
+    set_bits(dst, 54u, 8u, 0x33u); /* B */
+    set_bits(dst, 62u, 8u, 0x22u); /* G */
+    set_bits(dst, 70u, 8u, 0x11u); /* R */
+    set_bits(dst, 78u, 8u, 0xc2u); /* truecolor method */
+    for (size_t bit = 44u; bit < 240u; ++bit) {
+        const uint32_t v = (uint32_t)((src[bit/8u] >>
+                             (7u - bit%8u)) & 1u);
+        set_bits(dst, bit + 42u, 1u, v);
+    }
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, tagged, 43u, &crc))
+        return 0;
+    tagged[43] = (uint8_t)crc;
+    tagged[44] = (uint8_t)(crc >> 8u);
+    uint8_t preserved[sizeof(tagged)];
+    memcpy(preserved, tagged, sizeof(tagged));
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024LineFields xyz = {0};
+    if (!musa_dwg_ac1024_line_common_probe(
+            tagged, sizeof(tagged), 0u, &common) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            tagged, sizeof(tagged), 0u, &xyz) ||
+        musa_dwg_ac1024_line_common_failure_stage(
+            tagged, sizeof(tagged), 0u) != MUSA_DWG_LINE_COMMON_OK ||
+        !common.has_rgb || common.rgb_method != 0xc2u ||
+        common.rgb_raw != 0xc2112233u ||
+        common.rgb != 0x00112233u ||
+        common.geometry_start_bit != 115u ||
+        xyz.geometry_start_bit != 115u ||
+        xyz.geometry_end_bit != 250u ||
+        xyz.start[0] != 1.5 || xyz.end[0] != 1.5 ||
+        xyz.start[1] != -2.0 || xyz.end[1] != -2.0 ||
+        memcmp(preserved, tagged, sizeof(tagged)))
+        return 0;
+    const MusaDwgAc1024LineCommon saved = common;
+
+    /* Unsupported high-byte method remains rejected atomically. */
+    set_bits(dst, 78u, 8u, 0xc1u);
+    if (!musa_core_crc16_arc(0xc0c1u, tagged, 43u, &crc))
+        return 0;
+    tagged[43] = (uint8_t)crc;
+    tagged[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_common_probe(
+            tagged, sizeof(tagged), 0u, &common) ||
+        musa_dwg_ac1024_line_fields_probe(
+            tagged, sizeof(tagged), 0u, &xyz) ||
+        musa_dwg_ac1024_line_common_failure_stage(
+            tagged, sizeof(tagged), 0u) != MUSA_DWG_LINE_COMMON_RGB ||
+        memcmp(&common, &saved, sizeof(saved)))
+        return 0;
+    memcpy(tagged, preserved, sizeof(tagged));
+
+    /* No CRC workaround: even supported C2 must be refused if corrupt. */
+    tagged[44] ^= 1u;
+    if (musa_dwg_ac1024_line_common_probe(
+            tagged, sizeof(tagged), 0u, &common) ||
+        memcmp(&common, &saved, sizeof(saved)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -808,6 +889,7 @@ int main(void) {
     if (!test_implicit_line_layer_graph()) return 24;
     if (!test_xdictionary_original_handle_graph()) return 25;
     if (!test_eed_line_xyz_provisional()) return 26;
+    if (!test_r2010_tagged_truecolor()) return 31;
     puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
