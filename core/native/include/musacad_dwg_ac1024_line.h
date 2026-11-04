@@ -5,6 +5,7 @@
 #define MUSACAD_DWG_AC1024_LINE_H
 #include <stddef.h>
 #include <stdint.h>
+#include "musacad_dwg_ac1024_self_index.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -71,6 +72,26 @@ typedef struct MusaDwgAc1024LineFields {
 int musa_dwg_ac1024_line_fields_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024LineFields *out);
+
+/* A stronger source-internal LINE witness: CRC-verified coordinates
+ * AND original self-H -> independently authenticated owner OT49 and
+ * layer OT51. This API admits only mode 0 (explicit owner) and refuses
+ * implicit model/paper-space modes until an independent graph algorithm
+ * can authenticate their ownership. No scene/visibility/color inheritance,
+ * WCS placement, rendering or AutoCAD parity is claimed.
+ *
+ * Output is atomic on error and MUST NOT overlap the source or index.
+ * The recovered index must come from authenticated handle-map offsets.
+ */
+typedef struct MusaDwgAc1024LineGraphEvidence {
+    MusaDwgAc1024LineFields geometry;
+    MusaDwgAc1024OwnerLayerEvidence owner_layer;
+} MusaDwgAc1024LineGraphEvidence;
+
+int musa_dwg_ac1024_line_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024LineGraphEvidence *out);
 
 #ifdef __cplusplus
 }
