@@ -205,3 +205,36 @@ bağımsız MusaCAD çekirdeğine link/kopya edilmez. Önceki repodaki lisans
 izleri ticari dağıtım öncesi ayrıca incelenmelidir.
 
 İş akışı: .github/workflows/real-dwg-libredwg-host-oracle.yml
+
+
+## AC1024 LINE: model-space DATA ve doğrulanmış sahiplik sınırı (4 Kasım 2026)
+
+Salt-okunur GitHub Actions run `41895570094`, aynı 8 Karagümrük
+AC1024 dosyasındaki 5.142 örneklenmiş ham OT19 LINE kaydı için:
+
+- **4.113** kaydın DATA XYZ alanı dar, CRC-korumalı
+  `musa_dwg_ac1024_line_fields_probe` tarafından çözümlendi;
+  daha önce bu sayı **2.801** idi. Yeni **1.312** başarı
+  `entity_mode == 2` (model-space; açık owner H içermeyen) örnekleridir.
+- **2.801** kayıt, ayrıca orijinal CRC/OT/self-H ile doğrulanan
+  sahip OT49 ve katman OT51 bağlantısına sahiptir; bu sayının
+  artmaması doğrudur. `entity_mode == 1` (paper-space) örneklenen
+  kayıtlarda **0** kez görüldü.
+- Kalan **1.029** örnekte LINE DATA çözümü reddedildi:
+  **776** doğrulanamayan META ön eki,
+  **247** hâlen desteklenmeyen mode durumu ve kalan diğer
+  kısıtlı ortak-alan durumları. Bu sayılar kullanıcıya çizim
+  uyumluluk oranı olarak sunulamaz.
+- RAM dışında hiçbir DWG kaynağı değiştirilmedi. API başarısı
+  AutoCAD koordinat eşitliği veya ekran çizim kabulü değildir.
+
+Yeni `musa_dwg_ac1024_line_graph_probe` ortak C çekirdek API'si
+koordinat, LINE self-H ve farklı CRC/OT/self-H ile doğrulanmış
+BLOCK_HEADER OT49 / LAYER OT51 bağlantısını **aynı kaynak kayda**
+bağlar. Yalnızca açık sahiplikli (`mode 0`) kayıtları kabul eder;
+model/kâğıt alanındaki (`mode 1/2`) koordinatlar yine salt
+**provisional DATA** olarak kalır. Atomik sonuç ve sahte katman/
+owner, hatalı CRC ve bozuk indeks reddi sentetik C testleriyle
+sınanır. İzleyen gerçek-DWG tanısı, bu yeni API'yi aynı korpus
+üzerinde ayrıca ölçer. Tüm 2D/3D CAD işlevleri ve sahne kabulü
+ayrı bağımsız doğrulamaya tabidir.
