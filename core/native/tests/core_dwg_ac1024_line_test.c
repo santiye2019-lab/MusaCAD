@@ -628,6 +628,168 @@ static int test_r2010_tagged_truecolor(void) {
     return 1;
 }
 
+/* CRC-backed EED LINE: APPID H5 is bounded, then independently
+ * verify original layer OT51 and, only if mode 0, owner OT49.
+ * This fixture is NOT an assertion of block transforms/render readiness. */
+static int test_eed_line_original_graph(void) {
+    uint8_t base[37] = {0};
+    uint8_t source[71] = {0};
+    if (!make_line(base) ||
+        !make_graph_target(source, 51u, 32u) ||
+        !make_graph_target(source + 13u, 49u, 47u))
+        return 0;
+    uint8_t *const entity = source + 26u;
+    uint8_t *const p = entity + 3u;
+    entity[0] = 40u; /* 40 DATA/H bytes, CRC at entity[43..44] */
+    entity[2] = 16u; /* implicit-space layer H is 16 bits at bit304 */
+    set_bits(p, 2u, 8u, 19u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 48u); /* canonical LINE self H */
+    set_bits(p, 26u, 2u, 1u); /* EED: BS(1) */
+    set_bits(p, 28u, 8u, 1u);
+    set_bits(p, 36u, 4u, 5u); /* EED APPID H5 */
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 42u);
+    set_bits(p, 52u, 8u, 0x70u); /* opaque app byte */
+    set_bits(p, 60u, 2u, 2u); /* zero-EED terminator */
+    for (size_t bit = 28u; bit < 240u; ++bit) {
+        const uint8_t v = (uint8_t)((base[3u + bit / 8u] >>
+                                   (7u - bit % 8u)) & 1u);
+        set_bits(p, bit + 34u, 1u, v);
+    }
+    set_bits(p, 63u, 2u, 2u); /* implicit MODEL space */
+    set_bits(p, 304u, 4u, 5u); /* LAYER H5/H32 */
+    set_bits(p, 308u, 4u, 1u);
+    set_bits(p, 312u, 8u, 32u);
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
+        return 0;
+    entity[43] = (uint8_t)crc;
+    entity[44] = (uint8_t)(crc >> 8u);
+
+    const uint64_t offsets[3] = {0u, 13u, 26u};
+    MusaDwgAc1024SelfIdentity idx[3] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 3u, idx, 3u))
+        return 0;
+
+    uint8_t pristine[sizeof(source)];
+    memcpy(pristine, source, sizeof(pristine));
+    MusaDwgAc1024LineEedJoinedEvidence result = {0};
+    if (!musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        result.geometry.indexed_handle != 48u ||
+        result.geometry.geometry_start_bit != 107u ||
+        result.geometry.geometry_end_bit != 242u ||
+        result.geometry.start[0] != 1.5 ||
+        result.geometry.start[1] != -2.0 ||
+        result.graph.eed.application_count != 1u ||
+        result.graph.eed.application_data_bytes != 1u ||
+        result.graph.handles.entity_mode != 2u ||
+        result.graph.handles.entity_record_offset != 26u ||
+        result.graph.handles.layer_handle != 32u ||
+        result.graph.handles.layer_record_offset != 0u ||
+        result.graph.handles.owner_handle != 0u ||
+        result.graph.handles.xdictionary_handle != 0u ||
+        result.graph.handles.handle_tail_unparsed_bits != 0u ||
+        !result.graph.handles.original_records_crc_verified ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    const MusaDwgAc1024LineEedJoinedEvidence saved = result;
+
+    /* PAPER space is another implicit mode: no owner is synthesized. */
+    set_bits(p, 63u, 2u, 1u);
+    if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
+        return 0;
+    entity[43] = (uint8_t)crc;
+    entity[44] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        result.graph.handles.entity_mode != 1u ||
+        result.graph.handles.owner_handle != 0u ||
+        result.graph.handles.layer_handle != 32u)
+        return 0;
+    result = saved;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Explicit mode 0 has a DIFFERENT tail grammar: owner H4 followed
+     * by layer H5. No reinterpretation of model-space layout occurs. */
+    entity[2] = 32u; /* 32-bit tail starts at bit288 */
+    set_bits(p, 63u, 2u, 0u);
+    set_bits(p, 288u, 4u, 4u); /* owner H4 -> OT49/H47 */
+    set_bits(p, 292u, 4u, 1u);
+    set_bits(p, 296u, 8u, 47u);
+    set_bits(p, 304u, 4u, 5u); /* layer H5 -> OT51/H32 */
+    set_bits(p, 308u, 4u, 1u);
+    set_bits(p, 312u, 8u, 32u);
+    if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
+        return 0;
+    entity[43] = (uint8_t)crc;
+    entity[44] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        result.graph.handles.entity_mode != 0u ||
+        result.graph.handles.owner_handle != 47u ||
+        result.graph.handles.owner_record_offset != 13u ||
+        result.graph.handles.layer_handle != 32u)
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+    result = saved;
+
+    /* A correct LINE CRC cannot bypass an invalid original LAYER CRC. */
+    source[12] ^= 1u;
+    if (musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        memcmp(&saved, &result, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Broken EED APPID grammar with re-sealed CRC is still refused. */
+    set_bits(p, 36u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
+        return 0;
+    entity[43] = (uint8_t)crc;
+    entity[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        memcmp(&saved, &result, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* XDictionary-present flag means another H3 is mandatory; without
+     * an authenticated DICTIONARY OT42 reference this MUST refuse. */
+    set_bits(p, 67u, 1u, 0u);
+    if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
+        return 0;
+    entity[43] = (uint8_t)crc;
+    entity[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        memcmp(&saved, &result, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Fail-closed on fabricated index, NULL and overlapping destination. */
+    idx[0].raw_ot = 49u;
+    if (musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, &result) ||
+        memcmp(&saved, &result, sizeof(saved)))
+        return 0;
+    idx[0].raw_ot = 51u;
+    if (musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u, NULL) ||
+        musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u,
+            (MusaDwgAc1024LineEedJoinedEvidence *)(void *)source) ||
+        musa_dwg_ac1024_line_eed_verified_probe(
+            source, sizeof(source), idx, 3u, 48u,
+            (MusaDwgAc1024LineEedJoinedEvidence *)(void *)idx) ||
+        memcmp(&saved, &result, sizeof(saved)) ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -891,6 +1053,7 @@ int main(void) {
     if (!test_xdictionary_original_handle_graph()) return 25;
     if (!test_eed_line_xyz_provisional()) return 26;
     if (!test_r2010_tagged_truecolor()) return 31;
+    if (!test_eed_line_original_graph()) return 32;
     puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
