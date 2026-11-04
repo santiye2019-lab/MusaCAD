@@ -304,6 +304,12 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_first_h_count4to8;
     size_t sampled_scan_best_shift_bits;
     size_t sampled_scan_best_self_matches;
+    size_t sampled_h_internally_distinct, sampled_h_internal_duplicates;
+    size_t sampled_h_successive_pairs, sampled_h_successive_increases;
+    size_t sampled_h_successive_decreases, sampled_h_successive_equals;
+    size_t sampled_h_less_than_index, sampled_h_greater_than_index;
+    size_t sampled_h_index_requires_over3_bytes;
+    size_t sampled_h_low8_equal_index, sampled_h_low16_equal_index;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -708,6 +714,9 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                 size_t stride = legacy_count / 2048u;
                 if (!stride) stride = 1u;
                 size_t shifted_self_matches[33] = {0};
+                uint64_t sampled_h_values[2048] = {0};
+                size_t sampled_h_count = 0u;
+                uint64_t prior_h = 0u;
                 for (size_t k = 0u; k < legacy_count; k += stride) {
                     if (hint.sampled_first_h_attempts >= 2048u) break;
                     ++hint.sampled_first_h_attempts;
@@ -759,6 +768,30 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             ++hint.sampled_first_h_relative_code;
                     }
                     if (first.target != 0u) {
+                        if (sampled_h_count != 0u) {
+                            ++hint.sampled_h_successive_pairs;
+                            if (first.target > prior_h)
+                                ++hint.sampled_h_successive_increases;
+                            else if (first.target < prior_h)
+                                ++hint.sampled_h_successive_decreases;
+                            else ++hint.sampled_h_successive_equals;
+                        }
+                        prior_h = first.target;
+                        if (sampled_h_count < 2048u)
+                            sampled_h_values[sampled_h_count++] =
+                                first.target;
+                        if (first.target < legacy[k].handle)
+                            ++hint.sampled_h_less_than_index;
+                        else if (first.target > legacy[k].handle)
+                            ++hint.sampled_h_greater_than_index;
+                        if (legacy[k].handle > UINT64_C(0xffffff))
+                            ++hint.sampled_h_index_requires_over3_bytes;
+                        if ((first.target & UINT64_C(0xff)) ==
+                            (legacy[k].handle & UINT64_C(0xff)))
+                            ++hint.sampled_h_low8_equal_index;
+                        if ((first.target & UINT64_C(0xffff)) ==
+                            (legacy[k].handle & UINT64_C(0xffff)))
+                            ++hint.sampled_h_low16_equal_index;
                         if (first.count == 2u)
                             ++hint.sampled_first_h_count2;
                         else if (first.count == 3u)
@@ -804,6 +837,16 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             candidate.target == legacy[k].handle)
                             ++shifted_self_matches[shift];
                     }
+                }
+                qsort(sampled_h_values, sampled_h_count,
+                      sizeof(*sampled_h_values),
+                      ac1024_compare_offsets_u64);
+                for (size_t i = 0u; i < sampled_h_count; i++) {
+                    if (i == 0u || sampled_h_values[i] !=
+                        sampled_h_values[i - 1u])
+                        ++hint.sampled_h_internally_distinct;
+                    else
+                        ++hint.sampled_h_internal_duplicates;
                 }
                 for (size_t shift = 0u; shift <= 32u; shift++) {
                     if (shifted_self_matches[shift] >
@@ -972,7 +1015,18 @@ static void report(const char *signature, const char *result,
                "\"sampled_first_h_count3\":%zu,"
                "\"sampled_first_h_count4to8\":%zu,"
                "\"sampled_scan_best_shift_bits\":%zu,"
-               "\"sampled_scan_best_self_matches\":%zu}",
+               "\"sampled_scan_best_self_matches\":%zu,"
+               "\"sampled_h_internally_distinct\":%zu,"
+               "\"sampled_h_internal_duplicates\":%zu,"
+               "\"sampled_h_successive_pairs\":%zu,"
+               "\"sampled_h_successive_increases\":%zu,"
+               "\"sampled_h_successive_decreases\":%zu,"
+               "\"sampled_h_successive_equals\":%zu,"
+               "\"sampled_h_less_than_index\":%zu,"
+               "\"sampled_h_greater_than_index\":%zu,"
+               "\"sampled_h_index_requires_over3_bytes\":%zu,"
+               "\"sampled_h_low8_equal_index\":%zu,"
+               "\"sampled_h_low16_equal_index\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1084,7 +1138,18 @@ static void report(const char *signature, const char *result,
                hint->sampled_first_h_count3,
                hint->sampled_first_h_count4to8,
                hint->sampled_scan_best_shift_bits,
-               hint->sampled_scan_best_self_matches);
+               hint->sampled_scan_best_self_matches,
+               hint->sampled_h_internally_distinct,
+               hint->sampled_h_internal_duplicates,
+               hint->sampled_h_successive_pairs,
+               hint->sampled_h_successive_increases,
+               hint->sampled_h_successive_decreases,
+               hint->sampled_h_successive_equals,
+               hint->sampled_h_less_than_index,
+               hint->sampled_h_greater_than_index,
+               hint->sampled_h_index_requires_over3_bytes,
+               hint->sampled_h_low8_equal_index,
+               hint->sampled_h_low16_equal_index);
     }
     puts("}");
 }
