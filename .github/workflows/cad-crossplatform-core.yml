@@ -12,6 +12,7 @@ on:
       - 'app/src/main/cpp/native_nurbs.h'
       - 'app/src/main/cpp/native_scene.c'
       - 'app/src/main/cpp/CMakeLists.txt'
+      - 'platforms/ios/**'
       - '.github/workflows/cad-crossplatform-core.yml'
   workflow_dispatch:
 
@@ -95,4 +96,19 @@ jobs:
           test "$compiled" -gt 0
           echo "Compiled all $compiled common CAD core C units for iPhoneOS ARM64."
           bash tests/run_native_crossbuild.sh ios-archive
-          echo "This is object compilation only, NOT simulator, signed app or physical iPhone acceptance."
+          # Swift ABI import is checked for the iPhoneOS device target too.
+          xcrun --sdk iphoneos swiftc -target arm64-apple-ios15.0 -sdk "$SDK" \
+            -I platforms/ios/include \
+            -Xcc -I -Xcc "$PWD/core/native/include" \
+            -parse-as-library -typecheck platforms/ios/MusaCADCoreAdapter.swift
+          echo "This is object compilation, a static archive and Swift typecheck ONLY; no iPhone app or device acceptance."
+
+  ios-simulator-abi:
+    name: iOS/iPadOS simulator • shared C core + Swift ABI
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile, link and typecheck real iOS Simulator ARM64 ABI
+        shell: bash
+        run: bash tests/run_native_crossbuild.sh ios-simulator
