@@ -530,6 +530,21 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if not recovered_ok and (
                 entity_attempts or entity_verified or entity_refused):
             raise ValueError("unrecovered_ac1024_entity_meta_claim")
+        # The real native probe attempts owner/layer resolution once per
+        # eligible fixed-type entity. A verified link is a strict subset
+        # of CRC-backed common-entity metadata, never geometry or paint.
+        link_attempts = hint.get("sampled_owner_layer_attempts")
+        link_verified = hint.get("sampled_owner_layer_verified")
+        link_refused = hint.get("sampled_owner_layer_refused")
+        if (any(type(n) is not int or n < 0 for n in (
+                link_attempts, link_verified, link_refused)) or
+                link_attempts != entity_attempts or
+                link_verified + link_refused != link_attempts or
+                link_verified > entity_verified):
+            raise ValueError("invalid_ac1024_owner_layer_sample_contract")
+        if not recovered_ok and (
+                link_attempts or link_verified or link_refused):
+            raise ValueError("unrecovered_ac1024_owner_layer_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
