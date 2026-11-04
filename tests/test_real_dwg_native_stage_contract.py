@@ -193,6 +193,9 @@ def ac1024_probe_record():
             "sampled_line_common_fields_refused": 0,
             "sampled_line_implicit_paper_xyz_verified": 0,
             "sampled_line_implicit_model_xyz_verified": 0,
+            "sampled_line_graph_attempts": 0,
+            "sampled_line_graph_verified": 0,
+            "sampled_line_graph_refused": 0,
         }
     }
 
@@ -323,6 +326,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("sampled_line_implicit_paper_xyz_verified", 1),
             ("sampled_line_implicit_model_xyz_verified", 1),
             ("sampled_line_implicit_model_xyz_verified", True),
+            ("sampled_line_graph_attempts", 1),
+            ("sampled_line_graph_verified", 1),
+            ("sampled_line_graph_refused", 1),
+            ("sampled_line_graph_verified", True),
         ):
             with self.subTest(field=field, value=value):
                 invalid = deepcopy(original)
@@ -347,6 +354,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_line_common_fields_refused",
             "sampled_line_implicit_paper_xyz_verified",
             "sampled_line_implicit_model_xyz_verified",
+            "sampled_line_graph_attempts",
+            "sampled_line_graph_verified",
+            "sampled_line_graph_refused",
         ):
             with self.subTest(missing=missing):
                 invalid = deepcopy(original)
