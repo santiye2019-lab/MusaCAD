@@ -420,6 +420,26 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("inconsistent_ac1024_first_h_internal_census")
         elif any(hint[k] for k in self_h_evidence_fields):
             raise ValueError("unmeasured_ac1024_first_h_internal_census")
+        alt_valid = hint.get("masked6_candidate_index_valid")
+        alt_fields = (
+            "masked6_candidate_handle_count", "masked6_sample_attempts",
+            "masked6_sample_self_matches", "masked6_sample_other",
+            "masked6_sample_unreadable",
+        )
+        if (type(alt_valid) is not bool or
+                any(type(hint.get(k)) is not int or hint[k] < 0
+                    for k in alt_fields)):
+            raise ValueError("invalid_ac1024_alternate_map_contract")
+        alt_count, alt_attempts, alt_self, alt_other, alt_unreadable = (
+            hint[k] for k in alt_fields)
+        if alt_valid:
+            if (not measured or alt_count != handles or
+                    alt_attempts < 1 or alt_attempts > 2048 or
+                    alt_attempts > handles or
+                    alt_self + alt_other + alt_unreadable != alt_attempts):
+                raise ValueError("unproven_ac1024_alternate_map_sample")
+        elif any(hint[k] for k in alt_fields):
+            raise ValueError("unverified_ac1024_alternate_map_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
