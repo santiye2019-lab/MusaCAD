@@ -154,6 +154,15 @@ int musa_dwg_ac1024_record_entity_meta_prefix(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024EntityMetaPrefix *out);
 
+/* Deliberately separate from the zero-EED owner/layer/scene gates:
+ * after an authentic nonzero, fully terminated EED application chain,
+ * bound the no-proxy / entity-mode / reactor / XDictionary DATA header.
+ * Fixed OT19 only. No EED interpretation, original handle graph, scene
+ * or normal DWG-open permission follows from this evidence. */
+int musa_dwg_ac1024_record_line_eed_meta_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024EntityMetaPrefix *out);
+
 /* All-or-nothing read-only reconciliation of independently authenticated
  * AcDb:Handles RECORD OFFSETS with CRC-verified R2010 object self-H.
  *
