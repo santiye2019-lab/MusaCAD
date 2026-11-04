@@ -415,6 +415,11 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_meta_eed_refused;
     size_t sampled_line_meta_proxy_refused;
     size_t sampled_line_meta_entity_fields_refused;
+    /* Standalone bounded EED-chain re-probe; still NO geometry admission. */
+    size_t sampled_line_eed_chain_attempts;
+    size_t sampled_line_eed_chain_verified;
+    size_t sampled_line_eed_chain_refused;
+    size_t sampled_line_eed_chain_has_applications;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1033,9 +1038,23 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                 ++hint.sampled_line_meta_self_refused;
                                             else if (!musa_dwg_ac1024_record_zero_eed_prefix(
                                                     objects, nb,
-                                                    recovered[k].record_offset, &eed))
+                                                    recovered[k].record_offset, &eed)) {
                                                 ++hint.sampled_line_meta_eed_refused;
-                                            else if (!musa_dwg_ac1024_record_no_proxy_prefix(
+                                                ++hint.sampled_line_eed_chain_attempts;
+                                                MusaDwgAc1024EedChainEvidence chain = {0};
+                                                if (musa_dwg_ac1024_record_eed_chain_probe(
+                                                        objects, nb,
+                                                        recovered[k].record_offset, &chain) &&
+                                                    chain.embedded_absolute_handle ==
+                                                        recovered[k].embedded_absolute_handle &&
+                                                    chain.original_crc16_verified &&
+                                                    chain.eed_boundaries_verified) {
+                                                    ++hint.sampled_line_eed_chain_verified;
+                                                    if (chain.application_count > 0u)
+                                                        ++hint.sampled_line_eed_chain_has_applications;
+                                                } else
+                                                    ++hint.sampled_line_eed_chain_refused;
+                                            } else if (!musa_dwg_ac1024_record_no_proxy_prefix(
                                                     objects, nb,
                                                     recovered[k].record_offset, &proxy))
                                                 ++hint.sampled_line_meta_proxy_refused;
@@ -1573,6 +1592,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_meta_eed_refused\":%zu,"
                "\"sampled_line_meta_proxy_refused\":%zu,"
                "\"sampled_line_meta_entity_fields_refused\":%zu,"
+               "\"sampled_line_eed_chain_attempts\":%zu,"
+               "\"sampled_line_eed_chain_verified\":%zu,"
+               "\"sampled_line_eed_chain_refused\":%zu,"
+               "\"sampled_line_eed_chain_has_applications\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -1762,6 +1785,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_meta_eed_refused,
                hint->sampled_line_meta_proxy_refused,
                hint->sampled_line_meta_entity_fields_refused,
+               hint->sampled_line_eed_chain_attempts,
+               hint->sampled_line_eed_chain_verified,
+               hint->sampled_line_eed_chain_refused,
+               hint->sampled_line_eed_chain_has_applications,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
