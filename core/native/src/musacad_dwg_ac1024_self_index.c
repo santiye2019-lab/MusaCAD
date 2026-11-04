@@ -223,3 +223,49 @@ int musa_dwg_ac1024_recover_self_index(
     free(staged);
     return valid;
 }
+
+/* Fast bounded lookup in a previously authenticated recovered index.
+ * A caller-provided array is NOT authenticated by this function; checking
+ * all 145k records every lookup would defeat the purpose. The recovered
+ * index must be retained unchanged for the lifetime of all lookups. */
+int musa_dwg_ac1024_self_index_find(
+    const MusaDwgAc1024SelfIdentity *verified_index, size_t record_count,
+    uint64_t canonical_absolute_handle, MusaDwgAc1024SelfIdentity *out) {
+    if (!verified_index || !out || !canonical_absolute_handle ||
+        !record_count || record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*verified_index) ||
+        overlaps(verified_index, record_count * sizeof(*verified_index),
+                 out, sizeof(*out)))
+        return 0;
+
+    size_t low = 0u, high = record_count; /* exclusive upper bound */
+    while (low < high) {
+        const size_t mid = low + (high - low) / 2u;
+        if (verified_index[mid].embedded_absolute_handle <
+            canonical_absolute_handle)
+            low = mid + 1u;
+        else
+            high = mid;
+    }
+    if (low == record_count ||
+        verified_index[low].embedded_absolute_handle !=
+            canonical_absolute_handle)
+        return 0;
+    const MusaDwgAc1024SelfIdentity *found = &verified_index[low];
+    if (found->frame_crc16_verified != 1u ||
+        found->embedded_handle_code0_verified != 1u ||
+        (low > 0u &&
+         (verified_index[low - 1u].embedded_absolute_handle >=
+              canonical_absolute_handle ||
+          verified_index[low - 1u].frame_crc16_verified != 1u ||
+          verified_index[low - 1u].embedded_handle_code0_verified != 1u)) ||
+        (low + 1u < record_count &&
+         (verified_index[low + 1u].embedded_absolute_handle <=
+              canonical_absolute_handle ||
+          verified_index[low + 1u].frame_crc16_verified != 1u ||
+          verified_index[low + 1u].embedded_handle_code0_verified != 1u)))
+        return 0;
+    *out = *found;
+    return 1;
+}
+
