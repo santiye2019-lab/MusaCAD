@@ -575,6 +575,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_xdic_present_attempts",
             "sampled_line_xdic_present_xyz_verified",
             "sampled_line_xdic_present_xyz_refused",
+            "sampled_line_xdic_hgraph_attempts",
+            "sampled_line_xdic_hgraph_verified",
+            "sampled_line_xdic_hgraph_refused",
         )
         if any(type(hint.get(k)) is not int or hint[k] < 0
                for k in line_keys):
@@ -589,7 +592,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          graph_refused, implicit_layer_attempts,
          implicit_layer_ok, implicit_layer_bad,
          xdic_present_attempts, xdic_present_xyz_ok,
-         xdic_present_xyz_bad) = (hint[k] for k in line_keys)
+         xdic_present_xyz_bad, xdic_hgraph_attempts,
+         xdic_hgraph_ok, xdic_hgraph_bad) = (hint[k] for k in line_keys)
         if (line_attempts > entity_attempts or
                 line_attempts > 2048 or
                 line_attempts != line_common_ok + line_common_bad or
@@ -611,6 +615,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 xdic_present_attempts > line_attempts or
                 xdic_present_xyz_ok > line_xyz_ok or
                 xdic_present_xyz_bad > line_xyz_bad or
+                xdic_hgraph_attempts != xdic_present_xyz_ok or
+                xdic_hgraph_ok + xdic_hgraph_bad != xdic_hgraph_attempts or
                 line_meta_rejected > entity_refused or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
