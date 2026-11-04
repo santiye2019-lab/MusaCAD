@@ -417,6 +417,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_common_reactors_unsupported;
     size_t sampled_line_common_xdic_unsupported;
     size_t sampled_line_common_fields_refused;
+    /* Provisional DATA-only LINE XYZ in implicit layout space, never owner join. */
+    size_t sampled_line_implicit_paper_xyz_verified;
+    size_t sampled_line_implicit_model_xyz_verified;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -1019,6 +1022,10 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             ++hint.sampled_line_xyz_bounded_common;
                                             if (line_owner_layer_joinable)
                                                 ++hint.sampled_line_xyz_owner_layer_joined;
+                                            else if (meta.entity_mode == 1u)
+                                                ++hint.sampled_line_implicit_paper_xyz_verified;
+                                            else if (meta.entity_mode == 2u)
+                                                ++hint.sampled_line_implicit_model_xyz_verified;
                                         }
                                         if (xyz.start[0] != xyz.end[0] ||
                                             xyz.start[1] != xyz.end[1] ||
@@ -1448,7 +1455,9 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_common_mode_unsupported\":%zu,"
                "\"sampled_line_common_reactors_unsupported\":%zu,"
                "\"sampled_line_common_xdic_unsupported\":%zu,"
-               "\"sampled_line_common_fields_refused\":%zu}",
+               "\"sampled_line_common_fields_refused\":%zu,"
+               "\"sampled_line_implicit_paper_xyz_verified\":%zu,"
+               "\"sampled_line_implicit_model_xyz_verified\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1619,7 +1628,9 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_common_mode_unsupported,
                hint->sampled_line_common_reactors_unsupported,
                hint->sampled_line_common_xdic_unsupported,
-               hint->sampled_line_common_fields_refused);
+               hint->sampled_line_common_fields_refused,
+               hint->sampled_line_implicit_paper_xyz_verified,
+               hint->sampled_line_implicit_model_xyz_verified);
     }
     puts("}");
 }
