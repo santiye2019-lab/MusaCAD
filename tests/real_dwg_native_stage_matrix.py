@@ -361,6 +361,32 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if any(hint[k] > hint["sampled_first_h_code0_mismatch"]
                for k in comparison_fields):
             raise ValueError("unbounded_ac1024_handle_hypothesis_counters")
+
+        membership_fields = (
+            "sampled_first_h_in_handle_index",
+            "sampled_first_h_not_in_handle_index",
+            "sampled_first_h_same_index_offset",
+            "sampled_first_h_count2", "sampled_first_h_count3",
+            "sampled_first_h_count4to8",
+            "sampled_scan_best_shift_bits",
+            "sampled_scan_best_self_matches",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in membership_fields):
+            raise ValueError("invalid_ac1024_handle_membership_contract")
+        (in_map, out_map, same_offset, count2, count3, count4to8,
+         best_shift, best_matches) = (hint[k] for k in membership_fields)
+        if measured:
+            decoded_h = attempts - unreadable_h
+            if (in_map + out_map != decoded_h or
+                    same_offset > in_map or
+                    count2 + count3 + count4to8 > decoded_h or
+                    best_shift > 32 or best_matches > attempts or
+                    best_matches < self_matches or
+                    same_offset < self_matches):
+                raise ValueError("inconsistent_ac1024_first_h_map_membership")
+        elif any(hint[k] for k in membership_fields):
+            raise ValueError("unmeasured_ac1024_first_h_map_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
