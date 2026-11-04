@@ -297,6 +297,13 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_first_h_plus_one_matches;
     size_t sampled_first_h_minus_one_matches;
     size_t sampled_first_h_one_byte_values;
+    size_t sampled_first_h_in_handle_index;
+    size_t sampled_first_h_not_in_handle_index;
+    size_t sampled_first_h_same_index_offset;
+    size_t sampled_first_h_count2, sampled_first_h_count3;
+    size_t sampled_first_h_count4to8;
+    size_t sampled_scan_best_shift_bits;
+    size_t sampled_scan_best_self_matches;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -700,6 +707,7 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                    Never serialize source IDs, offsets, text or geometry. */
                 size_t stride = legacy_count / 2048u;
                 if (!stride) stride = 1u;
+                size_t shifted_self_matches[33] = {0};
                 for (size_t k = 0u; k < legacy_count; k += stride) {
                     if (hint.sampled_first_h_attempts >= 2048u) break;
                     ++hint.sampled_first_h_attempts;
@@ -749,6 +757,60 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             ++hint.sampled_first_h_absolute_other_code;
                         else
                             ++hint.sampled_first_h_relative_code;
+                    }
+                    if (first.target != 0u) {
+                        if (first.count == 2u)
+                            ++hint.sampled_first_h_count2;
+                        else if (first.count == 3u)
+                            ++hint.sampled_first_h_count3;
+                        else if (first.count >= 4u && first.count <= 8u)
+                            ++hint.sampled_first_h_count4to8;
+                        /* The verified handle map is strictly monotone.
+                           Binary lookup only; never print handles or offsets. */
+                        size_t low = 0u, high = legacy_count;
+                        while (low < high) {
+                            const size_t mid = low + (high - low) / 2u;
+                            if (legacy[mid].handle < first.target)
+                                low = mid + 1u;
+                            else high = mid;
+                        }
+                        if (low < legacy_count &&
+                            legacy[low].handle == first.target) {
+                            ++hint.sampled_first_h_in_handle_index;
+                            if (legacy[low].object_offset ==
+                                legacy[k].object_offset)
+                                ++hint.sampled_first_h_same_index_offset;
+                        } else
+                            ++hint.sampled_first_h_not_in_handle_index;
+                    }
+                    /* 0..32-bit scan is DIAGNOSTIC ONLY: matching a
+                       value by searching different start bits is not
+                       a valid self-H decoder or geometry evidence. */
+                    const size_t scan_bits =
+                        stream.handle_stream_start_bit -
+                        stream.data_after_ot_bit;
+                    for (size_t shift = 0u;
+                         shift <= 32u && shift < scan_bits; shift++) {
+                        MusaDwgAc1015Bits alt = {0};
+                        MusaDwgAc1015HandleRef candidate = {0};
+                        if (musa_dwg_ac1015_bits_init(
+                                &alt, objects + stream.payload_start_byte,
+                                stream.handle_stream_end_bit / 8u,
+                                stream.data_after_ot_bit + shift,
+                                stream.handle_stream_start_bit) &&
+                            musa_dwg_ac1015_read_handle_ref(
+                                &alt, legacy[k].handle, &candidate) &&
+                            candidate.code == 0u &&
+                            candidate.target == legacy[k].handle)
+                            ++shifted_self_matches[shift];
+                    }
+                }
+                for (size_t shift = 0u; shift <= 32u; shift++) {
+                    if (shifted_self_matches[shift] >
+                        hint.sampled_scan_best_self_matches) {
+                        hint.sampled_scan_best_self_matches =
+                            shifted_self_matches[shift];
+                        hint.sampled_scan_best_shift_bits = shift;
                     }
                 }
                 free(offsets);
@@ -902,7 +964,15 @@ static void report(const char *signature, const char *result,
                "\"sampled_first_h_reverse_bytes_matches\":%zu,"
                "\"sampled_first_h_plus_one_matches\":%zu,"
                "\"sampled_first_h_minus_one_matches\":%zu,"
-               "\"sampled_first_h_one_byte_values\":%zu}",
+               "\"sampled_first_h_one_byte_values\":%zu,"
+               "\"sampled_first_h_in_handle_index\":%zu,"
+               "\"sampled_first_h_not_in_handle_index\":%zu,"
+               "\"sampled_first_h_same_index_offset\":%zu,"
+               "\"sampled_first_h_count2\":%zu,"
+               "\"sampled_first_h_count3\":%zu,"
+               "\"sampled_first_h_count4to8\":%zu,"
+               "\"sampled_scan_best_shift_bits\":%zu,"
+               "\"sampled_scan_best_self_matches\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1006,7 +1076,15 @@ static void report(const char *signature, const char *result,
                hint->sampled_first_h_reverse_bytes_matches,
                hint->sampled_first_h_plus_one_matches,
                hint->sampled_first_h_minus_one_matches,
-               hint->sampled_first_h_one_byte_values);
+               hint->sampled_first_h_one_byte_values,
+               hint->sampled_first_h_in_handle_index,
+               hint->sampled_first_h_not_in_handle_index,
+               hint->sampled_first_h_same_index_offset,
+               hint->sampled_first_h_count2,
+               hint->sampled_first_h_count3,
+               hint->sampled_first_h_count4to8,
+               hint->sampled_scan_best_shift_bits,
+               hint->sampled_scan_best_self_matches);
     }
     puts("}");
 }
