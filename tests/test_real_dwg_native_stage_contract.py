@@ -161,6 +161,10 @@ def ac1024_probe_record():
             "full_embedded_h_increases": 0,
             "full_embedded_h_decreases": 0,
             "full_embedded_h_equals": 0,
+            "core_embedded_h_recovery_attempted": False,
+            "core_embedded_h_recovery_succeeded": False,
+            "core_embedded_h_recovery_records": 0,
+            "core_embedded_h_recovery_original_index_matches": 0,
         }
     }
 
@@ -372,6 +376,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "full_embedded_h_increases": 145274,
             "full_embedded_h_decreases": 0,
             "full_embedded_h_equals": 0,
+            "core_embedded_h_recovery_attempted": True,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
             "mc_invalid_ms_zero": 2,
@@ -434,6 +439,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("full_embedded_h_parsed_code0", 145278),
             ("full_embedded_h_neighbor_pairs", 145277),
             ("full_embedded_h_less_than_index", 143276),
+            ("core_embedded_h_recovery_attempted", False),
+            ("core_embedded_h_recovery_succeeded", True),
+            ("core_embedded_h_recovery_records", 145279),
         ):
             with self.subTest(field=field):
                 invalid = deepcopy(record)
@@ -520,6 +528,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "full_embedded_h_increases": 145274,
             "full_embedded_h_decreases": 0,
             "full_embedded_h_equals": 0,
+            "core_embedded_h_recovery_attempted": True,
             "mc_unreadable_invalid_ms": 2,
             "mc_unreadable_first_half": 1,
             "mc_invalid_ms_zero": 2,
