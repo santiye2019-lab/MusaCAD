@@ -143,6 +143,59 @@ int main(void) {
         memcmp(&old_common, &common, sizeof(common)) ||
         memcmp(&old_line, &line, sizeof(line)) ||
         memcmp(saved, record, sizeof(saved))) return 8;
+
+    /* Full XYZ 3D fixture: three genuinely different endpoints exercise
+     * RD and absolute DD(3) instead of only the equal-point DD(0) path.
+     * No real-source identity/owner/layer or display parity is inferred. */
+    uint8_t record3d[69] = {0};
+    record3d[0] = 64u; /* MS=64-byte payload, MC=16 handle bits */
+    record3d[2] = 16u;
+    memcpy(record3d + 3u, saved + 3u, 10u); /* authenticated common header */
+    uint8_t *const p3 = record3d + 3u;
+    set_bits(p3, 73u, 1u, 0u);  /* nonzero Z stream is present */
+    set_rd(p3, 74u, 1.5);       /* start X */
+    set_bits(p3, 138u, 2u, 3u); /* end X is a full RD */
+    set_rd(p3, 140u, 4.5);
+    set_rd(p3, 204u, -2.0);     /* start Y */
+    set_bits(p3, 268u, 2u, 3u); /* end Y is a full RD */
+    set_rd(p3, 270u, 6.0);
+    set_rd(p3, 334u, 3.0);      /* start Z */
+    set_bits(p3, 398u, 2u, 3u); /* end Z is a full RD */
+    set_rd(p3, 400u, -1.0);
+    set_bits(p3, 464u, 1u, 1u); /* zero thickness */
+    set_bits(p3, 465u, 1u, 1u); /* default extrusion */
+    uint16_t crc3 = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record3d, 67u, &crc3)) return 9;
+    record3d[67] = (uint8_t)crc3;
+    record3d[68] = (uint8_t)(crc3 >> 8u);
+    uint8_t before3d[sizeof(record3d)];
+    memcpy(before3d, record3d, sizeof(record3d));
+    MusaDwgAc1024LineCommon common3d = {0};
+    MusaDwgAc1024LineFields line3d = {0};
+    if (!musa_dwg_ac1024_line_common_probe(
+            record3d, sizeof(record3d), 0u, &common3d) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            record3d, sizeof(record3d), 0u, &line3d) ||
+        common3d.indexed_handle != 44u ||
+        common3d.geometry_start_bit != 73u ||
+        common3d.data_end_bit != 496u ||
+        line3d.indexed_handle != 44u ||
+        line3d.geometry_end_bit != 466u ||
+        !line3d.coordinates_decoded ||
+        line3d.start[0] != 1.5 || line3d.end[0] != 4.5 ||
+        line3d.start[1] != -2.0 || line3d.end[1] != 6.0 ||
+        line3d.start[2] != 3.0 || line3d.end[2] != -1.0 ||
+        line3d.thickness != 0.0 ||
+        line3d.extrusion[0] != 0.0 ||
+        line3d.extrusion[1] != 0.0 ||
+        line3d.extrusion[2] != 1.0 ||
+        memcmp(before3d, record3d, sizeof(record3d))) return 10;
+    const MusaDwgAc1024LineFields prior3d = line3d;
+    record3d[68] ^= 1u; /* CRC corruption must not mutate caller output */
+    if (musa_dwg_ac1024_line_fields_probe(
+            record3d, sizeof(record3d), 0u, &line3d) ||
+        memcmp(&line3d, &prior3d, sizeof(line3d))) return 11;
+
     puts("AC1024 LINE common/XYZ synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
