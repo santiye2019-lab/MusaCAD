@@ -576,6 +576,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_eed_join_explicit_owner",
             "sampled_line_eed_join_implicit_layer",
             "sampled_line_eed_join_xdictionary",
+            "sampled_line_eed_appid_attempts",
+            "sampled_line_eed_appid_verified",
+            "sampled_line_eed_appid_refused",
+            "sampled_line_eed_appid_references_verified",
+            "sampled_line_eed_appid_distinct_references_verified",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -617,6 +622,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          eed_xyz_distinct,
          eed_join_attempts, eed_join_ok, eed_join_bad,
          eed_join_explicit_owner, eed_join_implicit_layer, eed_join_xdic,
+         eed_appid_attempts, eed_appid_ok, eed_appid_bad,
+         eed_appid_refs, eed_appid_distinct,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -666,6 +673,12 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 eed_join_ok + eed_join_bad != eed_join_attempts or
                 eed_join_explicit_owner + eed_join_implicit_layer != eed_join_ok or
                 eed_join_xdic > eed_join_ok or
+                eed_appid_attempts != eed_xyz_verified or
+                eed_appid_ok + eed_appid_bad != eed_appid_attempts or
+                eed_appid_refs < eed_appid_ok or
+                eed_appid_refs > 64 * eed_appid_ok or
+                eed_appid_distinct < eed_appid_ok or
+                eed_appid_distinct > eed_appid_refs or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
