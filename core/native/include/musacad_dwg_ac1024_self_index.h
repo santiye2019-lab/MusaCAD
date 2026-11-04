@@ -157,6 +157,37 @@ int musa_dwg_ac1024_self_index_find(
     uint64_t canonical_absolute_handle, MusaDwgAc1024SelfIdentity *out);
 
 
+
+/* AC1024 common owner/layer H evidence for the narrow verified subset:
+ * fixed INSERT/ARC/CIRCLE/LINE, entity mode 0, zero reactors, no XDict,
+ * zero EED and no proxy graphic. Caller supplies the immutable output of
+ * recover_self_index. Actual owner BLOCK_HEADER (OT49) and LAYER (OT51)
+ * source records are re-CRC-checked, not inferred from raw handle values.
+ *
+ * Only two common H references are consumed; subsequent appearance,
+ * linetype, material and geometry data remain UNRESOLVED. Never use this
+ * witness to render or save a drawing. All outputs are atomic. */
+typedef struct MusaDwgAc1024OwnerLayerEvidence {
+    uint64_t entity_handle;
+    uint64_t entity_record_offset;
+    uint64_t owner_handle;
+    uint64_t owner_record_offset;
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t handle_tail_unparsed_bits;
+    uint16_t entity_raw_ot;
+    uint8_t owner_raw_h_code;
+    uint8_t layer_raw_h_code;
+    uint8_t source_crc_verified;
+    uint8_t target_records_verified;
+} MusaDwgAc1024OwnerLayerEvidence;
+
+int musa_dwg_ac1024_entity_owner_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024OwnerLayerEvidence *out);
+
+
 #ifdef __cplusplus
 }
 #endif
