@@ -240,6 +240,72 @@ static int ac1024_r2010_declared_ot(
     return 1;
 }
 
+/* TEST-ONLY independent hypothesis: a handle-map MC final byte might
+   reserve bit 0x40 rather than treating it as a magnitude bit.
+   The original immutable handle-map pages are CRC checked again.
+   This candidate must NEVER be used to accept a production index until
+   independently verified against embedded self-H across the real corpus. */
+static int ac1024_hmap_last_six_candidate(
+    const uint8_t *section, size_t section_bytes,
+    uint64_t *handles, size_t capacity, size_t *out_count) {
+    if (!section || !handles || !out_count || !capacity)
+        return 0;
+    size_t cursor = 0u, count = 0u;
+    uint64_t current = 0u;
+    while (cursor < section_bytes) {
+        if (section_bytes - cursor < 4u) return 0;
+        const size_t start = cursor;
+        const size_t page_bytes = ((size_t)section[start] << 8u) |
+                                  section[start + 1u];
+        if (page_bytes < 2u || page_bytes > 2040u ||
+            page_bytes > section_bytes - start - 2u) return 0;
+        const size_t end = start + page_bytes;
+        const uint16_t stored = (uint16_t)(
+            ((uint16_t)section[end] << 8u) | section[end + 1u]);
+        uint16_t computed = 0u;
+        if (!musa_core_crc16_arc(
+                0xc0c1u, section + start, page_bytes, &computed) ||
+            stored != computed) return 0;
+        cursor = start + 2u;
+        if (page_bytes == 2u) {
+            if (end + 2u != section_bytes || !count) return 0;
+            *out_count = count;
+            return 1;
+        }
+        while (cursor < end) {
+            uint64_t delta = 0u;
+            int ended = 0;
+            for (unsigned j = 0u; j < 10u; j++) {
+                if (cursor >= end) return 0;
+                const uint8_t b = section[cursor++];
+                const int last = !(b & 0x80u);
+                const uint64_t value = (uint64_t)(
+                    b & (last ? 0x3fu : 0x7fu));
+                if (j * 7u >= 64u ||
+                    value > (UINT64_MAX >> (j * 7u))) return 0;
+                delta |= value << (j * 7u);
+                if (last) { ended = 1; break; }
+            }
+            if (!ended || !delta || delta > UINT64_MAX - current ||
+                count >= capacity) return 0;
+            /* A separate signed MC location delta follows. Only its
+               bounded byte extent is needed for the handle hypothesis. */
+            int loc_ended = 0;
+            for (unsigned j = 0u; j < 10u; j++) {
+                if (cursor >= end) return 0;
+                const uint8_t b = section[cursor++];
+                if (!(b & 0x80u)) { loc_ended = 1; break; }
+            }
+            if (!loc_ended) return 0;
+            current += delta;
+            handles[count++] = current;
+        }
+        if (cursor != end) return 0;
+        cursor = end + 2u;
+    }
+    return 0;
+}
+
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
     size_t candidate_handles;
@@ -310,6 +376,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_h_less_than_index, sampled_h_greater_than_index;
     size_t sampled_h_index_requires_over3_bytes;
     size_t sampled_h_low8_equal_index, sampled_h_low16_equal_index;
+    int masked6_candidate_index_valid;
+    size_t masked6_candidate_handle_count;
+    size_t masked6_sample_attempts, masked6_sample_self_matches;
+    size_t masked6_sample_other, masked6_sample_unreadable;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
