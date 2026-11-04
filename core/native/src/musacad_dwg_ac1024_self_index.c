@@ -95,6 +95,72 @@ int musa_dwg_ac1024_record_zero_eed_prefix(
     return 1;
 }
 
+/* Original R2010 EED framing only. Reject malformed lengths, non-canonical
+ * application H and unterminated sequences. This reader consumes *only*
+ * EED metadata; it intentionally does not reinterpret raw application
+ * contents, enable no-proxy geometry, or authorize rendering.
+ * Limits prevent CPU/resource abuse on untrusted CRC-correct records. */
+int musa_dwg_ac1024_record_eed_chain_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024EedChainEvidence *out) {
+    if (!objects || !object_bytes || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfPrefix self = {0};
+    if (!musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, indexed_offset, &self) ||
+        self.payload_start_byte >= object_bytes ||
+        self.handle_stream_end_bit / 8u >
+            object_bytes - self.payload_start_byte)
+        return 0;
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + self.payload_start_byte,
+            self.handle_stream_end_bit / 8u,
+            self.data_after_self_bit, self.handle_stream_start_bit))
+        return 0;
+    size_t applications = 0u, bytes_read = 0u;
+    for (;;) {
+        uint16_t data_bytes = 0u;
+        if (!musa_dwg_ac1015_bits_read_bs(&bits, &data_bytes))
+            return 0;
+        if (!data_bytes) break;
+        if (applications >= 64u ||
+            data_bytes > 1048576u - bytes_read)
+            return 0;
+        uint32_t code = 0u, count = 0u, octet = 0u;
+        if (!musa_dwg_ac1015_bits_read_u(&bits, 4u, &code) ||
+            !musa_dwg_ac1015_bits_read_u(&bits, 4u, &count) ||
+            code != 5u || count == 0u || count > 8u)
+            return 0;
+        uint64_t application_handle = 0u;
+        for (uint32_t k = 0u; k < count; ++k) {
+            if (!musa_dwg_ac1015_bits_read_u(&bits, 8u, &octet) ||
+                (k == 0u && octet == 0u))
+                return 0;
+            application_handle =
+                (application_handle << 8u) | (uint64_t)octet;
+        }
+        if (!application_handle ||
+            bits.bit_pos > bits.bit_end ||
+            data_bytes > (bits.bit_end - bits.bit_pos) / 8u)
+            return 0;
+        bits.bit_pos += (size_t)data_bytes * 8u;
+        bytes_read += (size_t)data_bytes;
+        ++applications;
+    }
+    const MusaDwgAc1024EedChainEvidence next = {
+        self.indexed_object_offset, self.embedded_absolute_handle,
+        self.payload_start_byte, bits.bit_pos,
+        self.handle_stream_start_bit, self.handle_stream_end_bit,
+        applications, bytes_read, self.raw_ot,
+        self.frame_crc16_verified, 1u
+    };
+    *out = next;
+    return 1;
+}
+
 /* Third bounded common DATA field: graphic-present bit, admitted only
  * as 0 after a verified zero-length EED. No payload skipping or scene. */
 int musa_dwg_ac1024_record_no_proxy_prefix(
