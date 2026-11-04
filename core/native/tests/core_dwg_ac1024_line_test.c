@@ -150,7 +150,6 @@ int main(void) {
      * must refuse it without changing previously authenticated outputs.
      * Each case keeps the *same* LINE OT, self-H and valid frame CRC. */
     const struct { unsigned bit; unsigned width; unsigned value; } policy[] = {
-        {29u, 2u, 1u}, /* implicit entity owner mode is not yet supported */
         {33u, 1u, 0u}  /* XDictionary exists; do not invent its reference */
     };
     for (size_t k = 0u; k < sizeof(policy) / sizeof(policy[0]); k++) {
@@ -194,6 +193,46 @@ int main(void) {
         memcmp(&old_common, &common, sizeof(common)) ||
         memcmp(&old_line, &line, sizeof(line)))
         return 16;
+    /* DATA bit stream is identical for valid R2010 mode 1 (paper space)
+     * and mode 2 (model space). No explicit owner H is serialized in those
+     * modes. Decode only coordinates: no layer, ownership or scene claim. */
+    for (unsigned mode = 1u; mode <= 2u; ++mode) {
+        memcpy(record, saved, sizeof(saved));
+        set_bits(record + 3u, 29u, 2u, mode);
+        uint8_t unchanged[sizeof(saved)];
+        MusaDwgAc1024EntityMetaPrefix implicit_meta = {0};
+        if (!seal(record)) return 17;
+        memcpy(unchanged, record, sizeof(unchanged));
+        if (!musa_dwg_ac1024_record_entity_meta_prefix(
+                record, sizeof(saved), 0u, &implicit_meta) ||
+            implicit_meta.entity_mode != mode ||
+            implicit_meta.embedded_absolute_handle != 44u ||
+            !musa_dwg_ac1024_line_common_probe(
+                record, sizeof(saved), 0u, &common) ||
+            !musa_dwg_ac1024_line_fields_probe(
+                record, sizeof(saved), 0u, &line) ||
+            !common.record_crc_verified ||
+            line.indexed_handle != 44u ||
+            line.geometry_start_bit != 73u ||
+            line.geometry_end_bit != 208u ||
+            line.start[0] != 1.5 || line.end[0] != 1.5 ||
+            line.start[1] != -2.0 || line.end[1] != -2.0 ||
+            line.start[2] != 0.0 || line.end[2] != 0.0 ||
+            memcmp(unchanged, record, sizeof(unchanged)))
+            return 18 + (int)mode;
+    }
+    /* The reserved mode 3 must remain refused even with a valid CRC. */
+    memcpy(record, saved, sizeof(saved));
+    set_bits(record + 3u, 29u, 2u, 3u);
+    MusaDwgAc1024EntityMetaPrefix reserved = {0};
+    if (!seal(record)) return 21;
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, sizeof(saved), 0u, &reserved) ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        musa_dwg_ac1024_line_fields_probe(
+            record, sizeof(saved), 0u, &line))
+        return 22;
     memcpy(record, saved, sizeof(saved));
 
     /* Full XYZ 3D fixture: three genuinely different endpoints exercise
