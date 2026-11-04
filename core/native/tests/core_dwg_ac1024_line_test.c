@@ -844,6 +844,123 @@ static int test_eed_line_original_graph(void) {
     return 1;
 }
 
+/* EED APPID references must identify original CRC-proven OT67 records,
+ * not merely the numeric EED H5 value. No app-specific EED content
+ * is interpreted and the LINE is never promoted to a drawable scene. */
+static int test_eed_appid_original_records(void) {
+    uint8_t base[37] = {0};
+    uint8_t source[58] = {0};
+    if (!make_line(base) ||
+        !make_graph_target(source, 67u, 42u))
+        return 0;
+    uint8_t *const line = source + 13u;
+    uint8_t *const p = line + 3u;
+    line[0] = 40u;
+    line[2] = 16u;
+    set_bits(p, 2u, 8u, 19u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 48u);
+    set_bits(p, 26u, 2u, 1u); /* BS length 1 */
+    set_bits(p, 28u, 8u, 1u);
+    set_bits(p, 36u, 4u, 5u); /* EED APPID H5 */
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 42u);
+    set_bits(p, 52u, 8u, 0x70u);
+    set_bits(p, 60u, 2u, 2u); /* BS zero */
+    for (size_t bit = 28u; bit < 240u; ++bit) {
+        const uint8_t v = (uint8_t)((base[3u + bit / 8u] >>
+                                   (7u - bit % 8u)) & 1u);
+        set_bits(p, bit + 34u, 1u, v);
+    }
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, line, 43u, &crc))
+        return 0;
+    line[43] = (uint8_t)crc;
+    line[44] = (uint8_t)(crc >> 8u);
+    const uint64_t offsets[2] = {0u, 13u};
+    MusaDwgAc1024SelfIdentity index[2] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 2u, index, 2u))
+        return 0;
+
+    uint8_t pristine[sizeof(source)] = {0};
+    memcpy(pristine, source, sizeof(pristine));
+    MusaDwgAc1024EedAppidEvidence witness = {0};
+    MusaDwgAc1024LineFields xyz = {0};
+    if (!musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u, &witness) ||
+        !musa_dwg_ac1024_line_eed_fields_probe(
+            source, sizeof(source), 13u, &xyz) ||
+        witness.chain.embedded_absolute_handle != 48u ||
+        witness.chain.indexed_object_offset != 13u ||
+        witness.chain.application_count != 1u ||
+        witness.chain.application_data_bytes != 1u ||
+        witness.appid_reference_count != 1u ||
+        witness.distinct_appid_count != 1u ||
+        witness.first_appid_handle != 42u ||
+        witness.first_appid_record_offset != 0u ||
+        !witness.original_appid_records_crc_verified ||
+        xyz.start[0] != 1.5 || xyz.end[1] != -2.0 ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    const MusaDwgAc1024EedAppidEvidence saved = witness;
+
+    /* APPID target CRC corruption must refuse atomically. */
+    source[12] ^= 1u;
+    if (musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u, &witness) ||
+        memcmp(&saved, &witness, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Wrong indexed object type cannot impersonate APPID. */
+    index[0].raw_ot = 51u;
+    if (musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u, &witness) ||
+        memcmp(&saved, &witness, sizeof(saved)))
+        return 0;
+    index[0].raw_ot = 67u;
+
+    /* Correct LINE CRC alone is not enough when H5 is dangling. */
+    set_bits(p, 44u, 8u, 43u);
+    if (!musa_core_crc16_arc(0xc0c1u, line, 43u, &crc))
+        return 0;
+    line[43] = (uint8_t)crc;
+    line[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u, &witness) ||
+        memcmp(&saved, &witness, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* CRC-valid record with invalid H code must be rejected too. */
+    set_bits(p, 36u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, line, 43u, &crc))
+        return 0;
+    line[43] = (uint8_t)crc;
+    line[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u, &witness) ||
+        memcmp(&saved, &witness, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    if (musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 0u, &witness) ||
+        musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u, NULL) ||
+        musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u,
+            (MusaDwgAc1024EedAppidEvidence *)(void *)source) ||
+        musa_dwg_ac1024_line_eed_appid_probe(
+            source, sizeof(source), index, 2u, 48u,
+            (MusaDwgAc1024EedAppidEvidence *)(void *)index) ||
+        memcmp(&saved, &witness, sizeof(saved)) ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -1108,6 +1225,7 @@ int main(void) {
     if (!test_eed_line_xyz_provisional()) return 26;
     if (!test_r2010_tagged_truecolor()) return 31;
     if (!test_eed_line_original_graph()) return 32;
+    if (!test_eed_appid_original_records()) return 34;
     puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
