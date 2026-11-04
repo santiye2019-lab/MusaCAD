@@ -29,3 +29,13 @@ neighboring output sentinels remain unchanged. This checks retry isolation of
 post-decode color resolution, not independent DWG parsing or real-file fidelity.
 No external CAD code or fixtures were introduced. CI results must be checked
 against the exact commit; adding this test alone does not establish a pass.
+
+## Independent INSERT contexts and immutable shared source (fb41f0a, 2026-11-04)
+
+A synthetic 127-record page is resolved twice with different INSERT ACI values.
+Only BYBLOCK records may change; layer-zero BYLAYER and explicit ACI records
+must retain their respective effective colors. The original definition colors,
+raw color sources, and child layer handles are compared byte-for-byte after
+both calls to detect unintended shared-source mutation. This is a post-decode
+unit regression and does not certify authentic AC1032 parsing or rendering.
+No third-party source code or DWG fixture was introduced.
