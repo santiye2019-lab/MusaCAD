@@ -294,6 +294,80 @@ int musa_dwg_ac1024_entity_owner_layer_probe(
     return 1;
 }
 
+
+/* Implicit paper/model-space entities omit the owner H. Their first
+ * applicable handle-stream reference is a layer H: check the original
+ * CRC-backed layer object instead of fabricating a BLOCK_HEADER owner.
+ * Only fixed OT19 and empty EED/reactor/XDictionary subsets are admitted.
+ * All outputs remain unchanged if any lookup or bit boundary fails. */
+int musa_dwg_ac1024_implicit_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024ImplicitLayerEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !entity_handle || !record_count ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity entity = {0}, layer = {0};
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, entity_handle, &entity) ||
+        entity.raw_ot != 19u || !entity.frame_crc16_verified ||
+        !entity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, entity.record_offset, &meta) ||
+        meta.raw_ot != 19u ||
+        meta.embedded_absolute_handle != entity_handle ||
+        !meta.original_crc16_verified ||
+        (meta.entity_mode != 1u && meta.entity_mode != 2u) ||
+        meta.reactor_count != 0u || meta.xdictionary_missing != 1u ||
+        meta.payload_start_byte >= object_bytes ||
+        meta.handle_stream_end_bit / 8u >
+            object_bytes - meta.payload_start_byte)
+        return 0;
+
+    MusaDwgAc1015Bits tail = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &tail, objects + meta.payload_start_byte,
+            meta.handle_stream_end_bit / 8u,
+            meta.handle_stream_start_bit, meta.handle_stream_end_bit))
+        return 0;
+    uint64_t layer_handle = 0u;
+    uint8_t code = 0u;
+    if (!r2010_link_h(&tail, entity_handle, 0, &layer_handle, &code) ||
+        !musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, layer_handle, &layer) ||
+        layer.raw_ot != 51u ||
+        !layer.frame_crc16_verified ||
+        !layer.embedded_handle_code0_verified)
+        return 0;
+
+    MusaDwgAc1024SelfPrefix original_layer = {0};
+    if (!musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, layer.record_offset, &original_layer) ||
+        original_layer.raw_ot != 51u ||
+        original_layer.embedded_absolute_handle != layer_handle ||
+        !original_layer.frame_crc16_verified ||
+        !original_layer.embedded_handle_code0_verified ||
+        tail.bit_pos > tail.bit_end)
+        return 0;
+
+    const MusaDwgAc1024ImplicitLayerEvidence result = {
+        entity_handle, entity.record_offset,
+        layer_handle, layer.record_offset,
+        tail.bit_end - tail.bit_pos,
+        19u, meta.entity_mode, code, 1u, 1u
+    };
+    *out = result;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
