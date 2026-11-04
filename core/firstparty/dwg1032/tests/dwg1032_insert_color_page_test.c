@@ -265,6 +265,51 @@ static void future_page_alias_is_rejected(void) {
         &insert,&layer,definition+future));
     assert(memcmp(saved,definition+future,sizeof(saved))==0);
 }
+/* TrueColor and explicit ACI must survive an INSERT context unchanged;
+ * only layer-zero ByLayer and ByBlock may inherit instance colors. */
+static void truecolor_and_provenance_page(void) {
+    const size_t first=PAGE*5u+1u;
+    const MusaDwg1032ResolvedColor insert={{0u,0x123456u,1u},0u};
+    const MusaDwg1032ResolvedColor layer={{0u,0xabcdefu,1u},0u};
+    MusaDwg1032ResolvedColor output[5], before[5];
+    MusaDwg1032CadColor old_raw[3];
+    MusaDwg1032ResolvedColor old_def[3];
+    uint64_t old_layers[3];
+    memcpy(old_raw,source+first,sizeof(old_raw));
+    memcpy(old_def,definition+first,sizeof(old_def));
+    memcpy(old_layers,child_layers+first,sizeof(old_layers));
+    /* Three distinct semantics: explicit RGB, layer-zero ByLayer, ByBlock. */
+    source[first]=(MusaDwg1032CadColor){0u,0x112233u,1u};
+    definition[first]=(MusaDwg1032ResolvedColor){{0u,0x112233u,1u},0u};
+    source[first+1u]=(MusaDwg1032CadColor){256u,0u,0u};
+    definition[first+1u]=(MusaDwg1032ResolvedColor){{4u,0u,0u},0u};
+    child_layers[first+1u]=100u;
+    source[first+2u]=(MusaDwg1032CadColor){0u,0u,0u};
+    definition[first+2u]=(MusaDwg1032ResolvedColor){{0u,0u,0u},1u};
+    memset(output,0x5a,sizeof(output));
+    memcpy(before,output,sizeof(before));
+    assert(musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,3u,100u,
+        &insert,&layer,output+1u));
+    assert(output[1].color.has_truecolor==1u &&
+           output[1].color.truecolor_rgb==0x112233u);
+    assert(output[2].color.has_truecolor==1u &&
+           output[2].color.truecolor_rgb==0xabcdefu);
+    assert(output[3].color.has_truecolor==1u &&
+           output[3].color.truecolor_rgb==0x123456u);
+    assert(memcmp(output,before,sizeof(output[0]))==0);
+    assert(memcmp(output+4u,before+4u,sizeof(output[0]))==0);
+    /* A definition contradicting its original RGB must fail atomically. */
+    definition[first].color.truecolor_rgb=0x445566u;
+    memcpy(output,before,sizeof(output));
+    assert(!musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,3u,100u,
+        &insert,&layer,output+1u));
+    assert(memcmp(output,before,sizeof(output))==0);
+    memcpy(source+first,old_raw,sizeof(old_raw));
+    memcpy(definition+first,old_def,sizeof(old_def));
+    memcpy(child_layers+first,old_layers,sizeof(old_layers));
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
@@ -279,5 +324,6 @@ int main(void) {
     failed_page_does_not_poison_other_insert_context();
     independent_insert_contexts_do_not_mutate_source();
     future_page_alias_is_rejected();
+    truecolor_and_provenance_page();
     return 0;
 }
