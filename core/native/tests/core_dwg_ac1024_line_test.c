@@ -67,6 +67,119 @@ static int make_line(uint8_t record[37]) {
     /* bit 240 begins MC-declared HANDLES; field readers must stop there. */
     return seal(record);
 }
+/* Real CRC-backed synthetic graph: LAYER OT51/H32, BLOCK_HEADER OT49/H47
+ * and LINE OT19/H48 in the original handle-index ordering. */
+static int make_graph_target(uint8_t *dst, unsigned type, unsigned h) {
+    memset(dst, 0, 13u);
+    dst[0] = 8u;
+    dst[2] = 16u;
+    uint8_t *const p = dst + 3u;
+    set_bits(p, 2u, 8u, type);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, h);
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, dst, 11u, &crc))
+        return 0;
+    dst[11] = (uint8_t)crc;
+    dst[12] = (uint8_t)(crc >> 8u);
+    return 1;
+}
+
+static int test_authenticated_line_graph(void) {
+    uint8_t source[63] = {0};
+    if (!make_graph_target(source, 51u, 32u) ||
+        !make_graph_target(source + 13u, 49u, 47u) ||
+        !make_line(source + 26u))
+        return 0;
+
+    uint8_t *const entity = source + 26u;
+    uint8_t *const p = entity + 3u;
+    set_bits(p, 18u, 8u, 48u); /* LINE canonical self H */
+    entity[2] = 48u; /* 48-bit H tail begins at bit 208 */
+    set_bits(p, 208u, 4u, 12u); /* owner relative H: H48-1 = H47 */
+    set_bits(p, 212u, 4u, 1u);
+    set_bits(p, 216u, 8u, 1u);
+    set_bits(p, 224u, 4u, 5u); /* absolute layer H32 */
+    set_bits(p, 228u, 4u, 1u);
+    set_bits(p, 232u, 8u, 32u);
+    if (!seal(entity))
+        return 0;
+
+    const uint64_t offsets[3] = {0u, 13u, 26u};
+    MusaDwgAc1024SelfIdentity idx[3] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 3u, idx, 3u))
+        return 0;
+
+    uint8_t source_before[sizeof(source)];
+    memcpy(source_before, source, sizeof(source));
+    MusaDwgAc1024LineGraphEvidence attested = {0};
+    if (!musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, &attested) ||
+        attested.geometry.indexed_handle != 48u ||
+        attested.geometry.start[0] != 1.5 ||
+        attested.geometry.end[0] != 1.5 ||
+        attested.geometry.start[1] != -2.0 ||
+        attested.geometry.end[1] != -2.0 ||
+        attested.geometry.geometry_start_bit != 73u ||
+        attested.geometry.geometry_end_bit != 208u ||
+        attested.owner_layer.entity_raw_ot != 19u ||
+        attested.owner_layer.entity_record_offset != 26u ||
+        attested.owner_layer.owner_handle != 47u ||
+        attested.owner_layer.layer_handle != 32u ||
+        !attested.owner_layer.source_crc_verified ||
+        !attested.owner_layer.target_records_verified ||
+        memcmp(source, source_before, sizeof(source)))
+        return 0;
+
+    const MusaDwgAc1024LineGraphEvidence witness = attested;
+    /* Valid CRC and provisional model-space DATA are NOT owner evidence.
+     * A strict graph join must still refuse mode 2 atomically. */
+    set_bits(p, 29u, 2u, 2u);
+    if (!seal(entity) ||
+        musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, &attested) ||
+        memcmp(&witness, &attested, sizeof(witness)))
+        return 0;
+
+    memcpy(source, source_before, sizeof(source));
+    source[12] ^= 1u; /* CORRUPT original authenticated layer record */
+    if (musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, &attested) ||
+        memcmp(&witness, &attested, sizeof(witness)))
+        return 0;
+
+    memcpy(source, source_before, sizeof(source));
+    entity[36] ^= 1u; /* CORRUPT LINE CRC */
+    if (musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, &attested) ||
+        memcmp(&witness, &attested, sizeof(witness)))
+        return 0;
+
+    memcpy(source, source_before, sizeof(source));
+    idx[1].raw_ot = 19u; /* do not trust mutated owner-index class */
+    if (musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, &attested) ||
+        memcmp(&witness, &attested, sizeof(witness)))
+        return 0;
+    idx[1].raw_ot = 49u;
+
+    if (musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 0u, &attested) ||
+        musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, NULL) ||
+        musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u,
+            (MusaDwgAc1024LineGraphEvidence *)(void *)source) ||
+        musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u,
+            (MusaDwgAc1024LineGraphEvidence *)(void *)idx) ||
+        memcmp(&witness, &attested, sizeof(witness)) ||
+        memcmp(source, source_before, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -287,6 +400,7 @@ int main(void) {
             record3d, sizeof(record3d), 0u, &line3d) ||
         memcmp(&line3d, &prior3d, sizeof(line3d))) return 11;
 
-    puts("AC1024 LINE common/XYZ synthetic checks: pass; real-DWG parity unproven");
+    if (!test_authenticated_line_graph()) return 23;
+    puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
