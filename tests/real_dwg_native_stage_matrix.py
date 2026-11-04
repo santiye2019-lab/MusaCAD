@@ -510,6 +510,14 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("incomplete_ac1024_zero_eed_sample")
         elif zero_eed_attempts or zero_eed_verified or zero_eed_refused:
             raise ValueError("unrecovered_ac1024_zero_eed_claim")
+        no_proxy_verified = hint.get("sampled_no_proxy_verified")
+        no_proxy_refused = hint.get("sampled_no_proxy_refused")
+        if (type(no_proxy_verified) is not int or
+                type(no_proxy_refused) is not int or
+                no_proxy_verified < 0 or no_proxy_refused < 0 or
+                no_proxy_verified + no_proxy_refused != zero_eed_attempts or
+                no_proxy_verified > zero_eed_verified):
+            raise ValueError("invalid_ac1024_no_proxy_sample_contract")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
