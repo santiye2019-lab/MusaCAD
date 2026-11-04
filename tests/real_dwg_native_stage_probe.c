@@ -420,6 +420,9 @@ typedef struct MusaAc1024CompatibilityHint {
     /* Provisional DATA-only LINE XYZ in implicit layout space, never owner join. */
     size_t sampled_line_implicit_paper_xyz_verified;
     size_t sampled_line_implicit_model_xyz_verified;
+    /* Same original-index graph+geometry API: no owner fabrication. */
+    size_t sampled_line_graph_attempts;
+    size_t sampled_line_graph_verified, sampled_line_graph_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -1020,9 +1023,35 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             xyz.geometry_end_bit <=
                                                 common.data_end_bit) {
                                             ++hint.sampled_line_xyz_bounded_common;
-                                            if (line_owner_layer_joinable)
+                                            if (line_owner_layer_joinable) {
                                                 ++hint.sampled_line_xyz_owner_layer_joined;
-                                            else if (meta.entity_mode == 1u)
+                                                ++hint.sampled_line_graph_attempts;
+                                                MusaDwgAc1024LineGraphEvidence graph = {0};
+                                                if (musa_dwg_ac1024_line_graph_probe(
+                                                        objects, nb, recovered,
+                                                        legacy_count,
+                                                        recovered[k].embedded_absolute_handle,
+                                                        &graph) &&
+                                                    graph.owner_layer.entity_record_offset ==
+                                                        recovered[k].record_offset &&
+                                                    graph.owner_layer.entity_handle ==
+                                                        recovered[k].embedded_absolute_handle &&
+                                                    graph.geometry.indexed_handle ==
+                                                        xyz.indexed_handle &&
+                                                    graph.geometry.geometry_start_bit ==
+                                                        xyz.geometry_start_bit &&
+                                                    graph.geometry.geometry_end_bit ==
+                                                        xyz.geometry_end_bit &&
+                                                    graph.geometry.start[0] == xyz.start[0] &&
+                                                    graph.geometry.start[1] == xyz.start[1] &&
+                                                    graph.geometry.start[2] == xyz.start[2] &&
+                                                    graph.geometry.end[0] == xyz.end[0] &&
+                                                    graph.geometry.end[1] == xyz.end[1] &&
+                                                    graph.geometry.end[2] == xyz.end[2])
+                                                    ++hint.sampled_line_graph_verified;
+                                                else
+                                                    ++hint.sampled_line_graph_refused;
+                                            } else if (meta.entity_mode == 1u)
                                                 ++hint.sampled_line_implicit_paper_xyz_verified;
                                             else if (meta.entity_mode == 2u)
                                                 ++hint.sampled_line_implicit_model_xyz_verified;
@@ -1457,7 +1486,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_common_xdic_unsupported\":%zu,"
                "\"sampled_line_common_fields_refused\":%zu,"
                "\"sampled_line_implicit_paper_xyz_verified\":%zu,"
-               "\"sampled_line_implicit_model_xyz_verified\":%zu}",
+               "\"sampled_line_implicit_model_xyz_verified\":%zu,"
+               "\"sampled_line_graph_attempts\":%zu,"
+               "\"sampled_line_graph_verified\":%zu,"
+               "\"sampled_line_graph_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1630,7 +1662,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_common_xdic_unsupported,
                hint->sampled_line_common_fields_refused,
                hint->sampled_line_implicit_paper_xyz_verified,
-               hint->sampled_line_implicit_model_xyz_verified);
+               hint->sampled_line_implicit_model_xyz_verified,
+               hint->sampled_line_graph_attempts,
+               hint->sampled_line_graph_verified,
+               hint->sampled_line_graph_refused);
     }
     puts("}");
 }
