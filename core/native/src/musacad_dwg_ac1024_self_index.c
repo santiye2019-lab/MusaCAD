@@ -95,6 +95,40 @@ int musa_dwg_ac1024_record_zero_eed_prefix(
     return 1;
 }
 
+/* Third bounded common DATA field: graphic-present bit, admitted only
+ * as 0 after a verified zero-length EED. No payload skipping or scene. */
+int musa_dwg_ac1024_record_no_proxy_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024NoProxyPrefix *out) {
+    if (!objects || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024ZeroEedPrefix zero = {0};
+    if (!musa_dwg_ac1024_record_zero_eed_prefix(
+            objects, object_bytes, indexed_offset, &zero))
+        return 0;
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + zero.payload_start_byte,
+            zero.handle_stream_end_bit / 8u,
+            zero.data_after_zero_eed_bit,
+            zero.handle_stream_start_bit))
+        return 0;
+    uint32_t graphic_flag = 1u;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &graphic_flag) ||
+        graphic_flag != 0u || bits.bit_pos > zero.handle_stream_start_bit)
+        return 0;
+    const MusaDwgAc1024NoProxyPrefix next = {
+        zero.indexed_object_offset, zero.embedded_absolute_handle,
+        zero.payload_start_byte, bits.bit_pos,
+        zero.handle_stream_start_bit, zero.handle_stream_end_bit,
+        zero.raw_ot, zero.record_crc16_verified,
+        zero.zero_eed_verified, 1u
+    };
+    *out = next;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
