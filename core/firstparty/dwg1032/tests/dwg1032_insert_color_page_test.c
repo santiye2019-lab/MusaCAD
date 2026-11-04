@@ -125,6 +125,22 @@ static void unaligned_page_with_canaries(void) {
     assert(memcmp(guarded+1u,reference+first,
                   PAGE*sizeof(guarded[0]))==0);
 }
+static void unaligned_late_failure_preserves_canaries(void) {
+    const MusaDwg1032ResolvedColor insert={{7u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{3u,0u,0u},0u};
+    MusaDwg1032ResolvedColor guarded[PAGE+2u];
+    MusaDwg1032ResolvedColor untouched[PAGE+2u];
+    const size_t first=PAGE-1u;
+    const size_t bad=first+PAGE-1u;
+    memset(guarded,0x53,sizeof(guarded));
+    memcpy(untouched,guarded,sizeof(guarded));
+    source[bad].has_truecolor=2u;
+    assert(!musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,PAGE,100u,
+        &insert,&layer,guarded+1u));
+    assert(memcmp(guarded,untouched,sizeof(guarded))==0);
+    source[bad].has_truecolor=0u;
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
@@ -132,5 +148,6 @@ int main(void) {
     late_failure_and_full_source_alias();
     last_record_singleton_page();
     unaligned_page_with_canaries();
+    unaligned_late_failure_preserves_canaries();
     return 0;
 }
