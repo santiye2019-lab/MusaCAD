@@ -67,6 +67,29 @@ int musa_dwg_ac1024_record_zero_eed_prefix(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024ZeroEedPrefix *out);
 
+/* After CRC-verified self H and zero-length EED, the published common
+ * format has a single graphic-present flag. This narrow witness ONLY
+ * accepts flag=0 and returns the next exact DATA bit position. A flag=1
+ * means unsupported proxy graphics and is never silently skipped.
+ * This does not decode the remaining common entity header, object
+ * geometry or any owner/layer handle reference. */
+typedef struct MusaDwgAc1024NoProxyPrefix {
+    uint64_t indexed_object_offset;
+    uint64_t embedded_absolute_handle;
+    size_t payload_start_byte;
+    size_t data_after_no_proxy_flag_bit;
+    size_t handle_stream_start_bit;
+    size_t handle_stream_end_bit;
+    uint16_t raw_ot;
+    uint8_t frame_crc16_verified;
+    uint8_t zero_eed_verified;
+    uint8_t no_proxy_graphic_verified;
+} MusaDwgAc1024NoProxyPrefix;
+
+int musa_dwg_ac1024_record_no_proxy_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024NoProxyPrefix *out);
+
 /* All-or-nothing read-only reconciliation of independently authenticated
  * AcDb:Handles RECORD OFFSETS with CRC-verified R2010 object self-H.
  *
