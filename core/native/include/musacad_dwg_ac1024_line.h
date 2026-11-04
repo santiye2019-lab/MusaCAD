@@ -10,7 +10,11 @@ extern "C" {
 #endif
 
 /* Evidence-only common DATA fields for an original CRC-verified AC1024
- * fixed OT19 LINE: owner-mode 0, zero EED/reactors, no proxy/XDictionary.
+ * fixed OT19 LINE: entity mode 0 (explicit owner), 1 (paper space),
+ * or 2 (model space), with zero EED/reactors and no proxy/XDictionary.
+ * Modes 1/2 lack a serialized owner H; parsing their DATA NEVER proves
+ * a block owner, authenticated layer, visibility or drawing readiness.
+ * Check the verified metadata prefix for mode; no owner is synthesized.
  * The R2013+ DS bit MUST NOT be consumed from an R2010 record.
  * Bit offsets refer to the record payload, never to the source file.
  * This is not layer/color inheritance, Android paint, or normal-open proof.
@@ -60,6 +64,9 @@ typedef struct MusaDwgAc1024LineFields {
  * common-data boundary is authenticated from the same CRC-checked record.
  * It does not prove display, measurement, owner/layer semantics or parity
  * with the source drawing; those require independent real-DWG tests.
+ * When entity mode is 1/2, returned coordinates are provisional only:
+ * there is no explicit owner handle and a layer/block/scene join is required
+ * before painting anything.
  */
 int musa_dwg_ac1024_line_fields_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
