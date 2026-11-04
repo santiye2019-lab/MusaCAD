@@ -176,6 +176,11 @@ def ac1024_probe_record():
             "sampled_owner_layer_attempts": 0,
             "sampled_owner_layer_verified": 0,
             "sampled_owner_layer_refused": 0,
+            "sampled_line_attempts": 0,
+            "sampled_line_common_verified": 0,
+            "sampled_line_common_refused": 0,
+            "sampled_line_xyz_verified": 0,
+            "sampled_line_xyz_refused": 0,
         }
     }
 
@@ -268,6 +273,38 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_owner_layer_attempts",
             "sampled_owner_layer_verified",
             "sampled_owner_layer_refused",
+        ):
+            with self.subTest(missing=missing):
+                invalid = deepcopy(original)
+                del invalid["ac1024_compatibility_hypothesis"][missing]
+                with self.assertRaises(ValueError):
+                    validate_fake_result(invalid)
+
+    def test_real_line_sample_counts_require_verified_record_provenance(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for field, value in (
+            ("sampled_line_attempts", 1),
+            ("sampled_line_common_verified", 1),
+            ("sampled_line_common_refused", 1),
+            ("sampled_line_xyz_verified", 1),
+            ("sampled_line_xyz_refused", 1),
+            ("sampled_line_attempts", 2049),
+            ("sampled_line_attempts", True),
+            ("sampled_line_common_verified", -1),
+            ("sampled_line_xyz_refused", "0"),
+        ):
+            with self.subTest(field=field, value=value):
+                invalid = deepcopy(original)
+                invalid["ac1024_compatibility_hypothesis"][field] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(invalid)
+        for missing in (
+            "sampled_line_attempts",
+            "sampled_line_common_verified",
+            "sampled_line_common_refused",
+            "sampled_line_xyz_verified",
+            "sampled_line_xyz_refused",
         ):
             with self.subTest(missing=missing):
                 invalid = deepcopy(original)
