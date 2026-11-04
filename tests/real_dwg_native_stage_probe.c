@@ -434,6 +434,13 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_join_explicit_owner;
     size_t sampled_line_eed_join_implicit_layer;
     size_t sampled_line_eed_join_xdictionary;
+    /* Independent CRC/authenticated APPID OT67 target references from
+     * the original EED frames; never an application-semantics claim. */
+    size_t sampled_line_eed_appid_attempts;
+    size_t sampled_line_eed_appid_verified;
+    size_t sampled_line_eed_appid_refused;
+    size_t sampled_line_eed_appid_references_verified;
+    size_t sampled_line_eed_appid_distinct_references_verified;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1106,6 +1113,30 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                             eed_xyz.geometry_end_bit >
                                                                 eed_xyz.geometry_start_bit) {
                                                             ++hint.sampled_line_eed_xyz_verified;
+                                                            ++hint.sampled_line_eed_appid_attempts;
+                                                            MusaDwgAc1024EedAppidEvidence appids = {0};
+                                                            if (musa_dwg_ac1024_line_eed_appid_probe(
+                                                                    objects, nb, recovered, legacy_count,
+                                                                    recovered[k].embedded_absolute_handle,
+                                                                    &appids) &&
+                                                                appids.chain.indexed_object_offset ==
+                                                                    recovered[k].record_offset &&
+                                                                appids.chain.embedded_absolute_handle ==
+                                                                    recovered[k].embedded_absolute_handle &&
+                                                                appids.chain.application_count ==
+                                                                    chain.application_count &&
+                                                                appids.appid_reference_count ==
+                                                                    chain.application_count &&
+                                                                appids.distinct_appid_count <=
+                                                                    appids.appid_reference_count &&
+                                                                appids.original_appid_records_crc_verified) {
+                                                                ++hint.sampled_line_eed_appid_verified;
+                                                                hint.sampled_line_eed_appid_references_verified +=
+                                                                    appids.appid_reference_count;
+                                                                hint.sampled_line_eed_appid_distinct_references_verified +=
+                                                                    appids.distinct_appid_count;
+                                                            } else
+                                                                ++hint.sampled_line_eed_appid_refused;
                                                             ++hint.sampled_line_eed_join_attempts;
                                                             MusaDwgAc1024LineEedJoinedEvidence joined = {0};
                                                             if (musa_dwg_ac1024_line_eed_verified_probe(
@@ -1700,6 +1731,11 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_join_explicit_owner\":%zu,"
                "\"sampled_line_eed_join_implicit_layer\":%zu,"
                "\"sampled_line_eed_join_xdictionary\":%zu,"
+               "\"sampled_line_eed_appid_attempts\":%zu,"
+               "\"sampled_line_eed_appid_verified\":%zu,"
+               "\"sampled_line_eed_appid_refused\":%zu,"
+               "\"sampled_line_eed_appid_references_verified\":%zu,"
+               "\"sampled_line_eed_appid_distinct_references_verified\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -1910,6 +1946,11 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_join_explicit_owner,
                hint->sampled_line_eed_join_implicit_layer,
                hint->sampled_line_eed_join_xdictionary,
+               hint->sampled_line_eed_appid_attempts,
+               hint->sampled_line_eed_appid_verified,
+               hint->sampled_line_eed_appid_refused,
+               hint->sampled_line_eed_appid_references_verified,
+               hint->sampled_line_eed_appid_distinct_references_verified,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
