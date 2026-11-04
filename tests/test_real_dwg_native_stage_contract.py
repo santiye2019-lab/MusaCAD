@@ -165,6 +165,9 @@ def ac1024_probe_record():
             "core_embedded_h_recovery_succeeded": False,
             "core_embedded_h_recovery_records": 0,
             "core_embedded_h_recovery_original_index_matches": 0,
+            "sampled_zero_eed_attempts": 0,
+            "sampled_zero_eed_verified": 0,
+            "sampled_zero_eed_refused": 0,
         }
     }
 
@@ -184,6 +187,23 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_zero_eed_evidence_is_bounded_and_never_geometry(self):
+        record = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(record), record)
+        for field, value in (
+            ("sampled_zero_eed_attempts", 1),
+            ("sampled_zero_eed_verified", 1),
+            ("sampled_zero_eed_refused", 1),
+            ("sampled_zero_eed_attempts", 2049),
+            ("sampled_zero_eed_attempts", True),
+            ("sampled_zero_eed_verified", -1),
+        ):
+            with self.subTest(field=field, value=value):
+                invalid = deepcopy(record)
+                invalid["ac1024_compatibility_hypothesis"][field] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(invalid)
+
     def test_candidate_handles_do_not_prove_entities(self):
         record = ac1024_probe_record()
         self.assertEqual(validate_fake_result(record), record)
