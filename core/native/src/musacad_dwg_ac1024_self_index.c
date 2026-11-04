@@ -178,25 +178,48 @@ int musa_dwg_ac1024_record_entity_meta_prefix(
     return 1;
 }
 
-/* Narrow first-party R2010 H decoder from the documented 4+4+N*8
- * wire grammar. Not a copy or adapter of the legacy GPL decoder. */
+/* Original R2010 H reference grammar, 4-bit code + 4-bit byte count.
+ * Absolute owner/layer references retain the explicit role-specific 4/5
+ * code gate. The published relative soft-pointer forms 6/8/A/C resolve
+ * against the authenticated embedded self-H and still must resolve to an
+ * independently CRC-authenticated OT49 owner or OT51 layer record.
+ * Codes 6/8 have ZERO payload bytes; A/C carry a canonical positive
+ * offset. No global handle decoder, GPL import or scene acceptance. */
 static int r2010_link_h(MusaDwgAc1015Bits *bits, uint64_t self,
                          int owner, uint64_t *target, uint8_t *code_out) {
     MusaDwgAc1015Bits cur = *bits;
     uint32_t code = 0u, count = 0u, byte = 0u;
     if (!musa_dwg_ac1015_bits_read_u(&cur, 4u, &code) ||
-        !musa_dwg_ac1015_bits_read_u(&cur, 4u, &count) ||
-        !(owner ? (code == 4u || code == 12u) : code == 5u) ||
-        count == 0u || count > 8u) return 0;
+        !musa_dwg_ac1015_bits_read_u(&cur, 4u, &count))
+        return 0;
+    const int implicit = code == 6u || code == 8u;
+    const int relative = implicit || code == 10u || code == 12u;
+    if (!(relative || (owner ? code == 4u : code == 5u)) ||
+        (implicit ? count != 0u : (count == 0u || count > 8u)))
+        return 0;
     uint64_t value = 0u;
     for (uint32_t i = 0u; i < count; ++i) {
         if (!musa_dwg_ac1015_bits_read_u(&cur, 8u, &byte) ||
             (i == 0u && byte == 0u)) return 0;
-        value = (value << 8u) | byte;
+        value = (value << 8u) | (uint64_t)byte;
     }
-    if (value == 0u || (code == 12u && value >= self)) return 0;
-    const uint64_t resolved = code == 12u ? self - value : value;
-    if (resolved == self || resolved == 0u) return 0;
+    uint64_t resolved = 0u;
+    if (code == 6u) {
+        if (self == UINT64_MAX) return 0;
+        resolved = self + 1u;
+    } else if (code == 8u) {
+        if (self <= 1u) return 0;
+        resolved = self - 1u;
+    } else if (code == 10u) {
+        if (!value || value > UINT64_MAX - self) return 0;
+        resolved = self + value;
+    } else if (code == 12u) {
+        if (!value || value >= self) return 0;
+        resolved = self - value;
+    } else {
+        resolved = value;
+    }
+    if (!resolved || resolved == self) return 0;
     *bits = cur; *target = resolved; *code_out = (uint8_t)code;
     return 1;
 }
