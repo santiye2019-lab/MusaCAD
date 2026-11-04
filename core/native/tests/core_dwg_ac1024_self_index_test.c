@@ -360,7 +360,73 @@ static int test_entity_meta_subset(void) {
     return 1;
 }
 
+/* A lookup may use ONLY an unmodified, previously recovered index.
+ * Synthetic values test search boundaries; they do not authenticate DWG. */
+static int test_verified_self_index_find(void) {
+    MusaDwgAc1024SelfIdentity items[5] = {
+        {1u, 0u, 19u, 1u, 1u},
+        {5u, 13u, 17u, 1u, 1u},
+        {8u, 26u, 18u, 1u, 1u},
+        {256u, 39u, 7u, 1u, 1u},
+        {5000u, 52u, 19u, 1u, 1u}
+    };
+    MusaDwgAc1024SelfIdentity result = {0};
+    for (size_t i = 0u; i < 5u; i++) {
+        if (!musa_dwg_ac1024_self_index_find(
+                items, 5u, items[i].embedded_absolute_handle, &result) ||
+            result.embedded_absolute_handle !=
+                items[i].embedded_absolute_handle ||
+            result.record_offset != items[i].record_offset ||
+            result.raw_ot != items[i].raw_ot ||
+            !result.frame_crc16_verified ||
+            !result.embedded_handle_code0_verified)
+            return 0;
+    }
+    const MusaDwgAc1024SelfIdentity saved = result;
+    const uint64_t absent[] = {0u, 2u, 7u, 9u, 255u, 257u, 5001u, UINT64_MAX};
+    for (size_t i = 0u; i < sizeof(absent) / sizeof(absent[0]); i++) {
+        if (musa_dwg_ac1024_self_index_find(
+                items, 5u, absent[i], &result) ||
+            memcmp(&saved, &result, sizeof(result)))
+            return 0;
+    }
+    if (musa_dwg_ac1024_self_index_find(
+            NULL, 5u, 5u, &result) ||
+        musa_dwg_ac1024_self_index_find(
+            items, 0u, 5u, &result) ||
+        musa_dwg_ac1024_self_index_find(
+            items, SIZE_MAX, 5u, &result) ||
+        musa_dwg_ac1024_self_index_find(
+            items, 5u, 5u, NULL) ||
+        musa_dwg_ac1024_self_index_find(
+            items, 5u, 5u, &items[1]) ||
+        memcmp(&saved, &result, sizeof(result)))
+        return 0;
+
+    items[2].frame_crc16_verified = 0u;
+    if (musa_dwg_ac1024_self_index_find(items, 5u, 8u, &result) ||
+        musa_dwg_ac1024_self_index_find(items, 5u, 5u, &result))
+        return 0;
+    items[2].frame_crc16_verified = 1u;
+    items[2].embedded_handle_code0_verified = 0u;
+    if (musa_dwg_ac1024_self_index_find(items, 5u, 8u, &result))
+        return 0;
+    items[2].embedded_handle_code0_verified = 1u;
+
+    /* Neighbor duplicate/order violations are not accepted as evidence. */
+    items[1].embedded_absolute_handle = 8u;
+    if (musa_dwg_ac1024_self_index_find(items, 5u, 8u, &result))
+        return 0;
+    items[1].embedded_absolute_handle = 5u;
+    items[3].embedded_absolute_handle = 8u;
+    if (musa_dwg_ac1024_self_index_find(items, 5u, 8u, &result))
+        return 0;
+    items[3].embedded_absolute_handle = 256u;
+    return memcmp(&saved, &result, sizeof(result)) == 0;
+}
+
 int main(void) {
+    if (!test_verified_self_index_find()) return 10;
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
     if (!test_no_proxy_subset()) return 8;
