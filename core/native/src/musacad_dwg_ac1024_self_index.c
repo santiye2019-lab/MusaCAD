@@ -186,7 +186,8 @@ int musa_dwg_ac1024_record_entity_meta_prefix(
  * Codes 6/8 have ZERO payload bytes; A/C carry a canonical positive
  * offset. No global handle decoder, GPL import or scene acceptance. */
 static int r2010_link_h(MusaDwgAc1015Bits *bits, uint64_t self,
-                         int owner, uint64_t *target, uint8_t *code_out) {
+                         uint32_t absolute_code, uint64_t *target,
+                         uint8_t *code_out) {
     MusaDwgAc1015Bits cur = *bits;
     uint32_t code = 0u, count = 0u, byte = 0u;
     if (!musa_dwg_ac1015_bits_read_u(&cur, 4u, &code) ||
@@ -194,7 +195,7 @@ static int r2010_link_h(MusaDwgAc1015Bits *bits, uint64_t self,
         return 0;
     const int implicit = code == 6u || code == 8u;
     const int relative = implicit || code == 10u || code == 12u;
-    if (!(relative || (owner ? code == 4u : code == 5u)) ||
+    if (!(relative || code == absolute_code) ||
         (implicit ? count != 0u : (count == 0u || count > 8u)))
         return 0;
     uint64_t value = 0u;
@@ -263,8 +264,8 @@ int musa_dwg_ac1024_entity_owner_layer_probe(
         return 0;
     uint64_t owner_h = 0u, layer_h = 0u;
     uint8_t owner_code = 0u, layer_code = 0u;
-    if (!r2010_link_h(&tail, entity_handle, 1, &owner_h, &owner_code) ||
-        !r2010_link_h(&tail, entity_handle, 0, &layer_h, &layer_code) ||
+    if (!r2010_link_h(&tail, entity_handle, 4u, &owner_h, &owner_code) ||
+        !r2010_link_h(&tail, entity_handle, 5u, &layer_h, &layer_code) ||
         owner_h == layer_h ||
         !musa_dwg_ac1024_self_index_find(
             recovered_index, record_count, owner_h, &owner) ||
@@ -340,7 +341,7 @@ int musa_dwg_ac1024_implicit_layer_probe(
         return 0;
     uint64_t layer_handle = 0u;
     uint8_t code = 0u;
-    if (!r2010_link_h(&tail, entity_handle, 0, &layer_handle, &code) ||
+    if (!r2010_link_h(&tail, entity_handle, 5u, &layer_handle, &code) ||
         !musa_dwg_ac1024_self_index_find(
             recovered_index, record_count, layer_handle, &layer) ||
         layer.raw_ot != 51u ||
