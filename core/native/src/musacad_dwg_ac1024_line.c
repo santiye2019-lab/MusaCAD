@@ -17,10 +17,12 @@ static int overlap(const void *a, size_t an, const void *b, size_t bn) {
 
 static int musa_line_common_probe_impl(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
-    MusaDwgAc1024LineCommon *out, int has_eed) {
+    MusaDwgAc1024LineCommon *out, int has_eed, uint8_t *stage) {
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_ARGUMENT;
     if (!objects || !out || !object_bytes ||
         overlap(objects, object_bytes, out, sizeof(*out))) return 0;
 
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_META;
     MusaDwgAc1024EntityMetaPrefix meta = {0};
     if (!(has_eed ?
           musa_dwg_ac1024_record_line_eed_meta_prefix(
@@ -45,6 +47,7 @@ static int musa_line_common_probe_impl(
         meta.data_after_xdic_bit >= meta.handle_stream_start_bit)
         return 0;
 
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_STREAM;
     MusaDwgAc1015Bits b = {0};
     if (!musa_dwg_ac1015_bits_init(
             &b, objects + meta.payload_start_byte,
@@ -54,18 +57,21 @@ static int musa_line_common_probe_impl(
     MusaDwgAc1024LineCommon next = {0};
     next.indexed_handle = meta.embedded_absolute_handle;
     next.data_end_bit = meta.handle_stream_start_bit;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_COLOR;
     if (!musa_dwg_ac1015_bits_read_bs(&b, &next.encoded_color))
         return 0;
     const uint16_t flags = (uint16_t)(next.encoded_color & 0xe000u);
     next.color_index = (uint16_t)(next.encoded_color & 0x1fffu);
     if ((flags & 0x4000u) && !(flags & 0x8000u)) return 0;
     if (flags & 0x8000u) {
+        if (stage) *stage = MUSA_DWG_LINE_COMMON_RGB;
         if (!musa_dwg_ac1015_bits_read_bl(&b, &next.rgb) ||
             next.rgb > 0x00ffffffu) return 0;
         next.has_rgb = 1u;
         next.has_color_reference = (uint8_t)((flags & 0x4000u) != 0u);
     } else if (next.color_index > 256u) return 0;
     if (flags & 0x2000u) {
+        if (stage) *stage = MUSA_DWG_LINE_COMMON_TRANSPARENCY;
         if (!musa_dwg_ac1015_bits_read_bl(&b, &next.transparency))
             return 0;
         const uint32_t mode = (next.transparency >> 24u) & 0xffu;
@@ -75,9 +81,12 @@ static int musa_line_common_probe_impl(
     uint32_t ltype = 0u, plot = 0u, material = 0u;
     uint32_t shadow = 0u, full = 0u, face = 0u, edge = 0u;
     uint32_t weight = 0u;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_LTYPE_SCALE;
     if (!musa_dwg_ac1015_bits_read_bd(&b, &next.linetype_scale) ||
-        !isfinite(next.linetype_scale) || next.linetype_scale <= 0.0 ||
-        !musa_dwg_ac1015_bits_read_u(&b, 2u, &ltype) ||
+        !isfinite(next.linetype_scale) || next.linetype_scale <= 0.0)
+        return 0;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_APPEARANCE;
+    if (!musa_dwg_ac1015_bits_read_u(&b, 2u, &ltype) ||
         !musa_dwg_ac1015_bits_read_u(&b, 2u, &plot) ||
         !musa_dwg_ac1015_bits_read_u(&b, 2u, &material) ||
         !musa_dwg_ac1015_bits_read_u(&b, 8u, &shadow) ||
@@ -85,8 +94,9 @@ static int musa_line_common_probe_impl(
         !musa_dwg_ac1015_bits_read_u(&b, 1u, &face) ||
         !musa_dwg_ac1015_bits_read_u(&b, 1u, &edge) ||
         !musa_dwg_ac1015_bits_read_bs(&b, &next.invisibility) ||
-        !musa_dwg_ac1015_bits_read_u(&b, 8u, &weight) ||
-        b.bit_pos >= b.bit_end) return 0;
+        !musa_dwg_ac1015_bits_read_u(&b, 8u, &weight)) return 0;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_GEOMETRY_BOUND;
+    if (b.bit_pos >= b.bit_end) return 0;
     next.linetype_flags = (uint8_t)ltype;
     next.plotstyle_flags = (uint8_t)plot;
     next.material_flags = (uint8_t)material;
@@ -97,6 +107,7 @@ static int musa_line_common_probe_impl(
     next.geometry_start_bit = b.bit_pos;
     next.record_crc_verified = 1u;
     *out = next;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_OK;
     return 1;
 }
 
@@ -104,7 +115,17 @@ int musa_dwg_ac1024_line_common_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024LineCommon *out) {
     return musa_line_common_probe_impl(
-        objects, object_bytes, indexed_offset, out, 0);
+        objects, object_bytes, indexed_offset, out, 0, NULL);
+}
+
+/* The same strict reader produces a bounded stage code, never scene data. */
+uint8_t musa_dwg_ac1024_line_common_failure_stage(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset) {
+    MusaDwgAc1024LineCommon ignored = {0};
+    uint8_t stage = MUSA_DWG_LINE_COMMON_ARGUMENT;
+    (void)musa_line_common_probe_impl(
+        objects, object_bytes, indexed_offset, &ignored, 0, &stage);
+    return stage;
 }
 
 static int musa_line_fields_probe_impl(
@@ -121,7 +142,7 @@ static int musa_line_fields_probe_impl(
           musa_dwg_ac1024_record_entity_meta_prefix(
               objects, object_bytes, indexed_offset, &meta)) ||
         !musa_line_common_probe_impl(
-            objects, object_bytes, indexed_offset, &common, has_eed) ||
+            objects, object_bytes, indexed_offset, &common, has_eed, NULL) ||
         common.indexed_handle != meta.embedded_absolute_handle ||
         !common.record_crc_verified ||
         common.geometry_start_bit >= common.data_end_bit ||
