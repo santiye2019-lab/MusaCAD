@@ -67,6 +67,35 @@ int musa_dwg_ac1024_record_zero_eed_prefix(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024ZeroEedPrefix *out);
 
+/* Bounded original R2010 extended entity data (EED) frame proof:
+ * BS application-data byte length, H5 application ID, opaque raw bytes,
+ * repeated until an explicit zero-length BS terminator. The application
+ * bytes are NOT interpreted, and no app semantics, geometry, owner,
+ * layer, proxy graphic or drawing is certified.
+ *
+ * This separate read-only gate does not change the original zero-EED
+ * APIs or admit EED-bearing entities to existing LINE/scene readers.
+ * Returns an exact payload-relative bit cursor after the terminator,
+ * all-or-nothing and never writes to the source or caller on failure.
+ */
+typedef struct MusaDwgAc1024EedChainEvidence {
+    uint64_t indexed_object_offset;
+    uint64_t embedded_absolute_handle;
+    size_t payload_start_byte;
+    size_t data_after_eed_bit;
+    size_t handle_stream_start_bit;
+    size_t handle_stream_end_bit;
+    size_t application_count;
+    size_t application_data_bytes;
+    uint16_t raw_ot;
+    uint8_t original_crc16_verified;
+    uint8_t eed_boundaries_verified;
+} MusaDwgAc1024EedChainEvidence;
+
+int musa_dwg_ac1024_record_eed_chain_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024EedChainEvidence *out);
+
 /* After CRC-verified self H and zero-length EED, the published common
  * format has a single graphic-present flag. This narrow witness ONLY
  * accepts flag=0 and returns the next exact DATA bit position. A flag=1
