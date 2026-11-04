@@ -244,6 +244,62 @@ int musa_dwg_ac1024_record_entity_meta_prefix(
     return 1;
 }
 
+/* Strictly DATA-only: an original nonzero R2010 EED chain can be
+ * authenticated without assigning any meaning to its application bytes.
+ * Skip only validated BS/H5/opaque-data frames and require the next common
+ * entity header to be bounded. No owner, LAYER or scene witness is issued. */
+int musa_dwg_ac1024_record_line_eed_meta_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024EntityMetaPrefix *out) {
+    if (!objects || !object_bytes || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024EedChainEvidence chain = {0};
+    if (!musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, indexed_offset, &chain) ||
+        chain.raw_ot != 19u || !chain.application_count ||
+        !chain.original_crc16_verified ||
+        !chain.eed_boundaries_verified ||
+        chain.payload_start_byte >= object_bytes ||
+        chain.handle_stream_end_bit / 8u >
+            object_bytes - chain.payload_start_byte ||
+        chain.data_after_eed_bit >= chain.handle_stream_start_bit)
+        return 0;
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + chain.payload_start_byte,
+            chain.handle_stream_end_bit / 8u,
+            chain.data_after_eed_bit, chain.handle_stream_start_bit))
+        return 0;
+
+    uint32_t graphic_flag = 1u, mode = 3u;
+    uint32_t reactors = UINT32_MAX, xdic_missing = 2u;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &graphic_flag) ||
+        graphic_flag != 0u ||
+        !musa_dwg_ac1015_bits_read_u(&bits, 2u, &mode) ||
+        mode == 3u)
+        return 0;
+    const size_t after_mode = bits.bit_pos;
+    if (!musa_dwg_ac1015_bits_read_bl(&bits, &reactors) ||
+        reactors > 1024u)
+        return 0;
+    const size_t after_reactors = bits.bit_pos;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &xdic_missing) ||
+        bits.bit_pos >= chain.handle_stream_start_bit)
+        return 0;
+
+    const MusaDwgAc1024EntityMetaPrefix result = {
+        indexed_offset, chain.embedded_absolute_handle,
+        chain.payload_start_byte, after_mode, after_reactors,
+        bits.bit_pos, chain.handle_stream_start_bit,
+        chain.handle_stream_end_bit, reactors, 19u,
+        (uint8_t)mode, (uint8_t)xdic_missing, 1u
+    };
+    *out = result;
+    return 1;
+}
+
 /* Original R2010 H reference grammar, 4-bit code + 4-bit byte count.
  * Absolute owner/layer references retain the explicit role-specific 4/5
  * code gate. The published relative soft-pointer forms 6/8/A/C resolve
