@@ -68,6 +68,15 @@ jobs:
             -o /tmp/musacad-ac1024-core-record-test
           /tmp/musacad-ac1024-core-record-test
 
+      - name: Verify C11 AC1024 full recovered self-H index and atomic failures
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include core/native/tests/core_dwg_ac1024_self_index_test.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-self-index-test
+          /tmp/musacad-ac1024-self-index-test
+
       - name: Verify synthetic R2010 MC frame and CRC failure cases
         run: |
           set -euo pipefail
