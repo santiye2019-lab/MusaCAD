@@ -202,3 +202,62 @@ int musa_dwg_ac1024_line_graph_probe(
     *out = next;
     return 1;
 }
+
+/* R2010 mode 1/2 lack an explicit owner H. Verify the original
+ * model/paper-space LINE geometry and independently authenticated OT51
+ * layer from the exact same recovered self-H index. Do NOT accept any
+ * implied owner/layout and never emit scene geometry here. */
+int musa_dwg_ac1024_line_implicit_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024ImplicitLineLayerEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_line_handle || !out ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity identity = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle,
+            &identity) ||
+        identity.raw_ot != 19u ||
+        !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified)
+        return 0;
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024ImplicitLineLayerEvidence next = {0};
+    if (!musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, identity.record_offset, &meta) ||
+        meta.raw_ot != 19u ||
+        (meta.entity_mode != 1u && meta.entity_mode != 2u) ||
+        meta.embedded_absolute_handle != canonical_line_handle ||
+        !meta.original_crc16_verified ||
+        !musa_dwg_ac1024_line_common_probe(
+            objects, object_bytes, identity.record_offset, &common) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            objects, object_bytes, identity.record_offset, &next.geometry) ||
+        !musa_dwg_ac1024_implicit_layer_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &next.implicit_layer) ||
+        !common.record_crc_verified ||
+        common.indexed_handle != canonical_line_handle ||
+        !next.geometry.coordinates_decoded ||
+        next.geometry.indexed_handle != canonical_line_handle ||
+        next.geometry.geometry_start_bit != common.geometry_start_bit ||
+        next.geometry.geometry_end_bit <= common.geometry_start_bit ||
+        next.geometry.geometry_end_bit > common.data_end_bit ||
+        next.implicit_layer.entity_handle != canonical_line_handle ||
+        next.implicit_layer.entity_record_offset != identity.record_offset ||
+        next.implicit_layer.entity_raw_ot != 19u ||
+        next.implicit_layer.entity_mode != meta.entity_mode ||
+        !next.implicit_layer.source_crc_verified ||
+        !next.implicit_layer.layer_crc_verified)
+        return 0;
+    *out = next;
+    return 1;
+}
