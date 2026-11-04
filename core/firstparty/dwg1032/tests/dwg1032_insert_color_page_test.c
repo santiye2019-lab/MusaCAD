@@ -84,10 +84,31 @@ static void late_failure_and_full_source_alias(void) {
         &insert,&layer,guard));
     assert(memcmp(guard,saved,sizeof(guard))==0);
 }
+static void last_record_singleton_page(void) {
+    const MusaDwg1032ResolvedColor insert={{2u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{3u,0u,0u},0u};
+    MusaDwg1032ResolvedColor output[3];
+    MusaDwg1032ResolvedColor before[3];
+    memset(output,0x6d,sizeof(output));
+    memcpy(before,output,sizeof(before));
+    assert(musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,N-1u,1u,100u,
+        &insert,&layer,&output[1]));
+    assert(memcmp(&output[0],&before[0],sizeof(output[0]))==0);
+    assert(memcmp(&output[2],&before[2],sizeof(output[2]))==0);
+    assert(output[1].color.aci==6u);
+    assert(output[1].byblock==0u);
+    memcpy(output,before,sizeof(output));
+    assert(!musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,N-1u,2u,100u,
+        &insert,&layer,&output[1]));
+    assert(memcmp(output,before,sizeof(output))==0);
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
     compare_instance(2u,3u);
     late_failure_and_full_source_alias();
+    last_record_singleton_page();
     return 0;
 }
