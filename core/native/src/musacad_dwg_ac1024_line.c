@@ -26,7 +26,11 @@ int musa_dwg_ac1024_line_common_probe(
             objects, object_bytes, indexed_offset, &meta) ||
         meta.raw_ot != 19u || !meta.embedded_absolute_handle ||
         !meta.original_crc16_verified ||
-        meta.entity_mode != 0u || meta.reactor_count != 0u ||
+        /* R2010 mode 0 has an explicit owner H; modes 1 and 2 are
+         * implicit paper/model space and DO NOT carry an owner reference.
+         * This is DATA-only geometry evidence: owner/layer resolution
+         * remains a distinct verified graph gate before scene admission. */
+        meta.entity_mode > 2u || meta.reactor_count != 0u ||
         meta.xdictionary_missing != 1u ||
         meta.payload_start_byte >= object_bytes ||
         meta.handle_stream_end_bit / 8u >
