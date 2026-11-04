@@ -394,6 +394,8 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_zero_eed_attempts, sampled_zero_eed_verified;
     size_t sampled_zero_eed_refused;
     size_t sampled_no_proxy_verified, sampled_no_proxy_refused;
+    size_t sampled_entity_meta_attempts, sampled_entity_meta_verified;
+    size_t sampled_entity_meta_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -902,6 +904,24 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                     ++hint.sampled_no_proxy_verified;
                                 else
                                     ++hint.sampled_no_proxy_refused;
+                                /* Explicit fixed-type raw OT subset only:
+                                   no class guess, no raw handles, no owner,
+                                   layer, insert coordinate or scene output. */
+                                const uint16_t type = recovered[k].raw_ot;
+                                if (type == 7u || type == 17u ||
+                                    type == 18u || type == 19u) {
+                                    ++hint.sampled_entity_meta_attempts;
+                                    MusaDwgAc1024EntityMetaPrefix meta = {0};
+                                    if (musa_dwg_ac1024_record_entity_meta_prefix(
+                                            objects, nb, recovered[k].record_offset,
+                                            &meta) &&
+                                        meta.embedded_absolute_handle ==
+                                            recovered[k].embedded_absolute_handle &&
+                                        meta.raw_ot == type)
+                                        ++hint.sampled_entity_meta_verified;
+                                    else
+                                        ++hint.sampled_entity_meta_refused;
+                                }
                             }
                         }
                     }
@@ -1299,7 +1319,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_zero_eed_verified\":%zu,"
                "\"sampled_zero_eed_refused\":%zu,"
                "\"sampled_no_proxy_verified\":%zu,"
-               "\"sampled_no_proxy_refused\":%zu}",
+               "\"sampled_no_proxy_refused\":%zu,"
+               "\"sampled_entity_meta_attempts\":%zu,"
+               "\"sampled_entity_meta_verified\":%zu,"
+               "\"sampled_entity_meta_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1449,7 +1472,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_zero_eed_verified,
                hint->sampled_zero_eed_refused,
                hint->sampled_no_proxy_verified,
-               hint->sampled_no_proxy_refused);
+               hint->sampled_no_proxy_refused,
+               hint->sampled_entity_meta_attempts,
+               hint->sampled_entity_meta_verified,
+               hint->sampled_entity_meta_refused);
     }
     puts("}");
 }
