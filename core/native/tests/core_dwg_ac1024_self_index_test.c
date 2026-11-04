@@ -425,7 +425,86 @@ static int test_verified_self_index_find(void) {
     return memcmp(&saved, &result, sizeof(result)) == 0;
 }
 
+/* Verify canonical H -> original owner OT49 / layer OT51, not a visual
+ * scene. Both target records are real CRC-backed synthetic frames. */
+static int test_owner_layer_bridge(void) {
+    _Alignas(MusaDwgAc1024OwnerLayerEvidence) uint8_t src[47] = {0};
+    if (!make_record(src, 32u) || !make_record(src + 13u, 47u))
+        return 0;
+    set_bits(src + 3u, 2u, 8u, 51u);
+    set_bits(src + 16u, 2u, 8u, 49u);
+    uint16_t crc = 0u;
+    for (size_t at = 0u; at < 26u; at += 13u) {
+        if (!musa_core_crc16_arc(0xc0c1u, src + at, 11u, &crc))
+            return 0;
+        src[at + 11u] = (uint8_t)crc;
+        src[at + 12u] = (uint8_t)(crc >> 8u);
+    }
+    uint8_t *const line = src + 26u, *const body = line + 3u;
+    line[0] = 16u; line[2] = 48u; /* MS=16 bytes, MC=48 handle bits */
+    set_bits(body, 2u, 8u, 19u); /* LINE */
+    set_bits(body, 14u, 4u, 1u);
+    set_bits(body, 18u, 8u, 48u); /* canonical self H */
+    set_bits(body, 26u, 2u, 2u); /* zero EED */
+    set_bits(body, 31u, 2u, 2u); /* zero reactors */
+    set_bits(body, 33u, 1u, 1u); /* no XDictionary */
+    set_bits(body, 80u, 4u, 12u); set_bits(body, 84u, 4u, 1u);
+    set_bits(body, 88u, 8u, 1u);  /* owner H12 (-1) -> OT49 */
+    set_bits(body, 96u, 4u, 5u); set_bits(body, 100u, 4u, 1u);
+    set_bits(body, 104u, 8u, 32u); /* layer H5 -> OT51 */
+    if (!musa_core_crc16_arc(0xc0c1u, line, 19u, &crc)) return 0;
+    line[19u] = (uint8_t)crc; line[20u] = (uint8_t)(crc >> 8u);
+    uint8_t pristine[47];
+    memcpy(pristine, src, sizeof(src));
+    const uint64_t offsets[3] = {0u, 13u, 26u};
+    MusaDwgAc1024SelfIdentity idx[3] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            src, sizeof(src), offsets, 3u, idx, 3u)) return 0;
+    MusaDwgAc1024OwnerLayerEvidence links = {0};
+    if (!musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 48u, &links) ||
+        links.owner_handle != 47u || links.layer_handle != 32u ||
+        links.owner_record_offset != 13u ||
+        links.layer_record_offset != 0u ||
+        links.entity_record_offset != 26u ||
+        links.entity_raw_ot != 19u ||
+        links.owner_raw_h_code != 12u || links.layer_raw_h_code != 5u ||
+        links.handle_tail_unparsed_bits != 16u ||
+        !links.source_crc_verified || !links.target_records_verified ||
+        memcmp(src, pristine, sizeof(src))) return 0;
+    const MusaDwgAc1024OwnerLayerEvidence saved = links;
+    set_bits(body, 104u, 8u, 33u); /* nonexistent target */
+    if (!musa_core_crc16_arc(0xc0c1u, line, 19u, &crc)) return 0;
+    line[19u] = (uint8_t)crc; line[20u] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 48u, &links) ||
+        memcmp(&saved, &links, sizeof(saved))) return 0;
+    memcpy(src, pristine, sizeof(src));
+    line[20u] ^= 1u; /* CRC corruption */
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 48u, &links) ||
+        memcmp(&saved, &links, sizeof(saved))) return 0;
+    memcpy(src, pristine, sizeof(src));
+    idx[1].raw_ot = 19u; /* source type must not be faked */
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 48u, &links) ||
+        memcmp(&saved, &links, sizeof(saved))) return 0;
+    idx[1].raw_ot = 49u;
+    if (musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 0u, &links) ||
+        musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 48u, NULL) ||
+        musa_dwg_ac1024_entity_owner_layer_probe(
+            src, sizeof(src), idx, 3u, 48u,
+            (MusaDwgAc1024OwnerLayerEvidence *)(void *)src) ||
+        memcmp(&saved, &links, sizeof(saved)) ||
+        memcmp(src, pristine, sizeof(src))) return 0;
+    return 1;
+}
+
+
 int main(void) {
+    if (!test_owner_layer_bridge()) return 11;
     if (!test_verified_self_index_find()) return 10;
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
