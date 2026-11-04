@@ -579,6 +579,44 @@ int main(void) {
         memcmp(saved, record, sizeof(saved))) return 2;
     const MusaDwgAc1024LineCommon old_common = common;
     const MusaDwgAc1024LineFields old_line = line;
+    /* Diagnostic must call the SAME strict reader; no duplicate guesser,
+     * caller output write, or silent support for invalid color/scale.
+     * These CRC-valid mutations place faults at known DATA stages. */
+    if (musa_dwg_ac1024_line_common_failure_stage(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_OK ||
+        musa_dwg_ac1024_line_common_failure_stage(
+            NULL, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_ARGUMENT)
+        return 27;
+    set_bits(record + 3u, 34u, 2u, 0u); /* BS raw16 color */
+    set_bits(record + 3u, 36u, 16u, 257u); /* unsupported ACI */
+    if (!seal(record) ||
+        musa_dwg_ac1024_line_common_failure_stage(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_COLOR ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        memcmp(&old_common, &common, sizeof(common)))
+        return 28;
+    memcpy(record, saved, sizeof(saved));
+    set_bits(record + 3u, 44u, 2u, 2u); /* BD scale=0 */
+    if (!seal(record) ||
+        musa_dwg_ac1024_line_common_failure_stage(
+            record, sizeof(saved), 0u) !=
+                MUSA_DWG_LINE_COMMON_LTYPE_SCALE ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        memcmp(&old_common, &common, sizeof(common)))
+        return 29;
+    memcpy(record, saved, sizeof(saved));
+    set_bits(record + 3u, 29u, 2u, 3u); /* reserved mode */
+    if (!seal(record) ||
+        musa_dwg_ac1024_line_common_failure_stage(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_META ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        memcmp(&old_common, &common, sizeof(common)))
+        return 30;
+    memcpy(record, saved, sizeof(saved));
+
 
     /* Invalid color/scale cannot be promoted into fake geometry. */
     set_bits(record + 3u, 44u, 2u, 2u); /* BD scale=0 */
