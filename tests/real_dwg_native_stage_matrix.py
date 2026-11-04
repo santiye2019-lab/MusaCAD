@@ -387,6 +387,39 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("inconsistent_ac1024_first_h_map_membership")
         elif any(hint[k] for k in membership_fields):
             raise ValueError("unmeasured_ac1024_first_h_map_claim")
+        self_h_evidence_fields = (
+            "sampled_h_internally_distinct",
+            "sampled_h_internal_duplicates",
+            "sampled_h_successive_pairs",
+            "sampled_h_successive_increases",
+            "sampled_h_successive_decreases",
+            "sampled_h_successive_equals",
+            "sampled_h_less_than_index",
+            "sampled_h_greater_than_index",
+            "sampled_h_index_requires_over3_bytes",
+            "sampled_h_low8_equal_index",
+            "sampled_h_low16_equal_index",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in self_h_evidence_fields):
+            raise ValueError("invalid_ac1024_first_h_internal_census")
+        (distinct_h, duplicate_h, pairs_h, increases_h, decreases_h,
+         equal_h, less_h, greater_h, wide_index_h, same_low8, same_low16) = (
+            hint[k] for k in self_h_evidence_fields)
+        if measured:
+            decoded_h = attempts - unreadable_h
+            if (distinct_h + duplicate_h != decoded_h or
+                    pairs_h != max(decoded_h - 1, 0) or
+                    increases_h + decreases_h + equal_h != pairs_h or
+                    less_h + greater_h + self_matches != decoded_h or
+                    any(v > decoded_h for v in (
+                        wide_index_h, same_low8, same_low16)) or
+                    same_low16 > same_low8 or
+                    same_low16 < self_matches or
+                    duplicate_h < equal_h):
+                raise ValueError("inconsistent_ac1024_first_h_internal_census")
+        elif any(hint[k] for k in self_h_evidence_fields):
+            raise ValueError("unmeasured_ac1024_first_h_internal_census")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
