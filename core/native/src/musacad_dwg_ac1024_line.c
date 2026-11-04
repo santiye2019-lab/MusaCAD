@@ -65,8 +65,16 @@ static int musa_line_common_probe_impl(
     if ((flags & 0x4000u) && !(flags & 0x8000u)) return 0;
     if (flags & 0x8000u) {
         if (stage) *stage = MUSA_DWG_LINE_COMMON_RGB;
-        if (!musa_dwg_ac1015_bits_read_bl(&b, &next.rgb) ||
-            next.rgb > 0x00ffffffu) return 0;
+        if (!musa_dwg_ac1015_bits_read_bl(&b, &next.rgb_raw))
+            return 0;
+        /* In a R2004+ ENC color, the upper BL byte may carry the
+         * explicit truecolor method 0xC2; it is not a fourth RGB
+         * channel. Preserve raw provenance, expose RRGGBB separately.
+         * No other method is silently promoted to visible RGB. */
+        const uint8_t method = (uint8_t)(next.rgb_raw >> 24u);
+        if (method != 0u && method != 0xc2u) return 0;
+        next.rgb_method = method;
+        next.rgb = next.rgb_raw & 0x00ffffffu;
         next.has_rgb = 1u;
         next.has_color_reference = (uint8_t)((flags & 0x4000u) != 0u);
     } else if (next.color_index > 256u) return 0;
