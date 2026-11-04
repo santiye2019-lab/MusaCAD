@@ -141,6 +141,16 @@ int musa_dwg_ac1024_record_entity_meta_prefix(
  * candidate, NOT owner/layer linkage, per-entity semantics, Android preview
  * acceptance or AutoCAD parity.
  */
+/* Read-only O(log n) lookup in an ALREADY VERIFIED result from
+ * musa_dwg_ac1024_recover_self_index, sorted by canonical self-H.
+ * Does not repeat record CRCs or authenticate caller-made arrays.
+ * Performs local identity/neighbor/order checks at the found slot.
+ * Returns one immutable ID/offset witness, NEVER owner/layer/geometry.
+ * On no match, malformed local evidence or aliasing, leaves *out alone. */
+int musa_dwg_ac1024_self_index_find(
+    const MusaDwgAc1024SelfIdentity *verified_index, size_t record_count,
+    uint64_t canonical_absolute_handle, MusaDwgAc1024SelfIdentity *out);
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
