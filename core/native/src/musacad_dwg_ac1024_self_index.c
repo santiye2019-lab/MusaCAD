@@ -62,6 +62,39 @@ int musa_dwg_ac1024_record_self_prefix(
     return 1;
 }
 
+/* Second strict common-data field: the zero-length EED case only.
+ * The caller must never reinterpret a nonzero EED as zero, or decode
+ * graphics/visibility/owner/layer from this partial prefix. */
+int musa_dwg_ac1024_record_zero_eed_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024ZeroEedPrefix *out) {
+    if (!objects || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfPrefix self = {0};
+    if (!musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, indexed_offset, &self))
+        return 0;
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + self.payload_start_byte,
+            self.handle_stream_end_bit / 8u,
+            self.data_after_self_bit, self.handle_stream_start_bit))
+        return 0;
+    uint16_t eed_bytes = UINT16_MAX;
+    if (!musa_dwg_ac1015_bits_read_bs(&bits, &eed_bytes) ||
+        eed_bytes != 0u || bits.bit_pos > self.handle_stream_start_bit)
+        return 0;
+    const MusaDwgAc1024ZeroEedPrefix next = {
+        self.indexed_object_offset, self.embedded_absolute_handle,
+        self.payload_start_byte, self.data_after_self_bit, bits.bit_pos,
+        self.handle_stream_start_bit, self.handle_stream_end_bit,
+        self.raw_ot, self.frame_crc16_verified, 1u
+    };
+    *out = next;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
