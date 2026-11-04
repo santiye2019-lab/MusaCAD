@@ -288,6 +288,26 @@ int musa_dwg_ac1024_line_xdictionary_graph_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t entity_handle, MusaDwgAc1024LineXDictionaryGraph *out);
 
+
+/* Exact original H-stream evidence for EED-bearing LINE (fixed OT19).
+ * After a CRC-bounded, NONEMPTY EED application chain, this verifies:
+ * - original OT51 LAYER reference on mode 0/1/2,
+ * - original OT49 BLOCK_HEADER when mode 0 serializes an owner H,
+ * - original OT42 DICTIONARY when XDictionary-present is flagged.
+ * Modes 1/2 do NOT serialize an owner H; owner remains exactly zero.
+ * EED APPID H values are bounded, NOT separately object-verified here.
+ * This witness never implies layout membership, block transform, layer
+ * visibility, or render/scene permission. All output is atomic. */
+typedef struct MusaDwgAc1024LineEedHandleGraph {
+    MusaDwgAc1024LineXDictionaryGraph handles;
+    MusaDwgAc1024EedChainEvidence eed;
+} MusaDwgAc1024LineEedHandleGraph;
+
+int musa_dwg_ac1024_line_eed_handle_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024LineEedHandleGraph *out);
+
 #ifdef __cplusplus
 }
 #endif
