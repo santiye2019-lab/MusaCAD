@@ -133,6 +133,20 @@ static int test_authenticated_line_graph(void) {
         return 0;
 
     const MusaDwgAc1024LineGraphEvidence witness = attested;
+    /* XDictionary-present is DATA-only evidence: its extra H stream
+     * must not be silently admitted by a strict owner/layer graph. */
+    set_bits(p, 33u, 1u, 0u);
+    MusaDwgAc1024LineFields xdic_geometry = {0};
+    if (!seal(entity) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            source, sizeof(source), 26u, &xdic_geometry) ||
+        xdic_geometry.indexed_handle != 48u ||
+        xdic_geometry.start[0] != 1.5 ||
+        musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 3u, 48u, &attested) ||
+        memcmp(&witness, &attested, sizeof(witness)))
+        return 0;
+    memcpy(source, source_before, sizeof(source));
     /* Valid CRC and provisional model-space DATA are NOT owner evidence.
      * A strict graph join must still refuse mode 2 atomically. */
     set_bits(p, 29u, 2u, 2u);
@@ -371,31 +385,31 @@ int main(void) {
         memcmp(&old_line, &line, sizeof(line)) ||
         memcmp(saved, record, sizeof(saved))) return 8;
 
-    /* A CRC-valid original R2010 record can carry supported META syntax
-     * but still be outside the narrow LINE common-data policy. The parser
-     * must refuse it without changing previously authenticated outputs.
-     * Each case keeps the *same* LINE OT, self-H and valid frame CRC. */
-    const struct { unsigned bit; unsigned width; unsigned value; } policy[] = {
-        {33u, 1u, 0u}  /* XDictionary exists; do not invent its reference */
-    };
-    for (size_t k = 0u; k < sizeof(policy) / sizeof(policy[0]); k++) {
-        memcpy(record, saved, sizeof(saved));
-        set_bits(record + 3u, policy[k].bit,
-                 policy[k].width, policy[k].value);
-        MusaDwgAc1024EntityMetaPrefix candidate = {0};
-        if (!seal(record) ||
-            !musa_dwg_ac1024_record_entity_meta_prefix(
-                record, sizeof(saved), 0u, &candidate) ||
-            candidate.raw_ot != 19u ||
-            candidate.embedded_absolute_handle != 44u ||
-            musa_dwg_ac1024_line_common_probe(
-                record, sizeof(saved), 0u, &common) ||
-            musa_dwg_ac1024_line_fields_probe(
-                record, sizeof(saved), 0u, &line) ||
-            memcmp(&old_common, &common, sizeof(common)) ||
-            memcmp(&old_line, &line, sizeof(line)))
-            return 12 + (int)k;
-    }
+    /* XDictionary-present changes the separate H references, NOT
+     * the DATA common fields or coordinate boundaries. This fixture
+     * intentionally has NO authenticated XDictionary target: only
+     * provisional CRC-backed LINE DATA may be decoded, not a scene. */
+    memcpy(record, saved, sizeof(saved));
+    set_bits(record + 3u, 33u, 1u, 0u);
+    MusaDwgAc1024EntityMetaPrefix xdic_meta = {0};
+    if (!seal(record) ||
+        !musa_dwg_ac1024_record_entity_meta_prefix(
+            record, sizeof(saved), 0u, &xdic_meta) ||
+        xdic_meta.xdictionary_missing != 0u ||
+        xdic_meta.embedded_absolute_handle != 44u ||
+        !musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            record, sizeof(saved), 0u, &line) ||
+        common.indexed_handle != 44u ||
+        line.indexed_handle != 44u ||
+        line.start[0] != 1.5 || line.end[1] != -2.0 ||
+        line.geometry_start_bit != 73u ||
+        line.geometry_end_bit != 208u ||
+        memcmp(record, saved, 3u))
+        return 12;
+    memcpy(record, saved, sizeof(saved));
+
     /* A nonzero reactor BL is encoded as opcode 0 + raw LE32 here.
      * Opcode 3 is RESERVED in MusaCAD's strict BL reader, not "256".
      * Rebuild this authenticated META prefix with count=1 and xdic absent.
