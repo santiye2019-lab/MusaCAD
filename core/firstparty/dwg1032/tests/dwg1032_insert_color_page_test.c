@@ -106,11 +106,31 @@ static void last_record_singleton_page(void) {
         &insert,&layer,&output[1]));
     assert(memcmp(output,before,sizeof(output))==0);
 }
+static void unaligned_page_with_canaries(void) {
+    const MusaDwg1032ResolvedColor insert={{7u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{3u,0u,0u},0u};
+    MusaDwg1032ResolvedColor guarded[PAGE+2u];
+    MusaDwg1032ResolvedColor untouched[PAGE+2u];
+    const size_t first=PAGE-1u;
+    assert(musa_dwg1032_layer_color_apply_insert_context(
+        definition,source,child_layers,N,100u,&insert,&layer,reference));
+    memset(guarded,0x49,sizeof(guarded));
+    memcpy(untouched,guarded,sizeof(guarded));
+    assert(musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,PAGE,100u,
+        &insert,&layer,guarded+1u));
+    assert(memcmp(&guarded[0],&untouched[0],sizeof(guarded[0]))==0);
+    assert(memcmp(&guarded[PAGE+1u],&untouched[PAGE+1u],
+                  sizeof(guarded[0]))==0);
+    assert(memcmp(guarded+1u,reference+first,
+                  PAGE*sizeof(guarded[0]))==0);
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
     compare_instance(2u,3u);
     late_failure_and_full_source_alias();
     last_record_singleton_page();
+    unaligned_page_with_canaries();
     return 0;
 }
