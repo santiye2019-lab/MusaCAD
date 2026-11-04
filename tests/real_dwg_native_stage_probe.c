@@ -420,6 +420,12 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_chain_verified;
     size_t sampled_line_eed_chain_refused;
     size_t sampled_line_eed_chain_has_applications;
+    /* Additional provisional LINE XYZ after authenticated nonzero EED.
+     * These are NOT added to the legacy geometry/scene claims. */
+    size_t sampled_line_eed_xyz_attempts;
+    size_t sampled_line_eed_xyz_verified;
+    size_t sampled_line_eed_xyz_refused;
+    size_t sampled_line_eed_xyz_distinct_endpoints;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1050,8 +1056,27 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                     chain.original_crc16_verified &&
                                                     chain.eed_boundaries_verified) {
                                                     ++hint.sampled_line_eed_chain_verified;
-                                                    if (chain.application_count > 0u)
+                                                    if (chain.application_count > 0u) {
                                                         ++hint.sampled_line_eed_chain_has_applications;
+                                                        ++hint.sampled_line_eed_xyz_attempts;
+                                                        MusaDwgAc1024LineFields eed_xyz = {0};
+                                                        if (musa_dwg_ac1024_line_eed_fields_probe(
+                                                                objects, nb,
+                                                                recovered[k].record_offset,
+                                                                &eed_xyz) &&
+                                                            eed_xyz.indexed_handle ==
+                                                                recovered[k].embedded_absolute_handle &&
+                                                            eed_xyz.coordinates_decoded &&
+                                                            eed_xyz.geometry_end_bit >
+                                                                eed_xyz.geometry_start_bit) {
+                                                            ++hint.sampled_line_eed_xyz_verified;
+                                                            if (eed_xyz.start[0] != eed_xyz.end[0] ||
+                                                                eed_xyz.start[1] != eed_xyz.end[1] ||
+                                                                eed_xyz.start[2] != eed_xyz.end[2])
+                                                                ++hint.sampled_line_eed_xyz_distinct_endpoints;
+                                                        } else
+                                                            ++hint.sampled_line_eed_xyz_refused;
+                                                    }
                                                 } else
                                                     ++hint.sampled_line_eed_chain_refused;
                                             } else if (!musa_dwg_ac1024_record_no_proxy_prefix(
@@ -1596,6 +1621,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_chain_verified\":%zu,"
                "\"sampled_line_eed_chain_refused\":%zu,"
                "\"sampled_line_eed_chain_has_applications\":%zu,"
+               "\"sampled_line_eed_xyz_attempts\":%zu,"
+               "\"sampled_line_eed_xyz_verified\":%zu,"
+               "\"sampled_line_eed_xyz_refused\":%zu,"
+               "\"sampled_line_eed_xyz_distinct_endpoints\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -1789,6 +1818,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_chain_verified,
                hint->sampled_line_eed_chain_refused,
                hint->sampled_line_eed_chain_has_applications,
+               hint->sampled_line_eed_xyz_attempts,
+               hint->sampled_line_eed_xyz_verified,
+               hint->sampled_line_eed_xyz_refused,
+               hint->sampled_line_eed_xyz_distinct_endpoints,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
