@@ -19,3 +19,13 @@ single-record final-page and adjacent-output sentinel checks added in
 Do not promote this regression to a real-file acceptance claim. Run the
 `musacad-firstparty-dwg1032.yml` C11 matrix and inspect its actual result
 for the exact commit before describing the regression as passing.
+
+## Cross-INSERT failure isolation (30f981a, 2026-11-04)
+
+A late malformed synthetic source color must reject the entire 127-record page
+without writing output. After restoring that source record, a **different**
+INSERT context must resolve the same page exactly as the full-array reference;
+neighboring output sentinels remain unchanged. This checks retry isolation of
+post-decode color resolution, not independent DWG parsing or real-file fidelity.
+No external CAD code or fixtures were introduced. CI results must be checked
+against the exact commit; adding this test alone does not establish a pass.
