@@ -96,7 +96,9 @@ static void last_record_singleton_page(void) {
         &insert,&layer,&output[1]));
     assert(memcmp(&output[0],&before[0],sizeof(output[0]))==0);
     assert(memcmp(&output[2],&before[2],sizeof(output[2]))==0);
-    assert(output[1].color.aci==6u);
+    /* N-1 is 19999: modulo 3 equals 1, so BYBLOCK inherits INSERT ACI 2. */
+    assert((N-1u)%3u==1u);
+    assert(output[1].color.aci==insert.color.aci);
     assert(output[1].byblock==0u);
     memcpy(output,before,sizeof(output));
     assert(!musa_dwg1032_layer_color_apply_insert_context_page(
