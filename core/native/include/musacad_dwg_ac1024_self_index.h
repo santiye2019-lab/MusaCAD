@@ -18,6 +18,27 @@ typedef struct MusaDwgAc1024SelfIdentity {
     uint8_t embedded_handle_code0_verified;
 } MusaDwgAc1024SelfIdentity;
 
+/* Verified absolute self-H and exact DATA cursor immediately following it.
+ * Every offset is relative to the CRC-backed, independently decompressed
+ * AcDbObjects buffer/payload. This is an authenticated prefix boundary,
+ * NOT a complete common-entity prefix or proof of owner/layer/geometry.
+ * No source modification, and caller output is unchanged on failure. */
+typedef struct MusaDwgAc1024SelfPrefix {
+    uint64_t indexed_object_offset;
+    uint64_t embedded_absolute_handle;
+    size_t payload_start_byte;
+    size_t data_after_self_bit;
+    size_t handle_stream_start_bit;
+    size_t handle_stream_end_bit;
+    uint16_t raw_ot;
+    uint8_t frame_crc16_verified;
+    uint8_t embedded_handle_code0_verified;
+} MusaDwgAc1024SelfPrefix;
+
+int musa_dwg_ac1024_record_self_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024SelfPrefix *out);
+
 /* All-or-nothing read-only reconciliation of independently authenticated
  * AcDb:Handles RECORD OFFSETS with CRC-verified R2010 object self-H.
  *
