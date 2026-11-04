@@ -380,6 +380,13 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t masked6_candidate_handle_count;
     size_t masked6_sample_attempts, masked6_sample_self_matches;
     size_t masked6_sample_other, masked6_sample_unreadable;
+    int full_embedded_h_census_completed;
+    size_t full_embedded_h_attempts, full_embedded_h_parsed_code0;
+    size_t full_embedded_h_other_codes, full_embedded_h_unreadable;
+    size_t full_embedded_h_self_matches, full_embedded_h_less_than_index;
+    size_t full_embedded_h_greater_than_index;
+    size_t full_embedded_h_neighbor_pairs, full_embedded_h_increases;
+    size_t full_embedded_h_decreases, full_embedded_h_equals;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -776,6 +783,60 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         start = end;
                     }
                 }
+                /* Full-corpus embedded self-H census. This DOES NOT
+                   replace or repair the existing indexed handle map.
+                   Prove the published R2010 H prefix across every
+                   individually CRC-backed record; never export actual
+                   handles, offsets, names, geometry, or source bytes. */
+                hint.full_embedded_h_census_completed = 1;
+                uint64_t prior_full_h = 0u;
+                int prior_full_h_valid = 0;
+                for (size_t k = 0u; k < legacy_count; k++) {
+                    ++hint.full_embedded_h_attempts;
+                    MusaDwgAc1024StreamBounds stream = {0};
+                    MusaDwgAc1015Bits cursor = {0};
+                    MusaDwgAc1015HandleRef self = {0};
+                    if (!legacy[k].handle ||
+                        !musa_dwg_ac1024_record_stream_bounds(
+                            objects, nb, legacy[k].object_offset,
+                            &stream) ||
+                        stream.handle_stream_start_bit <=
+                            stream.data_after_ot_bit ||
+                        !musa_dwg_ac1015_bits_init(
+                            &cursor, objects + stream.payload_start_byte,
+                            stream.handle_stream_end_bit / 8u,
+                            stream.data_after_ot_bit,
+                            stream.handle_stream_start_bit) ||
+                        !musa_dwg_ac1015_read_handle_ref(
+                            &cursor, legacy[k].handle, &self)) {
+                        ++hint.full_embedded_h_unreadable;
+                        prior_full_h_valid = 0;
+                        continue;
+                    }
+                    if (self.code != 0u) {
+                        ++hint.full_embedded_h_other_codes;
+                        prior_full_h_valid = 0;
+                        continue;
+                    }
+                    ++hint.full_embedded_h_parsed_code0;
+                    if (self.target == legacy[k].handle)
+                        ++hint.full_embedded_h_self_matches;
+                    else if (self.target < legacy[k].handle)
+                        ++hint.full_embedded_h_less_than_index;
+                    else
+                        ++hint.full_embedded_h_greater_than_index;
+                    if (prior_full_h_valid) {
+                        ++hint.full_embedded_h_neighbor_pairs;
+                        if (self.target > prior_full_h)
+                            ++hint.full_embedded_h_increases;
+                        else if (self.target < prior_full_h)
+                            ++hint.full_embedded_h_decreases;
+                        else
+                            ++hint.full_embedded_h_equals;
+                    }
+                    prior_full_h_valid = 1;
+                    prior_full_h = self.target;
+                }
                 /* Separate fixed-budget exploratory H identity:
                    the public R2010 layout places a self-H immediately
                    after OT in the DATA stream. Only report aggregate
@@ -1146,7 +1207,19 @@ static void report(const char *signature, const char *result,
                "\"masked6_sample_attempts\":%zu,"
                "\"masked6_sample_self_matches\":%zu,"
                "\"masked6_sample_other\":%zu,"
-               "\"masked6_sample_unreadable\":%zu}",
+               "\"masked6_sample_unreadable\":%zu,"
+               "\"full_embedded_h_census_completed\":%s,"
+               "\"full_embedded_h_attempts\":%zu,"
+               "\"full_embedded_h_parsed_code0\":%zu,"
+               "\"full_embedded_h_other_codes\":%zu,"
+               "\"full_embedded_h_unreadable\":%zu,"
+               "\"full_embedded_h_self_matches\":%zu,"
+               "\"full_embedded_h_less_than_index\":%zu,"
+               "\"full_embedded_h_greater_than_index\":%zu,"
+               "\"full_embedded_h_neighbor_pairs\":%zu,"
+               "\"full_embedded_h_increases\":%zu,"
+               "\"full_embedded_h_decreases\":%zu,"
+               "\"full_embedded_h_equals\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1275,7 +1348,19 @@ static void report(const char *signature, const char *result,
                hint->masked6_sample_attempts,
                hint->masked6_sample_self_matches,
                hint->masked6_sample_other,
-               hint->masked6_sample_unreadable);
+               hint->masked6_sample_unreadable,
+               hint->full_embedded_h_census_completed ? "true" : "false",
+               hint->full_embedded_h_attempts,
+               hint->full_embedded_h_parsed_code0,
+               hint->full_embedded_h_other_codes,
+               hint->full_embedded_h_unreadable,
+               hint->full_embedded_h_self_matches,
+               hint->full_embedded_h_less_than_index,
+               hint->full_embedded_h_greater_than_index,
+               hint->full_embedded_h_neighbor_pairs,
+               hint->full_embedded_h_increases,
+               hint->full_embedded_h_decreases,
+               hint->full_embedded_h_equals);
     }
     puts("}");
 }
