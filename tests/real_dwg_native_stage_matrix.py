@@ -576,6 +576,13 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_common_reactors_unsupported",
             "sampled_line_common_xdic_unsupported",
             "sampled_line_common_fields_refused",
+            "sampled_line_common_stage_color",
+            "sampled_line_common_stage_rgb",
+            "sampled_line_common_stage_transparency",
+            "sampled_line_common_stage_ltype",
+            "sampled_line_common_stage_appearance",
+            "sampled_line_common_stage_geom_bound",
+            "sampled_line_common_stage_other",
             "sampled_line_implicit_paper_xyz_verified",
             "sampled_line_implicit_model_xyz_verified",
             "sampled_line_graph_attempts",
@@ -604,7 +611,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          eed_xyz_distinct,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
-         line_fields_rejected, implicit_paper_xyz,
+         line_fields_rejected,
+         stage_color, stage_rgb, stage_transparency, stage_ltype,
+         stage_appearance, stage_geom_bound, stage_other,
+         implicit_paper_xyz,
          implicit_model_xyz, graph_attempts, graph_ok,
          graph_refused, implicit_layer_attempts,
          implicit_layer_ok, implicit_layer_bad,
@@ -649,7 +659,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
                 line_common_after_meta_rejected != (
                     line_mode_rejected + line_reactors_rejected +
-                    line_xdic_rejected + line_fields_rejected)):
+                    line_xdic_rejected + line_fields_rejected) or
+                line_common_after_meta_rejected != (
+                    stage_color + stage_rgb + stage_transparency +
+                    stage_ltype + stage_appearance + stage_geom_bound +
+                    stage_other)):
             raise ValueError("invalid_ac1024_line_sample_counts")
         if not recovered_ok and any(hint[k] for k in line_keys):
             raise ValueError("unrecovered_ac1024_line_sample_claim")
