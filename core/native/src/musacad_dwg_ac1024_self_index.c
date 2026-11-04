@@ -129,6 +129,55 @@ int musa_dwg_ac1024_record_no_proxy_prefix(
     return 1;
 }
 
+/* Fixed built-in R2010 entities only; class-indexed and other
+ * OT values cannot be inferred from a generic common-data header. */
+static int is_fixed_entity_ot(uint16_t type) {
+    return type == 7u || type == 17u || type == 18u || type == 19u;
+}
+
+int musa_dwg_ac1024_record_entity_meta_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024EntityMetaPrefix *out) {
+    if (!objects || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024NoProxyPrefix no_proxy = {0};
+    if (!musa_dwg_ac1024_record_no_proxy_prefix(
+            objects, object_bytes, indexed_offset, &no_proxy) ||
+        !is_fixed_entity_ot(no_proxy.raw_ot) ||
+        !no_proxy.frame_crc16_verified || !no_proxy.zero_eed_verified ||
+        !no_proxy.no_proxy_graphic_verified)
+        return 0;
+
+    MusaDwgAc1015Bits bits = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + no_proxy.payload_start_byte,
+            no_proxy.handle_stream_end_bit / 8u,
+            no_proxy.data_after_no_proxy_flag_bit,
+            no_proxy.handle_stream_start_bit))
+        return 0;
+    uint32_t mode = 3u, reactors = UINT32_MAX, xdic_missing = 2u;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 2u, &mode) || mode == 3u)
+        return 0;
+    const size_t after_mode = bits.bit_pos;
+    if (!musa_dwg_ac1015_bits_read_bl(&bits, &reactors) ||
+        reactors > 1024u)
+        return 0;
+    const size_t after_reactors = bits.bit_pos;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &xdic_missing) ||
+        bits.bit_pos > no_proxy.handle_stream_start_bit)
+        return 0;
+    const MusaDwgAc1024EntityMetaPrefix next = {
+        indexed_offset, no_proxy.embedded_absolute_handle,
+        no_proxy.payload_start_byte, after_mode, after_reactors,
+        bits.bit_pos, no_proxy.handle_stream_start_bit,
+        no_proxy.handle_stream_end_bit, reactors, no_proxy.raw_ot,
+        (uint8_t)mode, (uint8_t)xdic_missing, 1u
+    };
+    *out = next;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
