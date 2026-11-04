@@ -181,6 +181,9 @@ def ac1024_probe_record():
             "sampled_line_common_refused": 0,
             "sampled_line_xyz_verified": 0,
             "sampled_line_xyz_refused": 0,
+            "sampled_line_xyz_owner_layer_joined": 0,
+            "sampled_line_xyz_distinct_endpoints": 0,
+            "sampled_line_xyz_bounded_common": 0,
         }
     }
 
@@ -293,6 +296,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("sampled_line_attempts", True),
             ("sampled_line_common_verified", -1),
             ("sampled_line_xyz_refused", "0"),
+            ("sampled_line_xyz_owner_layer_joined", 1),
+            ("sampled_line_xyz_distinct_endpoints", 1),
+            ("sampled_line_xyz_bounded_common", 1),
+            ("sampled_line_xyz_bounded_common", True),
+            ("sampled_line_xyz_owner_layer_joined", -1),
         ):
             with self.subTest(field=field, value=value):
                 invalid = deepcopy(original)
@@ -305,6 +313,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_line_common_refused",
             "sampled_line_xyz_verified",
             "sampled_line_xyz_refused",
+            "sampled_line_xyz_owner_layer_joined",
+            "sampled_line_xyz_distinct_endpoints",
+            "sampled_line_xyz_bounded_common",
         ):
             with self.subTest(missing=missing):
                 invalid = deepcopy(original)
