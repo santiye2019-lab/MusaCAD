@@ -252,6 +252,19 @@ static void independent_insert_contexts_do_not_mutate_source(void) {
     assert(memcmp(definition+first,original_definition,sizeof(original_definition))==0);
     assert(memcmp(child_layers+first,original_layers,sizeof(original_layers))==0);
 }
+/* Reject output that aliases a future definition page, even if the
+ * requested page itself is disjoint. Future INSERTs must see pristine data. */
+static void future_page_alias_is_rejected(void) {
+    const MusaDwg1032ResolvedColor insert={{2u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{5u,0u,0u},0u};
+    MusaDwg1032ResolvedColor saved[PAGE];
+    const size_t future=PAGE*8u;
+    memcpy(saved,definition+future,sizeof(saved));
+    assert(!musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,0u,PAGE,100u,
+        &insert,&layer,definition+future));
+    assert(memcmp(saved,definition+future,sizeof(saved))==0);
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
@@ -265,5 +278,6 @@ int main(void) {
     retry_after_invalid_middle_record();
     failed_page_does_not_poison_other_insert_context();
     independent_insert_contexts_do_not_mutate_source();
+    future_page_alias_is_rejected();
     return 0;
 }
