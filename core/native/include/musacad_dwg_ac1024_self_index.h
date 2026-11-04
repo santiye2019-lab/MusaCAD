@@ -96,6 +96,27 @@ int musa_dwg_ac1024_record_eed_chain_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024EedChainEvidence *out);
 
+/* Original R2010 EED APPID target proof (fixed OT19 LINE only).
+ * For each BS-length/H5/application-data frame, verify that the H5
+ * resolves to a unique source-indexed, original CRC-backed APPID (OT67)
+ * record with matching canonical self-H. Application bytes remain opaque.
+ * Repeated use of the same APPID is counted without fabricating a new
+ * target. No application semantics, geometry/scene, writer, visibility
+ * or external reference permission is inferred. Fail closed and atomic. */
+typedef struct MusaDwgAc1024EedAppidEvidence {
+    MusaDwgAc1024EedChainEvidence chain;
+    size_t appid_reference_count;
+    size_t distinct_appid_count;
+    uint64_t first_appid_handle;
+    uint64_t first_appid_record_offset;
+    uint8_t original_appid_records_crc_verified;
+} MusaDwgAc1024EedAppidEvidence;
+
+int musa_dwg_ac1024_line_eed_appid_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024EedAppidEvidence *out);
+
 /* After CRC-verified self H and zero-length EED, the published common
  * format has a single graphic-present flag. This narrow witness ONLY
  * accepts flag=0 and returns the next exact DATA bit position. A flag=1
