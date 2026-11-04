@@ -53,7 +53,7 @@ case "${1:-}" in
 from pathlib import Path
 import re
 root = Path("core/native")
-cmake = (root / "CMakeLists.txt").read_text(encoding="utf-8")
+cmake = Path("core/native/CMakeLists.txt").read_text(encoding="utf-8")
 match = re.search(r"add_library\(musacad_core STATIC\s+(.*?)\)", cmake, re.S)
 if not match:
     raise SystemExit("Missing the canonical shared C target")
