@@ -145,3 +145,60 @@ int musa_dwg_ac1024_line_fields_probe(
     *out = next;
     return 1;
 }
+
+/* Never elevate a successfully decoded implicit-space LINE into a scene
+ * through a guessed owner. Explicit-owner graph evidence is separate
+ * from provisional DATA-only geometry and comes from the exact same
+ * authenticated original record. */
+int musa_dwg_ac1024_line_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024LineGraphEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_line_handle || !out ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity identity = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle,
+            &identity) ||
+        identity.raw_ot != 19u ||
+        !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified)
+        return 0;
+
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024LineGraphEvidence next = {0};
+    if (!musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, identity.record_offset, &meta) ||
+        meta.raw_ot != 19u || meta.entity_mode != 0u ||
+        meta.embedded_absolute_handle != canonical_line_handle ||
+        !meta.original_crc16_verified ||
+        !musa_dwg_ac1024_line_common_probe(
+            objects, object_bytes, identity.record_offset, &common) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            objects, object_bytes, identity.record_offset, &next.geometry) ||
+        !musa_dwg_ac1024_entity_owner_layer_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &next.owner_layer) ||
+        !common.record_crc_verified ||
+        common.indexed_handle != canonical_line_handle ||
+        next.geometry.indexed_handle != canonical_line_handle ||
+        !next.geometry.coordinates_decoded ||
+        next.geometry.geometry_start_bit != common.geometry_start_bit ||
+        next.geometry.geometry_end_bit <= common.geometry_start_bit ||
+        next.geometry.geometry_end_bit > common.data_end_bit ||
+        next.owner_layer.entity_handle != canonical_line_handle ||
+        next.owner_layer.entity_record_offset != identity.record_offset ||
+        next.owner_layer.entity_raw_ot != 19u ||
+        !next.owner_layer.source_crc_verified ||
+        !next.owner_layer.target_records_verified)
+        return 0;
+    *out = next;
+    return 1;
+}
