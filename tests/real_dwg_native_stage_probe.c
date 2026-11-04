@@ -926,6 +926,50 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         hint.sampled_scan_best_shift_bits = shift;
                     }
                 }
+                /* Never modify the original CRC-backed R2004 map.
+                   Compare an alternative final-byte interpretation to
+                   the real object-embedded self H, without publishing IDs. */
+                if (legacy_count <= SIZE_MAX / sizeof(uint64_t)) {
+                    uint64_t *alt_handles =
+                        (uint64_t *)malloc(legacy_count * sizeof(uint64_t));
+                    size_t alt_count = 0u;
+                    if (alt_handles &&
+                        ac1024_hmap_last_six_candidate(
+                            handles, hb, alt_handles,
+                            legacy_count, &alt_count) &&
+                        alt_count == legacy_count) {
+                        hint.masked6_candidate_index_valid = 1;
+                        hint.masked6_candidate_handle_count = alt_count;
+                        for (size_t k = 0u; k < legacy_count; k += stride) {
+                            if (hint.masked6_sample_attempts >= 2048u) break;
+                            ++hint.masked6_sample_attempts;
+                            MusaDwgAc1024StreamBounds stream = {0};
+                            MusaDwgAc1015Bits cursor = {0};
+                            MusaDwgAc1015HandleRef first = {0};
+                            if (!alt_handles[k] ||
+                                !musa_dwg_ac1024_record_stream_bounds(
+                                    objects, nb, legacy[k].object_offset,
+                                    &stream) ||
+                                stream.handle_stream_start_bit <=
+                                    stream.data_after_ot_bit ||
+                                !musa_dwg_ac1015_bits_init(
+                                    &cursor,
+                                    objects + stream.payload_start_byte,
+                                    stream.handle_stream_end_bit / 8u,
+                                    stream.data_after_ot_bit,
+                                    stream.handle_stream_start_bit) ||
+                                !musa_dwg_ac1015_read_handle_ref(
+                                    &cursor, alt_handles[k], &first)) {
+                                ++hint.masked6_sample_unreadable;
+                            } else if (first.code == 0u &&
+                                       first.target == alt_handles[k]) {
+                                ++hint.masked6_sample_self_matches;
+                            } else
+                                ++hint.masked6_sample_other;
+                        }
+                    }
+                    free(alt_handles);
+                }
                 free(offsets);
                 free(legacy);
             }
@@ -1096,7 +1140,13 @@ static void report(const char *signature, const char *result,
                "\"sampled_h_greater_than_index\":%zu,"
                "\"sampled_h_index_requires_over3_bytes\":%zu,"
                "\"sampled_h_low8_equal_index\":%zu,"
-               "\"sampled_h_low16_equal_index\":%zu}",
+               "\"sampled_h_low16_equal_index\":%zu,"
+               "\"masked6_candidate_index_valid\":%s,"
+               "\"masked6_candidate_handle_count\":%zu,"
+               "\"masked6_sample_attempts\":%zu,"
+               "\"masked6_sample_self_matches\":%zu,"
+               "\"masked6_sample_other\":%zu,"
+               "\"masked6_sample_unreadable\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1219,7 +1269,13 @@ static void report(const char *signature, const char *result,
                hint->sampled_h_greater_than_index,
                hint->sampled_h_index_requires_over3_bytes,
                hint->sampled_h_low8_equal_index,
-               hint->sampled_h_low16_equal_index);
+               hint->sampled_h_low16_equal_index,
+               hint->masked6_candidate_index_valid ? "true" : "false",
+               hint->masked6_candidate_handle_count,
+               hint->masked6_sample_attempts,
+               hint->masked6_sample_self_matches,
+               hint->masked6_sample_other,
+               hint->masked6_sample_unreadable);
     }
     puts("}");
 }
