@@ -396,6 +396,8 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_no_proxy_verified, sampled_no_proxy_refused;
     size_t sampled_entity_meta_attempts, sampled_entity_meta_verified;
     size_t sampled_entity_meta_refused;
+    size_t sampled_owner_layer_attempts, sampled_owner_layer_verified;
+    size_t sampled_owner_layer_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -921,6 +923,17 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                         ++hint.sampled_entity_meta_verified;
                                     else
                                         ++hint.sampled_entity_meta_refused;
+                                    ++hint.sampled_owner_layer_attempts;
+                                    MusaDwgAc1024OwnerLayerEvidence links = {0};
+                                    if (musa_dwg_ac1024_entity_owner_layer_probe(
+                                            objects, nb, recovered, legacy_count,
+                                            recovered[k].embedded_absolute_handle,
+                                            &links) &&
+                                        links.entity_handle ==
+                                            recovered[k].embedded_absolute_handle)
+                                        ++hint.sampled_owner_layer_verified;
+                                    else
+                                        ++hint.sampled_owner_layer_refused;
                                 }
                             }
                         }
@@ -1322,7 +1335,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_no_proxy_refused\":%zu,"
                "\"sampled_entity_meta_attempts\":%zu,"
                "\"sampled_entity_meta_verified\":%zu,"
-               "\"sampled_entity_meta_refused\":%zu}",
+               "\"sampled_entity_meta_refused\":%zu,",
+               "\"sampled_owner_layer_attempts\":%zu,"
+               "\"sampled_owner_layer_verified\":%zu,"
+               "\"sampled_owner_layer_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1475,7 +1491,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_no_proxy_refused,
                hint->sampled_entity_meta_attempts,
                hint->sampled_entity_meta_verified,
-               hint->sampled_entity_meta_refused);
+               hint->sampled_entity_meta_refused,
+               hint->sampled_owner_layer_attempts,
+               hint->sampled_owner_layer_verified,
+               hint->sampled_owner_layer_refused);
     }
     puts("}");
 }
