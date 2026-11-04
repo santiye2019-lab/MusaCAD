@@ -104,6 +104,47 @@ static int test_short_r2010_mc_frame(void) {
     return 1;
 }
 
+/* Hypothesis only: final MC sign-bit used as a magnitude bit inflates
+   indexed handles. This synthetic map is NOT proof of R2010 semantics.
+   Independently CRC-check both pages and compare the two interpretations. */
+static int test_alternate_hmap_delta_not_accepted_as_production(void) {
+    uint8_t pages[12] = {
+        0u, 6u, 0x41u, 0x02u, 0x02u, 0x02u,
+        0u, 0u, 0u, 2u, 0u, 0u
+    };
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, pages, 6u, &crc))
+        return 0;
+    pages[6] = (uint8_t)(crc >> 8u);
+    pages[7] = (uint8_t)crc;
+    if (!musa_core_crc16_arc(
+            0xc0c1u, pages + 8u, 2u, &crc))
+        return 0;
+    pages[10] = (uint8_t)(crc >> 8u);
+    pages[11] = (uint8_t)crc;
+    MusaDwgAc1018HandleEntry trusted[2] = {{0}};
+    size_t trusted_count = 0u, alternate_count = 0u;
+    uint64_t alternate[2] = {0u, 0u};
+    if (!musa_dwg_ac1018_handles_index(
+            pages, sizeof(pages), 64u, trusted,
+            2u, &trusted_count) ||
+        !ac1024_hmap_last_six_candidate(
+            pages, sizeof(pages), alternate,
+            2u, &alternate_count) ||
+        trusted_count != 2u || alternate_count != 2u ||
+        trusted[0].handle != 65u ||
+        trusted[1].handle != 67u ||
+        alternate[0] != 1u || alternate[1] != 3u)
+        return 0;
+    pages[6] ^= 1u;
+    size_t unmodified_count = alternate_count;
+    if (ac1024_hmap_last_six_candidate(
+            pages, sizeof(pages), alternate, 2u, &alternate_count) ||
+        alternate_count != unmodified_count)
+        return 0;
+    return 1;
+}
+
 int main(void) {
     for (size_t length = 1u; length <= 3u; length++) {
         if (!check_r2010_mc_fixture(length)) {
@@ -114,6 +155,10 @@ int main(void) {
     if (!test_short_r2010_mc_frame()) {
         fputs("short R2010 MS payload regression failed\n", stderr);
         return 4;
+    }
+    if (!test_alternate_hmap_delta_not_accepted_as_production()) {
+        fputs("alternate MC handle delta hypothesis regression failed\n", stderr);
+        return 5;
     }
     if (!check_ot_encoding_variants()) {
         fputs("synthetic R2010 OT selector regression failed\n", stderr);
