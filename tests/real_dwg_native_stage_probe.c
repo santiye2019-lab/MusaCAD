@@ -393,6 +393,7 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t core_embedded_h_recovery_original_index_matches;
     size_t sampled_zero_eed_attempts, sampled_zero_eed_verified;
     size_t sampled_zero_eed_refused;
+    size_t sampled_no_proxy_verified, sampled_no_proxy_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -892,6 +893,15 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                     ++hint.sampled_zero_eed_verified;
                                 else
                                     ++hint.sampled_zero_eed_refused;
+                                MusaDwgAc1024NoProxyPrefix graphic = {0};
+                                if (musa_dwg_ac1024_record_no_proxy_prefix(
+                                        objects, nb, recovered[k].record_offset,
+                                        &graphic) &&
+                                    graphic.embedded_absolute_handle ==
+                                        recovered[k].embedded_absolute_handle)
+                                    ++hint.sampled_no_proxy_verified;
+                                else
+                                    ++hint.sampled_no_proxy_refused;
                             }
                         }
                     }
@@ -1287,7 +1297,9 @@ static void report(const char *signature, const char *result,
                "\"core_embedded_h_recovery_original_index_matches\":%zu,"
                "\"sampled_zero_eed_attempts\":%zu,"
                "\"sampled_zero_eed_verified\":%zu,"
-               "\"sampled_zero_eed_refused\":%zu}",
+               "\"sampled_zero_eed_refused\":%zu,"
+               "\"sampled_no_proxy_verified\":%zu,"
+               "\"sampled_no_proxy_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1435,7 +1447,9 @@ static void report(const char *signature, const char *result,
                hint->core_embedded_h_recovery_original_index_matches,
                hint->sampled_zero_eed_attempts,
                hint->sampled_zero_eed_verified,
-               hint->sampled_zero_eed_refused);
+               hint->sampled_zero_eed_refused,
+               hint->sampled_no_proxy_verified,
+               hint->sampled_no_proxy_refused);
     }
     puts("}");
 }
