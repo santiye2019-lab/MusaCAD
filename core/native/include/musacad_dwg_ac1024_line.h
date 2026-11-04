@@ -49,6 +49,24 @@ typedef struct MusaDwgAc1024LineCommon {
 int musa_dwg_ac1024_line_common_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024LineCommon *out);
+/* Diagnostic only, not an admission path. Zero means the strict original
+ * zero-EED common LINE DATA was read; other values label the first failed
+ * stage. No drawing data, coordinates or source bytes are exposed. */
+enum {
+    MUSA_DWG_LINE_COMMON_OK = 0,
+    MUSA_DWG_LINE_COMMON_META = 1,
+    MUSA_DWG_LINE_COMMON_STREAM = 2,
+    MUSA_DWG_LINE_COMMON_COLOR = 3,
+    MUSA_DWG_LINE_COMMON_RGB = 4,
+    MUSA_DWG_LINE_COMMON_TRANSPARENCY = 5,
+    MUSA_DWG_LINE_COMMON_LTYPE_SCALE = 6,
+    MUSA_DWG_LINE_COMMON_APPEARANCE = 7,
+    MUSA_DWG_LINE_COMMON_GEOMETRY_BOUND = 8,
+    MUSA_DWG_LINE_COMMON_ARGUMENT = 9
+};
+uint8_t musa_dwg_ac1024_line_common_failure_stage(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset);
+
 
 typedef struct MusaDwgAc1024LineFields {
     uint64_t indexed_handle;
