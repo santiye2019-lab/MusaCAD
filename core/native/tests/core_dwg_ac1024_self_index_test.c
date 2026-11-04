@@ -103,8 +103,85 @@ static int test_self_prefix_cursor(void) {
     return 1;
 }
 
+static int test_zero_eed_subset(void) {
+    _Alignas(MusaDwgAc1024ZeroEedPrefix) uint8_t record[64] = {0};
+    if (!make_record(record, 44u)) return 0;
+
+    /* Native compressed BS selector 2 means zero, using exactly 2 bits
+     * after the 26-bit (OT + canonical H) prefix. */
+    set_bits(record + 3u, 26u, 2u, 2u);
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    uint8_t untouched[13];
+    memcpy(untouched, record, sizeof(untouched));
+    MusaDwgAc1024ZeroEedPrefix out = {0};
+    if (!musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 13u, 0u, &out) ||
+        out.embedded_absolute_handle != 44u ||
+        out.raw_ot != 19u ||
+        out.payload_start_byte != 3u ||
+        out.data_after_self_bit != 26u ||
+        out.data_after_zero_eed_bit != 28u ||
+        out.handle_stream_start_bit != 48u ||
+        out.handle_stream_end_bit != 64u ||
+        !out.zero_eed_verified || !out.record_crc16_verified ||
+        memcmp(record, untouched, sizeof(untouched)))
+        return 0;
+    const MusaDwgAc1024ZeroEedPrefix saved = out;
+
+    /* Nonzero EED has additional application data: refuse this subset,
+       even with an otherwise valid original record CRC. */
+    set_bits(record + 3u, 26u, 2u, 1u);
+    set_bits(record + 3u, 28u, 8u, 1u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)))
+        return 0;
+
+    /* 1 bit remaining for BS cannot contain a complete 2-bit selector.
+       Self H is still complete, but the zero-EED gate MUST reject. */
+    memcpy(record, untouched, sizeof(untouched));
+    record[2] = 37u;  /* handle stream starts at bit 27 */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)))
+        return 0;
+    memcpy(record, untouched, sizeof(untouched));
+    record[12] ^= 0x01u;
+    if (musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)))
+        return 0;
+    memcpy(record, untouched, sizeof(untouched));
+    if (musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 12u, 0u, &out) ||
+        musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 13u, 13u, &out) ||
+        musa_dwg_ac1024_record_zero_eed_prefix(
+            record, 13u, 0u,
+            (MusaDwgAc1024ZeroEedPrefix *)(void *)record) ||
+        musa_dwg_ac1024_record_zero_eed_prefix(
+            NULL, 0u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)) ||
+        memcmp(record, untouched, sizeof(untouched)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_self_prefix_cursor()) return 6;
+    if (!test_zero_eed_subset()) return 7;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
     if (!make_record(objects, 1u) ||
         !make_record(objects + 13u, 2u))
