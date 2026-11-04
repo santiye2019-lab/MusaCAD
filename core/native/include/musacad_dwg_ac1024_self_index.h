@@ -188,6 +188,34 @@ int musa_dwg_ac1024_entity_owner_layer_probe(
     uint64_t entity_handle, MusaDwgAc1024OwnerLayerEvidence *out);
 
 
+
+/* Source-internal R2010 LINE layer-only evidence for implicit paper/model
+ * space entity mode (1/2). NO owner H is serialized, so NO owner, BLOCK
+ * relationship, layout identity, inherited style or scene readiness is
+ * inferred. The decoded layer H must point at an independently verified
+ * original CRC/OT51/self-H record, not merely at a numeric handle. */
+typedef struct MusaDwgAc1024ImplicitLayerEvidence {
+    uint64_t entity_handle;
+    uint64_t entity_record_offset;
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t handle_tail_unparsed_bits;
+    uint16_t entity_raw_ot;
+    uint8_t entity_mode;
+    uint8_t layer_raw_h_code;
+    uint8_t source_crc_verified;
+    uint8_t layer_crc_verified;
+} MusaDwgAc1024ImplicitLayerEvidence;
+
+/* Read-only, atomic on failure and no alias with original objects or
+ * independently authenticated recovered handle index. Fixed OT19 only.
+ * Authentication is scoped to the original indexed AcDbObjects section.
+ * This is NOT permission to render the provisional LINE geometry. */
+int musa_dwg_ac1024_implicit_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024ImplicitLayerEvidence *out);
+
 #ifdef __cplusplus
 }
 #endif
