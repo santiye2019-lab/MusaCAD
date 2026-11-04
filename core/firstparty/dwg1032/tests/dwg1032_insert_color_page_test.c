@@ -285,6 +285,8 @@ static void truecolor_and_provenance_page(void) {
     definition[first+1u]=(MusaDwg1032ResolvedColor){{4u,0u,0u},0u};
     child_layers[first+1u]=100u;
     source[first+2u]=(MusaDwg1032CadColor){0u,0u,0u};
+    /* ByBlock raw provenance requires a canonical unresolved definition. */
+    definition[first+2u]=(MusaDwg1032ResolvedColor){{0u,0u,0u},1u};
     definition[first+2u]=(MusaDwg1032ResolvedColor){{0u,0u,0u},1u};
     memset(output,0x5a,sizeof(output));
     memcpy(before,output,sizeof(before));
