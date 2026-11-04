@@ -307,6 +307,130 @@ static int test_implicit_line_layer_graph(void) {
     return 1;
 }
 
+/* Original R2010 XDictionary-present LINE H graph.
+ * Independent CRC-backed source records: layer OT51/H32, dictionary
+ * OT42/H34, block OT49/H47 and LINE OT19/H48. No external CAD reader,
+ * unverified layout owner, render acceptance or source mutation. */
+static int test_xdictionary_original_handle_graph(void) {
+    uint8_t source[92] = {0};
+    if (!make_graph_target(source, 51u, 32u) ||
+        !make_graph_target(source + 13u, 42u, 34u) ||
+        !make_graph_target(source + 26u, 49u, 47u) ||
+        !make_line(source + 39u))
+        return 0;
+    uint8_t *const record = source + 39u;
+    uint8_t *const payload = record + 3u;
+    record[0] = 48u; /* 48 data bytes, not the old 32-byte fixture */
+    record[2] = 48u; /* H stream: 3 canonical 16-bit handles */
+    record[35] = 0u; record[36] = 0u; /* discarded old short CRC */
+    set_bits(payload, 18u, 8u, 48u);
+    set_bits(payload, 33u, 1u, 0u); /* XDictionary is present */
+    set_bits(payload, 336u, 4u, 4u); /* owner soft pointer H47 */
+    set_bits(payload, 340u, 4u, 1u);
+    set_bits(payload, 344u, 8u, 47u);
+    set_bits(payload, 352u, 4u, 3u); /* XDictionary hard owner H34 */
+    set_bits(payload, 356u, 4u, 1u);
+    set_bits(payload, 360u, 8u, 34u);
+    set_bits(payload, 368u, 4u, 5u); /* layer hard pointer H32 */
+    set_bits(payload, 372u, 4u, 1u);
+    set_bits(payload, 376u, 8u, 32u);
+
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 51u, &crc)) return 0;
+    record[51] = (uint8_t)crc;
+    record[52] = (uint8_t)(crc >> 8u);
+    const uint64_t offsets[4] = {0u, 13u, 26u, 39u};
+    MusaDwgAc1024SelfIdentity idx[4] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 4u, idx, 4u))
+        return 0;
+
+    uint8_t pristine[sizeof(source)];
+    memcpy(pristine, source, sizeof(pristine));
+    MusaDwgAc1024LineXDictionaryGraph graph = {0};
+    MusaDwgAc1024LineFields provisional = {0};
+    MusaDwgAc1024LineGraphEvidence old_graph = {0};
+    if (!musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, &graph) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            source, sizeof(source), 39u, &provisional) ||
+        musa_dwg_ac1024_line_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, &old_graph) ||
+        graph.entity_handle != 48u || graph.entity_record_offset != 39u ||
+        graph.entity_mode != 0u || graph.owner_handle != 47u ||
+        graph.owner_record_offset != 26u || graph.owner_raw_h_code != 4u ||
+        graph.xdictionary_handle != 34u ||
+        graph.xdictionary_record_offset != 13u ||
+        graph.xdictionary_raw_h_code != 3u ||
+        graph.layer_handle != 32u || graph.layer_record_offset != 0u ||
+        graph.layer_raw_h_code != 5u ||
+        graph.handle_tail_unparsed_bits != 0u ||
+        !graph.original_records_crc_verified ||
+        provisional.indexed_handle != 48u ||
+        provisional.start[0] != 1.5 || provisional.end[1] != -2.0 ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    const MusaDwgAc1024LineXDictionaryGraph saved = graph;
+
+    /* Broken original DICTIONARY CRC cannot impersonate valid XDic. */
+    source[25] ^= 1u;
+    if (musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, &graph) ||
+        memcmp(&graph, &saved, sizeof(saved))) return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* A hard owner H must have a canonical code, not a soft pointer. */
+    set_bits(payload, 352u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 51u, &crc)) return 0;
+    record[51] = (uint8_t)crc;
+    record[52] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, &graph) ||
+        memcmp(&graph, &saved, sizeof(saved))) return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Implicit model space: no owner H is serialized. The XDictionary
+     * and LAYER references move to the beginning of the H stream. */
+    set_bits(payload, 29u, 2u, 2u);
+    set_bits(payload, 336u, 4u, 3u);
+    set_bits(payload, 340u, 4u, 1u);
+    set_bits(payload, 344u, 8u, 34u);
+    set_bits(payload, 352u, 4u, 5u);
+    set_bits(payload, 356u, 4u, 1u);
+    set_bits(payload, 360u, 8u, 32u);
+    set_bits(payload, 368u, 16u, 0u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 51u, &crc)) return 0;
+    record[51] = (uint8_t)crc;
+    record[52] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, &graph) ||
+        graph.entity_mode != 2u || graph.owner_handle != 0u ||
+        graph.owner_record_offset != 0u ||
+        graph.xdictionary_handle != 34u || graph.layer_handle != 32u ||
+        graph.handle_tail_unparsed_bits != 16u)
+        return 0;
+
+    memcpy(source, pristine, sizeof(source));
+    idx[1].raw_ot = 49u; /* an index-level fake is insufficient */
+    if (musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, &graph)) return 0;
+    idx[1].raw_ot = 42u;
+
+    if (musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 0u, &graph) ||
+        musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u, NULL) ||
+        musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u,
+            (MusaDwgAc1024LineXDictionaryGraph *)(void *)source) ||
+        musa_dwg_ac1024_line_xdictionary_graph_probe(
+            source, sizeof(source), idx, 4u, 48u,
+            (MusaDwgAc1024LineXDictionaryGraph *)(void *)idx) ||
+        memcmp(source, pristine, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -529,6 +653,7 @@ int main(void) {
 
     if (!test_authenticated_line_graph()) return 23;
     if (!test_implicit_line_layer_graph()) return 24;
+    if (!test_xdictionary_original_handle_graph()) return 25;
     puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
