@@ -16,6 +16,7 @@
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_dwg_ac1024_record.h"
 #include "musacad_dwg_ac1024_self_index.h"
+#include "musacad_dwg_ac1024_line.h"
 #include "musacad_dwg_ac1015_handle_refs.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
@@ -398,6 +399,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_entity_meta_refused;
     size_t sampled_owner_layer_attempts, sampled_owner_layer_verified;
     size_t sampled_owner_layer_refused;
+    /* CRC/self-index verified raw OT19 samples, no pixel or entity parity. */
+    size_t sampled_line_attempts;
+    size_t sampled_line_common_verified, sampled_line_common_refused;
+    size_t sampled_line_xyz_verified, sampled_line_xyz_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -935,6 +940,31 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                     else
                                         ++hint.sampled_owner_layer_refused;
                                 }
+                                /* Real LFS DWG only: no guessed stream offsets,
+                                 * no coordinates, source IDs or names emitted.
+                                 * A numeric OT19 is only a candidate LINE. */
+                                if (type == 19u) {
+                                    ++hint.sampled_line_attempts;
+                                    MusaDwgAc1024LineCommon common = {0};
+                                    if (musa_dwg_ac1024_line_common_probe(
+                                            objects, nb, recovered[k].record_offset,
+                                            &common) &&
+                                        common.indexed_handle ==
+                                            recovered[k].embedded_absolute_handle)
+                                        ++hint.sampled_line_common_verified;
+                                    else
+                                        ++hint.sampled_line_common_refused;
+                                    MusaDwgAc1024LineFields xyz = {0};
+                                    if (musa_dwg_ac1024_line_fields_probe(
+                                            objects, nb, recovered[k].record_offset,
+                                            &xyz) &&
+                                        xyz.indexed_handle ==
+                                            recovered[k].embedded_absolute_handle &&
+                                        xyz.coordinates_decoded)
+                                        ++hint.sampled_line_xyz_verified;
+                                    else
+                                        ++hint.sampled_line_xyz_refused;
+                                }
                             }
                         }
                     }
@@ -1338,7 +1368,12 @@ static void report(const char *signature, const char *result,
                "\"sampled_entity_meta_refused\":%zu,"
                "\"sampled_owner_layer_attempts\":%zu,"
                "\"sampled_owner_layer_verified\":%zu,"
-               "\"sampled_owner_layer_refused\":%zu}",
+               "\"sampled_owner_layer_refused\":%zu,"
+               "\"sampled_line_attempts\":%zu,"
+               "\"sampled_line_common_verified\":%zu,"
+               "\"sampled_line_common_refused\":%zu,"
+               "\"sampled_line_xyz_verified\":%zu,"
+               "\"sampled_line_xyz_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1494,7 +1529,12 @@ static void report(const char *signature, const char *result,
                hint->sampled_entity_meta_refused,
                hint->sampled_owner_layer_attempts,
                hint->sampled_owner_layer_verified,
-               hint->sampled_owner_layer_refused);
+               hint->sampled_owner_layer_refused,
+               hint->sampled_line_attempts,
+               hint->sampled_line_common_verified,
+               hint->sampled_line_common_refused,
+               hint->sampled_line_xyz_verified,
+               hint->sampled_line_xyz_refused);
     }
     puts("}");
 }
