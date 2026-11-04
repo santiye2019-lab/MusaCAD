@@ -403,6 +403,11 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_attempts;
     size_t sampled_line_common_verified, sampled_line_common_refused;
     size_t sampled_line_xyz_verified, sampled_line_xyz_refused;
+    /* Source-internal joint witnesses only; independent geometric parity
+     * remains NOT_MEASURABLE. Counts contain no raw drawing fields. */
+    size_t sampled_line_xyz_owner_layer_joined;
+    size_t sampled_line_xyz_distinct_endpoints;
+    size_t sampled_line_xyz_bounded_common;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -915,6 +920,7 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                    no class guess, no raw handles, no owner,
                                    layer, insert coordinate or scene output. */
                                 const uint16_t type = recovered[k].raw_ot;
+                                int line_owner_layer_joinable = 0;
                                 if (type == 7u || type == 17u ||
                                     type == 18u || type == 19u) {
                                     ++hint.sampled_entity_meta_attempts;
@@ -935,10 +941,18 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             recovered[k].embedded_absolute_handle,
                                             &links) &&
                                         links.entity_handle ==
-                                            recovered[k].embedded_absolute_handle)
+                                            recovered[k].embedded_absolute_handle) {
                                         ++hint.sampled_owner_layer_verified;
-                                    else
+                                        line_owner_layer_joinable =
+                                            type == 19u &&
+                                            links.entity_record_offset ==
+                                                recovered[k].record_offset &&
+                                            links.entity_raw_ot == 19u &&
+                                            links.source_crc_verified &&
+                                            links.target_records_verified;
+                                    } else {
                                         ++hint.sampled_owner_layer_refused;
+                                    }
                                 }
                                 /* Real LFS DWG only: no guessed stream offsets,
                                  * no coordinates, source IDs or names emitted.
@@ -946,24 +960,45 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 if (type == 19u) {
                                     ++hint.sampled_line_attempts;
                                     MusaDwgAc1024LineCommon common = {0};
-                                    if (musa_dwg_ac1024_line_common_probe(
+                                    const int common_ok =
+                                        musa_dwg_ac1024_line_common_probe(
                                             objects, nb, recovered[k].record_offset,
                                             &common) &&
                                         common.indexed_handle ==
-                                            recovered[k].embedded_absolute_handle)
+                                            recovered[k].embedded_absolute_handle &&
+                                        common.record_crc_verified;
+                                    if (common_ok)
                                         ++hint.sampled_line_common_verified;
                                     else
                                         ++hint.sampled_line_common_refused;
                                     MusaDwgAc1024LineFields xyz = {0};
-                                    if (musa_dwg_ac1024_line_fields_probe(
+                                    const int xyz_ok =
+                                        musa_dwg_ac1024_line_fields_probe(
                                             objects, nb, recovered[k].record_offset,
                                             &xyz) &&
                                         xyz.indexed_handle ==
                                             recovered[k].embedded_absolute_handle &&
-                                        xyz.coordinates_decoded)
+                                        xyz.coordinates_decoded;
+                                    if (xyz_ok) {
                                         ++hint.sampled_line_xyz_verified;
-                                    else
+                                        if (common_ok &&
+                                            xyz.geometry_start_bit ==
+                                                common.geometry_start_bit &&
+                                            xyz.geometry_end_bit >
+                                                xyz.geometry_start_bit &&
+                                            xyz.geometry_end_bit <=
+                                                common.data_end_bit) {
+                                            ++hint.sampled_line_xyz_bounded_common;
+                                            if (line_owner_layer_joinable)
+                                                ++hint.sampled_line_xyz_owner_layer_joined;
+                                        }
+                                        if (xyz.start[0] != xyz.end[0] ||
+                                            xyz.start[1] != xyz.end[1] ||
+                                            xyz.start[2] != xyz.end[2])
+                                            ++hint.sampled_line_xyz_distinct_endpoints;
+                                    } else {
                                         ++hint.sampled_line_xyz_refused;
+                                    }
                                 }
                             }
                         }
@@ -1373,7 +1408,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_common_verified\":%zu,"
                "\"sampled_line_common_refused\":%zu,"
                "\"sampled_line_xyz_verified\":%zu,"
-               "\"sampled_line_xyz_refused\":%zu}",
+               "\"sampled_line_xyz_refused\":%zu,"
+               "\"sampled_line_xyz_owner_layer_joined\":%zu,"
+               "\"sampled_line_xyz_distinct_endpoints\":%zu,"
+               "\"sampled_line_xyz_bounded_common\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1534,7 +1572,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_common_verified,
                hint->sampled_line_common_refused,
                hint->sampled_line_xyz_verified,
-               hint->sampled_line_xyz_refused);
+               hint->sampled_line_xyz_refused,
+               hint->sampled_line_xyz_owner_layer_joined,
+               hint->sampled_line_xyz_distinct_endpoints,
+               hint->sampled_line_xyz_bounded_common);
     }
     puts("}");
 }
