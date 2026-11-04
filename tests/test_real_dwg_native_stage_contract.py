@@ -143,6 +143,12 @@ def ac1024_probe_record():
             "sampled_h_index_requires_over3_bytes": 0,
             "sampled_h_low8_equal_index": 0,
             "sampled_h_low16_equal_index": 0,
+            "masked6_candidate_index_valid": False,
+            "masked6_candidate_handle_count": 0,
+            "masked6_sample_attempts": 0,
+            "masked6_sample_self_matches": 0,
+            "masked6_sample_other": 0,
+            "masked6_sample_unreadable": 0,
         }
     }
 
@@ -479,6 +485,22 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "mc_invalid_ms_zero": 2,
         })
         self.assertEqual(validate_fake_result(record), record)
+        hint["masked6_candidate_index_valid"] = True
+        hint["masked6_candidate_handle_count"] = 145279
+        hint["masked6_sample_attempts"] = 2048
+        hint["masked6_sample_self_matches"] = 0
+        hint["masked6_sample_other"] = 2048
+        hint["masked6_sample_unreadable"] = 0
+        self.assertEqual(validate_fake_result(record), record)
+        invalid_alt = deepcopy(record)
+        invalid_alt["ac1024_compatibility_hypothesis"][
+            "masked6_sample_attempts"] = 2047
+        with self.assertRaises(ValueError):
+            validate_fake_result(invalid_alt)
+        hint["masked6_candidate_index_valid"] = False
+        with self.assertRaises(ValueError):
+            validate_fake_result(record)
+        hint["masked6_candidate_index_valid"] = True
         hint["legacy_max_offset_multiplicity"] = 2
         with self.assertRaises(ValueError):
             validate_fake_result(record)
