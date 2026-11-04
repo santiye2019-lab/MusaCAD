@@ -156,6 +156,22 @@ static void first_record_failure_preserves_page(void) {
     assert(memcmp(guarded,untouched,sizeof(guarded))==0);
     source[first].has_truecolor=0u;
 }
+static void middle_record_failure_preserves_page(void) {
+    const MusaDwg1032ResolvedColor insert={{7u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{3u,0u,0u},0u};
+    MusaDwg1032ResolvedColor guarded[PAGE+2u];
+    MusaDwg1032ResolvedColor untouched[PAGE+2u];
+    const size_t first=PAGE+3u;
+    const size_t bad=first+PAGE/2u;
+    memset(guarded,0x37,sizeof(guarded));
+    memcpy(untouched,guarded,sizeof(guarded));
+    source[bad].has_truecolor=2u;
+    assert(!musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,PAGE,100u,
+        &insert,&layer,guarded+1u));
+    assert(memcmp(guarded,untouched,sizeof(guarded))==0);
+    source[bad].has_truecolor=0u;
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
@@ -165,5 +181,6 @@ int main(void) {
     unaligned_page_with_canaries();
     unaligned_late_failure_preserves_canaries();
     first_record_failure_preserves_page();
+    middle_record_failure_preserves_page();
     return 0;
 }
