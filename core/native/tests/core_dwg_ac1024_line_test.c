@@ -180,6 +180,119 @@ static int test_authenticated_line_graph(void) {
     return 1;
 }
 
+
+/* Synthetic R2010 model/paper LINE omits the owner H: its H stream
+ * begins with a layer reference. Only the CRC-backed original OT51
+ * layer may be joined; do NOT synthesize an owner/block. */
+static int test_implicit_line_layer_graph(void) {
+    uint8_t source[50] = {0};
+    if (!make_graph_target(source, 51u, 32u) ||
+        !make_line(source + 13u))
+        return 0;
+    uint8_t *const entity = source + 13u;
+    uint8_t *const p = entity + 3u;
+    set_bits(p, 18u, 8u, 48u); /* canonical LINE self H */
+    set_bits(p, 29u, 2u, 2u);  /* implicit model-space owner */
+    set_bits(p, 240u, 4u, 5u); /* first H is the layer, no owner H */
+    set_bits(p, 244u, 4u, 1u);
+    set_bits(p, 248u, 8u, 32u);
+    if (!seal(entity)) return 0;
+    const uint64_t offsets[2] = {0u, 13u};
+    MusaDwgAc1024SelfIdentity idx[2] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 2u, idx, 2u))
+        return 0;
+
+    uint8_t before[sizeof(source)];
+    memcpy(before, source, sizeof(before));
+    MusaDwgAc1024ImplicitLineLayerEvidence witness = {0};
+    if (!musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        witness.geometry.indexed_handle != 48u ||
+        witness.geometry.start[0] != 1.5 ||
+        witness.geometry.end[1] != -2.0 ||
+        witness.geometry.geometry_start_bit != 73u ||
+        witness.geometry.geometry_end_bit != 208u ||
+        witness.implicit_layer.entity_handle != 48u ||
+        witness.implicit_layer.entity_record_offset != 13u ||
+        witness.implicit_layer.layer_handle != 32u ||
+        witness.implicit_layer.layer_record_offset != 0u ||
+        witness.implicit_layer.entity_mode != 2u ||
+        witness.implicit_layer.layer_raw_h_code != 5u ||
+        witness.implicit_layer.entity_raw_ot != 19u ||
+        witness.implicit_layer.handle_tail_unparsed_bits != 0u ||
+        !witness.implicit_layer.source_crc_verified ||
+        !witness.implicit_layer.layer_crc_verified ||
+        memcmp(before, source, sizeof(before)))
+        return 0;
+    const MusaDwgAc1024ImplicitLineLayerEvidence saved = witness;
+
+    /* Same original fields in paper space; no owner is asserted. */
+    set_bits(p, 29u, 2u, 1u);
+    if (!seal(entity) ||
+        !musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        witness.implicit_layer.entity_mode != 1u ||
+        witness.implicit_layer.layer_handle != 32u ||
+        witness.geometry.start[1] != -2.0)
+        return 0;
+    witness = saved;
+    memcpy(source, before, sizeof(source));
+
+    /* Explicit owner mode cannot use this layer-only witness. */
+    set_bits(p, 29u, 2u, 0u);
+    if (!seal(entity) ||
+        musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        memcmp(&witness, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, before, sizeof(source));
+
+    set_bits(p, 248u, 8u, 35u); /* H target does not exist */
+    if (!seal(entity) ||
+        musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        memcmp(&witness, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, before, sizeof(source));
+
+    source[12] ^= 1u; /* original layer CRC must be authenticated */
+    if (musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        memcmp(&witness, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, before, sizeof(source));
+
+    entity[36] ^= 1u; /* LINE CRC, no partial output */
+    if (musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        memcmp(&witness, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, before, sizeof(source));
+
+    idx[0].raw_ot = 49u; /* index target class is not a layer */
+    if (musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, &witness) ||
+        memcmp(&witness, &saved, sizeof(saved)))
+        return 0;
+    idx[0].raw_ot = 51u;
+
+    if (musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 0u, &witness) ||
+        musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u, NULL) ||
+        musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u,
+            (MusaDwgAc1024ImplicitLineLayerEvidence *)(void *)source) ||
+        musa_dwg_ac1024_line_implicit_layer_probe(
+            source, sizeof(source), idx, 2u, 48u,
+            (MusaDwgAc1024ImplicitLineLayerEvidence *)(void *)idx) ||
+        memcmp(&witness, &saved, sizeof(saved)) ||
+        memcmp(source, before, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -401,6 +514,7 @@ int main(void) {
         memcmp(&line3d, &prior3d, sizeof(line3d))) return 11;
 
     if (!test_authenticated_line_graph()) return 23;
+    if (!test_implicit_line_layer_graph()) return 24;
     puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
