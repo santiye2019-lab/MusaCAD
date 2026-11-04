@@ -93,6 +93,23 @@ int musa_dwg_ac1024_line_graph_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_line_handle, MusaDwgAc1024LineGraphEvidence *out);
 
+
+/* Stronger than provisional coordinates, weaker than scene admission.
+ * Fixed OT19 mode 1/2 LINE DATA and independently CRC-backed LAYER OT51
+ * from the same record. There is NO serialized owner H; this API does
+ * NOT assert a block owner, layout, inherited color or image readiness.
+ */
+typedef struct MusaDwgAc1024ImplicitLineLayerEvidence {
+    MusaDwgAc1024LineFields geometry;
+    MusaDwgAc1024ImplicitLayerEvidence implicit_layer;
+} MusaDwgAc1024ImplicitLineLayerEvidence;
+
+int musa_dwg_ac1024_line_implicit_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024ImplicitLineLayerEvidence *out);
+
 #ifdef __cplusplus
 }
 #endif
