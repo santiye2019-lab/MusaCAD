@@ -454,6 +454,15 @@ int main(void) {
         return 2;
     MusaDwgAc1024SelfIdentity saved[2];
     memcpy(saved, records, sizeof(saved));
+    /* Exercise the actual CRC-verified recovered array, not only
+       the synthetic search-order fixtures. */
+    MusaDwgAc1024SelfIdentity match = {0};
+    if (!musa_dwg_ac1024_self_index_find(records, 2u, 1u, &match) ||
+        match.record_offset != 0u || match.raw_ot != 19u ||
+        !musa_dwg_ac1024_self_index_find(records, 2u, 2u, &match) ||
+        match.record_offset != 13u ||
+        musa_dwg_ac1024_self_index_find(records, 2u, 3u, &match))
+        return 11;
     if (musa_dwg_ac1024_recover_self_index(
             objects, sizeof(objects), duplicates, 2u, records, 2u) ||
         musa_dwg_ac1024_recover_self_index(
