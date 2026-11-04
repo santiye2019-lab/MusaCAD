@@ -637,7 +637,7 @@ static int test_eed_line_original_graph(void) {
     if (!make_line(base) ||
         !make_graph_target(source, 51u, 32u) ||
         !make_graph_target(source + 13u, 49u, 47u))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     uint8_t *const entity = source + 26u;
     uint8_t *const p = entity + 3u;
     entity[0] = 40u; /* 40 DATA/H bytes, CRC at entity[43..44] */
@@ -663,7 +663,7 @@ static int test_eed_line_original_graph(void) {
     set_bits(p, 312u, 8u, 32u);
     uint16_t crc = 0u;
     if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     entity[43] = (uint8_t)crc;
     entity[44] = (uint8_t)(crc >> 8u);
 
@@ -671,7 +671,7 @@ static int test_eed_line_original_graph(void) {
     MusaDwgAc1024SelfIdentity idx[3] = {{0}};
     if (!musa_dwg_ac1024_recover_self_index(
             source, sizeof(source), offsets, 3u, idx, 3u))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
 
     uint8_t pristine[sizeof(source)];
     memcpy(pristine, source, sizeof(pristine));
@@ -694,13 +694,13 @@ static int test_eed_line_original_graph(void) {
         result.graph.handles.handle_tail_unparsed_bits != 0u ||
         !result.graph.handles.original_records_crc_verified ||
         memcmp(pristine, source, sizeof(source)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     const MusaDwgAc1024LineEedJoinedEvidence saved = result;
 
     /* PAPER space is another implicit mode: no owner is synthesized. */
     set_bits(p, 63u, 2u, 1u);
     if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     entity[43] = (uint8_t)crc;
     entity[44] = (uint8_t)(crc >> 8u);
     if (!musa_dwg_ac1024_line_eed_verified_probe(
@@ -708,7 +708,7 @@ static int test_eed_line_original_graph(void) {
         result.graph.handles.entity_mode != 1u ||
         result.graph.handles.owner_handle != 0u ||
         result.graph.handles.layer_handle != 32u)
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     result = saved;
     memcpy(source, pristine, sizeof(source));
 
@@ -723,7 +723,7 @@ static int test_eed_line_original_graph(void) {
     set_bits(p, 308u, 4u, 1u);
     set_bits(p, 312u, 8u, 32u);
     if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     entity[43] = (uint8_t)crc;
     entity[44] = (uint8_t)(crc >> 8u);
     if (!musa_dwg_ac1024_line_eed_verified_probe(
@@ -732,7 +732,7 @@ static int test_eed_line_original_graph(void) {
         result.graph.handles.owner_handle != 47u ||
         result.graph.handles.owner_record_offset != 13u ||
         result.graph.handles.layer_handle != 32u)
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
     result = saved;
 
@@ -741,41 +741,44 @@ static int test_eed_line_original_graph(void) {
     if (musa_dwg_ac1024_line_eed_verified_probe(
             source, sizeof(source), idx, 3u, 48u, &result) ||
         memcmp(&saved, &result, sizeof(saved)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
 
     /* Broken EED APPID grammar with re-sealed CRC is still refused. */
     set_bits(p, 36u, 4u, 4u);
     if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     entity[43] = (uint8_t)crc;
     entity[44] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_line_eed_verified_probe(
             source, sizeof(source), idx, 3u, 48u, &result) ||
         memcmp(&saved, &result, sizeof(saved)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
 
     /* XDictionary-present flag means another H3 is mandatory; without
      * an authenticated DICTIONARY OT42 reference this MUST refuse. */
     set_bits(p, 67u, 1u, 0u);
     if (!musa_core_crc16_arc(0xc0c1u, entity, 43u, &crc))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     entity[43] = (uint8_t)crc;
     entity[44] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_line_eed_verified_probe(
             source, sizeof(source), idx, 3u, 48u, &result) ||
         memcmp(&saved, &result, sizeof(saved)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
 
     /* EED and a real XDictionary can coexist. The H stream now has
      * explicit owner H4, DICTIONARY H3 and layer H5; all referenced
      * targets must be authenticated ORIGINAL OT49/OT42/OT51 records. */
     uint8_t with_xdic[84] = {0};
-    memcpy(with_xdic, source, 26u); /* original LAYER and BLOCK_HEADER */
-    if (!make_graph_target(with_xdic + 26u, 42u, 34u))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+    /* Self-index requires increasing embedded H in original records:
+     * LAYER H32, DICTIONARY H34, BLOCK_HEADER H47, LINE H48. */
+    memcpy(with_xdic, source, 13u); /* original LAYER H32 */
+    if (!make_graph_target(with_xdic + 13u, 42u, 34u))
+        return 0;
+    memcpy(with_xdic + 26u, source + 13u, 13u); /* owner H47 */
     memcpy(with_xdic + 39u, pristine + 26u, 45u);
     uint8_t *const xe = with_xdic + 39u;
     uint8_t *const xp = xe + 3u;
@@ -792,14 +795,14 @@ static int test_eed_line_original_graph(void) {
     set_bits(xp, 308u, 4u, 1u);
     set_bits(xp, 312u, 8u, 32u);
     if (!musa_core_crc16_arc(0xc0c1u, xe, 43u, &crc))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     xe[43] = (uint8_t)crc;
     xe[44] = (uint8_t)(crc >> 8u);
     const uint64_t xoffsets[4] = {0u, 13u, 26u, 39u};
     MusaDwgAc1024SelfIdentity xindex[4] = {{0}};
     if (!musa_dwg_ac1024_recover_self_index(
             with_xdic, sizeof(with_xdic), xoffsets, 4u, xindex, 4u))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     MusaDwgAc1024LineEedJoinedEvidence xwitness = {0};
     if (!musa_dwg_ac1024_line_eed_verified_probe(
             with_xdic, sizeof(with_xdic), xindex, 4u, 48u, &xwitness) ||
@@ -808,23 +811,24 @@ static int test_eed_line_original_graph(void) {
         xwitness.graph.handles.xdictionary_handle != 34u ||
         xwitness.graph.handles.layer_handle != 32u ||
         xwitness.graph.handles.entity_record_offset != 39u ||
-        xwitness.graph.handles.xdictionary_record_offset != 26u ||
+        xwitness.graph.handles.xdictionary_record_offset != 13u ||
+        xwitness.graph.handles.owner_record_offset != 26u ||
         xwitness.graph.handles.handle_tail_unparsed_bits != 0u ||
         !xwitness.graph.handles.original_records_crc_verified)
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     const MusaDwgAc1024LineEedJoinedEvidence xsave = xwitness;
-    with_xdic[38] ^= 1u; /* original dictionary CRC corruption */
+    with_xdic[25] ^= 1u; /* original dictionary CRC corruption */
     if (musa_dwg_ac1024_line_eed_verified_probe(
             with_xdic, sizeof(with_xdic), xindex, 4u, 48u, &xwitness) ||
         memcmp(&xsave, &xwitness, sizeof(xsave)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
 
     /* Fail-closed on fabricated index, NULL and overlapping destination. */
     idx[0].raw_ot = 49u;
     if (musa_dwg_ac1024_line_eed_verified_probe(
             source, sizeof(source), idx, 3u, 48u, &result) ||
         memcmp(&saved, &result, sizeof(saved)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     idx[0].raw_ot = 51u;
     if (musa_dwg_ac1024_line_eed_verified_probe(
             source, sizeof(source), idx, 3u, 48u, NULL) ||
@@ -836,7 +840,7 @@ static int test_eed_line_original_graph(void) {
             (MusaDwgAc1024LineEedJoinedEvidence *)(void *)idx) ||
         memcmp(&saved, &result, sizeof(saved)) ||
         memcmp(pristine, source, sizeof(source)))
-        do { fprintf(stderr, "EED graph fixture rejected at C line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     return 1;
 }
 
