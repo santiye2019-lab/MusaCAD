@@ -187,6 +187,10 @@ def ac1024_probe_record():
             "sampled_line_meta_refused": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
+            "sampled_line_common_mode_unsupported": 0,
+            "sampled_line_common_reactors_unsupported": 0,
+            "sampled_line_common_xdic_unsupported": 0,
+            "sampled_line_common_fields_refused": 0,
         }
     }
 
@@ -309,6 +313,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("sampled_line_xyz_after_common_refused", 1),
             ("sampled_line_meta_refused", True),
             ("sampled_line_xyz_after_common_refused", -1),
+            ("sampled_line_common_mode_unsupported", 1),
+            ("sampled_line_common_reactors_unsupported", 1),
+            ("sampled_line_common_xdic_unsupported", 1),
+            ("sampled_line_common_fields_refused", 1),
+            ("sampled_line_common_fields_refused", True),
         ):
             with self.subTest(field=field, value=value):
                 invalid = deepcopy(original)
@@ -327,6 +336,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_line_meta_refused",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
+            "sampled_line_common_mode_unsupported",
+            "sampled_line_common_reactors_unsupported",
+            "sampled_line_common_xdic_unsupported",
+            "sampled_line_common_fields_refused",
         ):
             with self.subTest(missing=missing):
                 invalid = deepcopy(original)
