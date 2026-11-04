@@ -469,6 +469,34 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("incomplete_ac1024_full_self_h_census")
         elif any(hint[k] for k in census_fields):
             raise ValueError("unmeasured_ac1024_full_self_h_claim")
+        recovered_attempted = hint.get("core_embedded_h_recovery_attempted")
+        recovered_ok = hint.get("core_embedded_h_recovery_succeeded")
+        recovered_count = hint.get("core_embedded_h_recovery_records")
+        recovered_old_matches = hint.get(
+            "core_embedded_h_recovery_original_index_matches")
+        if (type(recovered_attempted) is not bool or
+                type(recovered_ok) is not bool or
+                type(recovered_count) is not int or
+                type(recovered_old_matches) is not int or
+                recovered_count < 0 or recovered_old_matches < 0):
+            raise ValueError("invalid_ac1024_recovered_index_contract")
+        if measured:
+            if not recovered_attempted:
+                raise ValueError("missing_ac1024_recovered_index_attempt")
+            if recovered_ok:
+                if (not census_complete or recovered_count != handles or
+                        recovered_old_matches != full_self or
+                        full_parsed != handles or full_other or full_bad or
+                        full_up != handles - 1 or full_down or full_equal):
+                    raise ValueError("unproven_ac1024_recovered_index")
+            elif recovered_count or recovered_old_matches:
+                raise ValueError("false_ac1024_recovered_index_count")
+            elif (census_complete and full_parsed == handles and
+                  full_up == handles - 1 and not full_down and
+                  not full_equal and not full_other and not full_bad):
+                raise ValueError("ac1024_reconciliation_failed_despite_valid_census")
+        elif recovered_attempted or recovered_ok or recovered_count or recovered_old_matches:
+            raise ValueError("unmeasured_ac1024_recovered_index_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
