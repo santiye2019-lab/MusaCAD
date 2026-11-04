@@ -564,7 +564,8 @@ static int test_r2010_tagged_truecolor(void) {
         set_bits(dst, bit, 1u, v);
     }
     set_bits(dst, 34u, 2u, 0u); /* BS raw16 */
-    set_bits(dst, 36u, 16u, 0x8000u); /* complex RGB ENC flag */
+    set_bits(dst, 36u, 8u, 0x00u); /* BS raw16 LOW byte */
+    set_bits(dst, 44u, 8u, 0x80u); /* BS raw16 HIGH byte: 0x8000 ENC */
     set_bits(dst, 52u, 2u, 0u); /* BL raw32 */
     set_bits(dst, 54u, 8u, 0x33u); /* B */
     set_bits(dst, 62u, 8u, 0x22u); /* G */
