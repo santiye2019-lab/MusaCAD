@@ -31,7 +31,11 @@ int musa_dwg_ac1024_line_common_probe(
          * This is DATA-only geometry evidence: owner/layer resolution
          * remains a distinct verified graph gate before scene admission. */
         meta.entity_mode > 2u || meta.reactor_count != 0u ||
-        meta.xdictionary_missing != 1u ||
+        /* An XDictionary-present flag adds an H-stream reference, not
+         * a DATA-stream offset. A CRC-authenticated LINE may expose
+         * provisional DATA-only geometry here; no owner/layer/scene
+         * graph may use that geometry until the XDictionary H is
+         * separately validated. See ODA R2004+ common entity fields. */
         meta.payload_start_byte >= object_bytes ||
         meta.handle_stream_end_bit / 8u >
             object_bytes - meta.payload_start_byte ||
