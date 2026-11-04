@@ -769,6 +769,56 @@ static int test_eed_line_original_graph(void) {
         return 0;
     memcpy(source, pristine, sizeof(source));
 
+    /* EED and a real XDictionary can coexist. The H stream now has
+     * explicit owner H4, DICTIONARY H3 and layer H5; all referenced
+     * targets must be authenticated ORIGINAL OT49/OT42/OT51 records. */
+    uint8_t with_xdic[84] = {0};
+    memcpy(with_xdic, source, 26u); /* original LAYER and BLOCK_HEADER */
+    if (!make_graph_target(with_xdic + 26u, 42u, 34u))
+        return 0;
+    memcpy(with_xdic + 39u, pristine + 26u, 45u);
+    uint8_t *const xe = with_xdic + 39u;
+    uint8_t *const xp = xe + 3u;
+    xe[2] = 48u; /* three 16-bit references: handle tail starts bit272 */
+    set_bits(xp, 63u, 2u, 0u); /* explicit owner */
+    set_bits(xp, 67u, 1u, 0u); /* XDictionary PRESENT */
+    set_bits(xp, 272u, 4u, 4u); /* BLOCK_HEADER OT49/H47 */
+    set_bits(xp, 276u, 4u, 1u);
+    set_bits(xp, 280u, 8u, 47u);
+    set_bits(xp, 288u, 4u, 3u); /* DICTIONARY OT42/H34 */
+    set_bits(xp, 292u, 4u, 1u);
+    set_bits(xp, 296u, 8u, 34u);
+    set_bits(xp, 304u, 4u, 5u); /* LAYER OT51/H32 */
+    set_bits(xp, 308u, 4u, 1u);
+    set_bits(xp, 312u, 8u, 32u);
+    if (!musa_core_crc16_arc(0xc0c1u, xe, 43u, &crc))
+        return 0;
+    xe[43] = (uint8_t)crc;
+    xe[44] = (uint8_t)(crc >> 8u);
+    const uint64_t xoffsets[4] = {0u, 13u, 26u, 39u};
+    MusaDwgAc1024SelfIdentity xindex[4] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            with_xdic, sizeof(with_xdic), xoffsets, 4u, xindex, 4u))
+        return 0;
+    MusaDwgAc1024LineEedJoinedEvidence xwitness = {0};
+    if (!musa_dwg_ac1024_line_eed_verified_probe(
+            with_xdic, sizeof(with_xdic), xindex, 4u, 48u, &xwitness) ||
+        xwitness.geometry.geometry_start_bit != 107u ||
+        xwitness.graph.handles.owner_handle != 47u ||
+        xwitness.graph.handles.xdictionary_handle != 34u ||
+        xwitness.graph.handles.layer_handle != 32u ||
+        xwitness.graph.handles.entity_record_offset != 39u ||
+        xwitness.graph.handles.xdictionary_record_offset != 26u ||
+        xwitness.graph.handles.handle_tail_unparsed_bits != 0u ||
+        !xwitness.graph.handles.original_records_crc_verified)
+        return 0;
+    const MusaDwgAc1024LineEedJoinedEvidence xsave = xwitness;
+    with_xdic[38] ^= 1u; /* original dictionary CRC corruption */
+    if (musa_dwg_ac1024_line_eed_verified_probe(
+            with_xdic, sizeof(with_xdic), xindex, 4u, 48u, &xwitness) ||
+        memcmp(&xsave, &xwitness, sizeof(xsave)))
+        return 0;
+
     /* Fail-closed on fabricated index, NULL and overlapping destination. */
     idx[0].raw_ot = 49u;
     if (musa_dwg_ac1024_line_eed_verified_probe(
