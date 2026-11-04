@@ -250,10 +250,121 @@ static int test_no_proxy_subset(void) {
     return 1;
 }
 
+static int test_entity_meta_subset(void) {
+    _Alignas(MusaDwgAc1024EntityMetaPrefix) uint8_t record[64] = {0};
+    if (!make_record(record, 44u)) return 0;
+    set_bits(record + 3u, 26u, 2u, 2u); /* zero EED BS */
+    set_bits(record + 3u, 28u, 1u, 0u); /* no proxy */
+    set_bits(record + 3u, 29u, 2u, 0u); /* owner-reference mode */
+    set_bits(record + 3u, 31u, 2u, 2u); /* BL zero reactors */
+    set_bits(record + 3u, 33u, 1u, 1u); /* no XDictionary */
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc)) return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    uint8_t original[13];
+    memcpy(original, record, sizeof(original));
+    MusaDwgAc1024EntityMetaPrefix out = {0};
+    if (!musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u, &out) ||
+        out.raw_ot != 19u || out.embedded_absolute_handle != 44u ||
+        out.payload_start_byte != 3u ||
+        out.data_after_entity_mode_bit != 31u ||
+        out.data_after_reactors_bit != 33u ||
+        out.data_after_xdic_bit != 34u ||
+        out.handle_stream_start_bit != 48u ||
+        out.handle_stream_end_bit != 64u ||
+        out.reactor_count != 0u || out.entity_mode != 0u ||
+        out.xdictionary_missing != 1u ||
+        !out.original_crc16_verified ||
+        memcmp(record, original, sizeof(original)))
+        return 0;
+    const MusaDwgAc1024EntityMetaPrefix saved = out;
+
+    /* Rejected reserved mode does not become an owner link. */
+    set_bits(record + 3u, 29u, 2u, 3u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc)) return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(out)))
+        return 0;
+
+    /* Valid modes 1 and 2 have no implied explicit owner ref. */
+    for (uint32_t mode = 1u; mode <= 2u; mode++) {
+        memcpy(record, original, sizeof(original));
+        set_bits(record + 3u, 29u, 2u, mode);
+        if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+            return 0;
+        record[11] = (uint8_t)crc;
+        record[12] = (uint8_t)(crc >> 8u);
+        MusaDwgAc1024EntityMetaPrefix other = {0};
+        if (!musa_dwg_ac1024_record_entity_meta_prefix(
+                record, 13u, 0u, &other) || other.entity_mode != mode ||
+            other.data_after_xdic_bit != 34u)
+            return 0;
+    }
+
+    /* Unknown class/object type, nonzero reactor overflow, truncated
+       BL and XDic flag, corrupt CRC and all aliases fail atomically. */
+    memcpy(record, original, sizeof(original));
+    set_bits(record + 3u, 2u, 8u, 51u); /* LAYER is not an entity */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc)) return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(out)))
+        return 0;
+
+    memcpy(record, original, sizeof(original));
+    set_bits(record + 3u, 31u, 2u, 3u); /* reserved BL opcode */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc)) return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(out)))
+        return 0;
+
+    memcpy(record, original, sizeof(original));
+    record[2] = 31u; /* separate H starts at bit 33: XDic not readable */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc)) return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(out)))
+        return 0;
+
+    memcpy(record, original, sizeof(original));
+    record[12] ^= 0x40u;
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(out)))
+        return 0;
+    memcpy(record, original, sizeof(original));
+    if (musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 12u, 0u, &out) ||
+        musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 13u, &out) ||
+        musa_dwg_ac1024_record_entity_meta_prefix(
+            record, 13u, 0u,
+            (MusaDwgAc1024EntityMetaPrefix *)(void *)record) ||
+        musa_dwg_ac1024_record_entity_meta_prefix(
+            NULL, 0u, 0u, &out) ||
+        memcmp(&saved, &out, sizeof(out)) ||
+        memcmp(record, original, sizeof(original)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
     if (!test_no_proxy_subset()) return 8;
+    if (!test_entity_meta_subset()) return 9;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
     if (!make_record(objects, 1u) ||
         !make_record(objects + 13u, 2u))
