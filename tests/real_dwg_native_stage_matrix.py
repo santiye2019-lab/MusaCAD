@@ -545,6 +545,30 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if not recovered_ok and (
                 link_attempts or link_verified or link_refused):
             raise ValueError("unrecovered_ac1024_owner_layer_claim")
+        # Bounded samples of *original* LFS DWG raw OT19 LINE records.
+        # A valid common prefix/XYZ field parse is NOT rendering, owner
+        # linkage, independent geometric parity, or normal-open acceptance.
+        line_keys = (
+            "sampled_line_attempts",
+            "sampled_line_common_verified",
+            "sampled_line_common_refused",
+            "sampled_line_xyz_verified",
+            "sampled_line_xyz_refused",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in line_keys):
+            raise ValueError("invalid_ac1024_line_sample_type")
+        (line_attempts, line_common_ok, line_common_bad,
+         line_xyz_ok, line_xyz_bad) = (hint[k] for k in line_keys)
+        if (line_attempts > entity_attempts or
+                line_attempts > 2048 or
+                line_attempts != line_common_ok + line_common_bad or
+                line_attempts != line_xyz_ok + line_xyz_bad or
+                line_common_ok > entity_verified or
+                line_xyz_ok > line_common_ok):
+            raise ValueError("invalid_ac1024_line_sample_counts")
+        if not recovered_ok and any(hint[k] for k in line_keys):
+            raise ValueError("unrecovered_ac1024_line_sample_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
