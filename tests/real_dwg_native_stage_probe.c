@@ -412,6 +412,11 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_meta_refused;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
+    /* Precedence-classified subset of common refusals AFTER meta admission. */
+    size_t sampled_line_common_mode_unsupported;
+    size_t sampled_line_common_reactors_unsupported;
+    size_t sampled_line_common_xdic_unsupported;
+    size_t sampled_line_common_fields_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -926,10 +931,10 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 const uint16_t type = recovered[k].raw_ot;
                                 int line_owner_layer_joinable = 0;
                                 int line_meta_ok = 0;
+                                MusaDwgAc1024EntityMetaPrefix meta = {0};
                                 if (type == 7u || type == 17u ||
                                     type == 18u || type == 19u) {
                                     ++hint.sampled_entity_meta_attempts;
-                                    MusaDwgAc1024EntityMetaPrefix meta = {0};
                                     if (musa_dwg_ac1024_record_entity_meta_prefix(
                                             objects, nb, recovered[k].record_offset,
                                             &meta) &&
@@ -978,10 +983,21 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                         ++hint.sampled_line_common_verified;
                                     } else {
                                         ++hint.sampled_line_common_refused;
-                                        if (line_meta_ok)
+                                        if (line_meta_ok) {
                                             ++hint.sampled_line_common_after_meta_refused;
-                                        else
+                                            /* First unsupported policy wins; do not conflate
+                                             * it with a corrupt CRC or unreadable record. */
+                                            if (meta.entity_mode != 0u)
+                                                ++hint.sampled_line_common_mode_unsupported;
+                                            else if (meta.reactor_count != 0u)
+                                                ++hint.sampled_line_common_reactors_unsupported;
+                                            else if (meta.xdictionary_missing != 1u)
+                                                ++hint.sampled_line_common_xdic_unsupported;
+                                            else
+                                                ++hint.sampled_line_common_fields_refused;
+                                        } else {
                                             ++hint.sampled_line_meta_refused;
+                                        }
                                     }
                                     MusaDwgAc1024LineFields xyz = {0};
                                     const int xyz_ok =
@@ -1428,7 +1444,11 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_xyz_bounded_common\":%zu,"
                "\"sampled_line_meta_refused\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
-               "\"sampled_line_xyz_after_common_refused\":%zu}",
+               "\"sampled_line_xyz_after_common_refused\":%zu,"
+               "\"sampled_line_common_mode_unsupported\":%zu,"
+               "\"sampled_line_common_reactors_unsupported\":%zu,"
+               "\"sampled_line_common_xdic_unsupported\":%zu,"
+               "\"sampled_line_common_fields_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1595,7 +1615,11 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_xyz_bounded_common,
                hint->sampled_line_meta_refused,
                hint->sampled_line_common_after_meta_refused,
-               hint->sampled_line_xyz_after_common_refused);
+               hint->sampled_line_xyz_after_common_refused,
+               hint->sampled_line_common_mode_unsupported,
+               hint->sampled_line_common_reactors_unsupported,
+               hint->sampled_line_common_xdic_unsupported,
+               hint->sampled_line_common_fields_refused);
     }
     puts("}");
 }
