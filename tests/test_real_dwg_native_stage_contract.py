@@ -170,6 +170,9 @@ def ac1024_probe_record():
             "sampled_zero_eed_refused": 0,
             "sampled_no_proxy_verified": 0,
             "sampled_no_proxy_refused": 0,
+            "sampled_entity_meta_attempts": 0,
+            "sampled_entity_meta_verified": 0,
+            "sampled_entity_meta_refused": 0,
         }
     }
 
@@ -214,6 +217,23 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             ("sampled_no_proxy_refused", 1),
             ("sampled_no_proxy_verified", -1),
             ("sampled_no_proxy_refused", True),
+        ):
+            with self.subTest(field=field, value=value):
+                invalid = deepcopy(original)
+                invalid["ac1024_compatibility_hypothesis"][field] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(invalid)
+
+    def test_entity_meta_subset_does_not_claim_owner_or_geometry(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for field, value in (
+            ("sampled_entity_meta_attempts", 1),
+            ("sampled_entity_meta_verified", 1),
+            ("sampled_entity_meta_refused", 1),
+            ("sampled_entity_meta_attempts", 2049),
+            ("sampled_entity_meta_attempts", True),
+            ("sampled_entity_meta_verified", -1),
         ):
             with self.subTest(field=field, value=value):
                 invalid = deepcopy(original)
