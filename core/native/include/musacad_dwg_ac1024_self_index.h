@@ -90,6 +90,41 @@ int musa_dwg_ac1024_record_no_proxy_prefix(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024NoProxyPrefix *out);
 
+/* R2010 common ENTITY preamble witness following authenticated
+ * OT + self-H + empty-EED + absent-proxy graphic:
+ *   BB entity-mode, BL reactor count, B XDictionary-missing flag.
+ * This deliberately covers ONLY fixed built-in types INSERT(7),
+ * ARC(17), CIRCLE(18), LINE(19). Other OT values MUST be
+ * class-resolved independently before any entity interpretation.
+ *
+ * Values are raw R2010 DATA evidence, never owner, layer or geometry
+ * identity. A missing XDictionary flag does not authenticate any
+ * handle reference. The DATA reader never enters the separate H stream.
+ * No rendering, normal-open, writer or commercial licensing claim. */
+typedef struct MusaDwgAc1024EntityMetaPrefix {
+    uint64_t indexed_object_offset;
+    uint64_t embedded_absolute_handle;
+    size_t payload_start_byte;
+    size_t data_after_entity_mode_bit;
+    size_t data_after_reactors_bit;
+    size_t data_after_xdic_bit;
+    size_t handle_stream_start_bit;
+    size_t handle_stream_end_bit;
+    uint32_t reactor_count;
+    uint16_t raw_ot;
+    uint8_t entity_mode;
+    uint8_t xdictionary_missing;
+    uint8_t original_crc16_verified;
+} MusaDwgAc1024EntityMetaPrefix;
+
+/* Atomic, source-immutable and fail-closed. Reject the reserved mode 3,
+ * more than 1024 reactors, malformed BL, any stream boundary crossing,
+ * unsupported raw OT, source alias and malformed CRC. Success exposes
+ * only a partial common DATA field boundary, never owner references. */
+int musa_dwg_ac1024_record_entity_meta_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024EntityMetaPrefix *out);
+
 /* All-or-nothing read-only reconciliation of independently authenticated
  * AcDb:Handles RECORD OFFSETS with CRC-verified R2010 object self-H.
  *
