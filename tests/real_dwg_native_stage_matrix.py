@@ -440,6 +440,35 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("unproven_ac1024_alternate_map_sample")
         elif any(hint[k] for k in alt_fields):
             raise ValueError("unverified_ac1024_alternate_map_claim")
+        census_complete = hint.get("full_embedded_h_census_completed")
+        census_fields = (
+            "full_embedded_h_attempts", "full_embedded_h_parsed_code0",
+            "full_embedded_h_other_codes", "full_embedded_h_unreadable",
+            "full_embedded_h_self_matches",
+            "full_embedded_h_less_than_index",
+            "full_embedded_h_greater_than_index",
+            "full_embedded_h_neighbor_pairs",
+            "full_embedded_h_increases", "full_embedded_h_decreases",
+            "full_embedded_h_equals",
+        )
+        if (type(census_complete) is not bool or
+                any(type(hint.get(k)) is not int or hint[k] < 0
+                    for k in census_fields)):
+            raise ValueError("invalid_ac1024_full_self_h_census")
+        (full_attempts, full_parsed, full_other, full_bad,
+         full_self, full_less, full_greater, full_pairs,
+         full_up, full_down, full_equal) = (
+            hint[k] for k in census_fields)
+        if census_complete:
+            if (not measured or full_attempts != handles or
+                    full_parsed + full_other + full_bad != full_attempts or
+                    full_self + full_less + full_greater != full_parsed or
+                    full_pairs > max(full_parsed - 1, 0) or
+                    full_up + full_down + full_equal != full_pairs or
+                    full_self < self_matches):
+                raise ValueError("incomplete_ac1024_full_self_h_census")
+        elif any(hint[k] for k in census_fields):
+            raise ValueError("unmeasured_ac1024_full_self_h_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
