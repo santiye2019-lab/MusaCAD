@@ -103,6 +103,142 @@ static int test_self_prefix_cursor(void) {
     return 1;
 }
 
+/* Exact bounded R2010 EED framing: BS byte count + canonical H5
+ * application handle + opaque raw bytes, terminated by BS zero. The
+ * underlying source/CRC are original fixture bytes; there is no
+ * inference of app semantics, layer, owner or geometry. */
+static int test_eed_chain_bounded(void) {
+    _Alignas(MusaDwgAc1024EedChainEvidence) uint8_t record[64] = {0};
+    record[0] = 16u; /* 16 payload bytes; 16 trailing H bits */
+    record[2] = 16u;
+    uint8_t *const p = record + 3u;
+    set_bits(p, 0u, 2u, 0u);  /* OT short selector */
+    set_bits(p, 2u, 8u, 19u); /* LINE */
+    set_bits(p, 10u, 4u, 0u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 44u); /* self-H */
+    set_bits(p, 26u, 2u, 1u); /* first EED application length BS(3) */
+    set_bits(p, 28u, 8u, 3u);
+    set_bits(p, 36u, 4u, 5u); /* app handle H5 */
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 42u);
+    set_bits(p, 52u, 8u, 0x23u); /* opaque 3-byte payload */
+    set_bits(p, 60u, 8u, 0x55u);
+    set_bits(p, 68u, 8u, 0xaau);
+    set_bits(p, 76u, 2u, 2u); /* zero BS EED terminator */
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 19u, &crc))
+        return 0;
+    record[19] = (uint8_t)crc;
+    record[20] = (uint8_t)(crc >> 8u);
+    uint8_t original[21];
+    memcpy(original, record, sizeof(original));
+    MusaDwgAc1024EedChainEvidence out = {0};
+    if (!musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, &out) ||
+        out.indexed_object_offset != 0u ||
+        out.embedded_absolute_handle != 44u ||
+        out.payload_start_byte != 3u ||
+        out.raw_ot != 19u ||
+        out.data_after_eed_bit != 78u ||
+        out.handle_stream_start_bit != 112u ||
+        out.handle_stream_end_bit != 128u ||
+        out.application_count != 1u ||
+        out.application_data_bytes != 3u ||
+        !out.original_crc16_verified ||
+        !out.eed_boundaries_verified ||
+        memcmp(original, record, sizeof(original)))
+        return 0;
+    const MusaDwgAc1024EedChainEvidence saved = out;
+
+    /* A second bounded EED application ends exactly at DATA bit 112. */
+    set_bits(p, 76u, 2u, 1u); /* BS length 1 */
+    set_bits(p, 78u, 8u, 1u);
+    set_bits(p, 86u, 4u, 5u); /* H5 */
+    set_bits(p, 90u, 4u, 1u);
+    set_bits(p, 94u, 8u, 43u);
+    set_bits(p, 102u, 8u, 0x70u);
+    set_bits(p, 110u, 2u, 2u); /* BS zero terminator */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 19u, &crc))
+        return 0;
+    record[19] = (uint8_t)crc;
+    record[20] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, &out) ||
+        out.application_count != 2u ||
+        out.application_data_bytes != 4u ||
+        out.data_after_eed_bit != 112u)
+        return 0;
+    memcpy(record, original, sizeof(original));
+    out = saved;
+
+    /* Correct frame CRC alone never authorizes a malformed application
+     * handle, overlong data, nonterminated chain or noncanonical H. */
+    set_bits(p, 36u, 4u, 4u); /* wrong H code */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 19u, &crc))
+        return 0;
+    record[19] = (uint8_t)crc;
+    record[20] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved))) return 0;
+    memcpy(record, original, sizeof(original));
+
+    set_bits(p, 28u, 8u, 12u); /* too many bytes for bounded DATA */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 19u, &crc))
+        return 0;
+    record[19] = (uint8_t)crc;
+    record[20] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved))) return 0;
+    memcpy(record, original, sizeof(original));
+
+    set_bits(p, 40u, 4u, 0u); /* no app handle ID bytes */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 19u, &crc))
+        return 0;
+    record[19] = (uint8_t)crc;
+    record[20] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved))) return 0;
+    memcpy(record, original, sizeof(original));
+
+    record[20] ^= 1u; /* corrupted source CRC */
+    if (musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved))) return 0;
+    memcpy(record, original, sizeof(original));
+
+    if (musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original) - 1u, 0u, &out) ||
+        musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u, NULL) ||
+        musa_dwg_ac1024_record_eed_chain_probe(
+            record, sizeof(original), 0u,
+            (MusaDwgAc1024EedChainEvidence *)(void *)record) ||
+        memcmp(&out, &saved, sizeof(saved)) ||
+        memcmp(record, original, sizeof(original)))
+        return 0;
+
+    /* No EED is still valid bounded framing but must NOT promote
+     * the older zero-EED-only entry points to arbitrary EED. */
+    uint8_t zero[13] = {0};
+    if (!make_record(zero, 44u)) return 0;
+    set_bits(zero + 3u, 26u, 2u, 2u);
+    if (!musa_core_crc16_arc(0xc0c1u, zero, 11u, &crc))
+        return 0;
+    zero[11] = (uint8_t)crc;
+    zero[12] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_record_eed_chain_probe(
+            zero, sizeof(zero), 0u, &out) ||
+        out.application_count != 0u ||
+        out.application_data_bytes != 0u ||
+        out.data_after_eed_bit != 28u)
+        return 0;
+    return 1;
+}
+
 static int test_zero_eed_subset(void) {
     _Alignas(MusaDwgAc1024ZeroEedPrefix) uint8_t record[64] = {0};
     if (!make_record(record, 44u)) return 0;
@@ -636,6 +772,7 @@ int main(void) {
     if (!test_verified_self_index_find()) return 10;
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
+    if (!test_eed_chain_bounded()) return 13;
     if (!test_no_proxy_subset()) return 8;
     if (!test_entity_meta_subset()) return 9;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
