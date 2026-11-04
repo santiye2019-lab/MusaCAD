@@ -39,7 +39,72 @@ static int make_record(uint8_t *out, uint32_t self_handle) {
     out[12] = (uint8_t)(crc >> 8u);
     return 1;
 }
+static int test_self_prefix_cursor(void) {
+    _Alignas(MusaDwgAc1024SelfPrefix) uint8_t record[64] = {0};
+    if (!make_record(record, 44u)) return 0;
+    uint8_t original[13];
+    memcpy(original, record, sizeof(original));
+    MusaDwgAc1024SelfPrefix prefix = {0};
+    if (!musa_dwg_ac1024_record_self_prefix(
+            record, 13u, 0u, &prefix) ||
+        prefix.indexed_object_offset != 0u ||
+        prefix.embedded_absolute_handle != 44u ||
+        prefix.payload_start_byte != 3u ||
+        prefix.data_after_self_bit != 26u ||
+        prefix.handle_stream_start_bit != 48u ||
+        prefix.handle_stream_end_bit != 64u ||
+        prefix.raw_ot != 19u ||
+        !prefix.frame_crc16_verified ||
+        !prefix.embedded_handle_code0_verified ||
+        memcmp(record, original, sizeof(original)))
+        return 0;
+    const MusaDwgAc1024SelfPrefix saved = prefix;
+
+    /* Late CRC corruption, truncation, bad absolute H code and canonical
+     * leading-zero errors all preserve the caller's original output. */
+    record[12] ^= 0x40u;
+    if (musa_dwg_ac1024_record_self_prefix(
+            record, 13u, 0u, &prefix) ||
+        memcmp(&prefix, &saved, sizeof(saved)))
+        return 0;
+    if (!make_record(record, 44u)) return 0;
+    set_bits(record + 3u, 10u, 4u, 1u);
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_self_prefix(
+            record, 13u, 0u, &prefix) ||
+        memcmp(&prefix, &saved, sizeof(saved)))
+        return 0;
+    if (!make_record(record, 44u)) return 0;
+    set_bits(record + 3u, 18u, 8u, 0u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_self_prefix(
+            record, 13u, 0u, &prefix) ||
+        memcmp(&prefix, &saved, sizeof(saved)))
+        return 0;
+    if (!make_record(record, 44u)) return 0;
+    if (musa_dwg_ac1024_record_self_prefix(
+            record, 12u, 0u, &prefix) ||
+        musa_dwg_ac1024_record_self_prefix(
+            record, 13u, 13u, &prefix) ||
+        musa_dwg_ac1024_record_self_prefix(
+            record, 13u, 0u, (MusaDwgAc1024SelfPrefix *)(void *)record) ||
+        musa_dwg_ac1024_record_self_prefix(
+            NULL, 0u, 0u, &prefix) ||
+        memcmp(&prefix, &saved, sizeof(saved)) ||
+        memcmp(record, original, sizeof(original)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
+    if (!test_self_prefix_cursor()) return 6;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
     if (!make_record(objects, 1u) ||
         !make_record(objects + 13u, 2u))
