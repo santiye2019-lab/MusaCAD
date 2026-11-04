@@ -518,6 +518,18 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 no_proxy_verified + no_proxy_refused != zero_eed_attempts or
                 no_proxy_verified > zero_eed_verified):
             raise ValueError("invalid_ac1024_no_proxy_sample_contract")
+        entity_attempts = hint.get("sampled_entity_meta_attempts")
+        entity_verified = hint.get("sampled_entity_meta_verified")
+        entity_refused = hint.get("sampled_entity_meta_refused")
+        if (any(type(n) is not int or n < 0 for n in (
+                entity_attempts, entity_verified, entity_refused)) or
+                entity_attempts > zero_eed_attempts or
+                entity_verified + entity_refused != entity_attempts or
+                entity_verified > no_proxy_verified):
+            raise ValueError("invalid_ac1024_entity_meta_sample_contract")
+        if not recovered_ok and (
+                entity_attempts or entity_verified or entity_refused):
+            raise ValueError("unrecovered_ac1024_entity_meta_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
