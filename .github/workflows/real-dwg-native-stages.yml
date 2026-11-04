@@ -77,6 +77,15 @@ jobs:
             -o /tmp/musacad-ac1024-self-index-test
           /tmp/musacad-ac1024-self-index-test
 
+      - name: Verify strict AC1024 2D/3D LINE endpoints and CRC atomicity
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            -Icore/native/include core/native/tests/core_dwg_ac1024_line_test.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-line-test
+          /tmp/musacad-ac1024-line-test
+
       - name: Verify synthetic R2010 MC frame and CRC failure cases
         run: |
           set -euo pipefail
