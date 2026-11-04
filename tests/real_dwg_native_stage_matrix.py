@@ -558,6 +558,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_xyz_distinct_endpoints",
             "sampled_line_xyz_bounded_common",
             "sampled_line_meta_refused",
+            "sampled_line_meta_self_refused",
+            "sampled_line_meta_eed_refused",
+            "sampled_line_meta_proxy_refused",
+            "sampled_line_meta_entity_fields_refused",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -585,6 +589,7 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         (line_attempts, line_common_ok, line_common_bad,
          line_xyz_ok, line_xyz_bad, line_joined, line_distinct,
          line_bounded, line_meta_rejected,
+         line_meta_self, line_meta_eed, line_meta_proxy, line_meta_fields,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected, implicit_paper_xyz,
@@ -618,6 +623,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 xdic_hgraph_attempts != xdic_present_xyz_ok or
                 xdic_hgraph_ok + xdic_hgraph_bad != xdic_hgraph_attempts or
                 line_meta_rejected > entity_refused or
+                line_meta_rejected != (
+                    line_meta_self + line_meta_eed +
+                    line_meta_proxy + line_meta_fields) or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
                 line_common_after_meta_rejected != (
