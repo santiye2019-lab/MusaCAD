@@ -178,6 +178,99 @@ int musa_dwg_ac1024_record_entity_meta_prefix(
     return 1;
 }
 
+/* Narrow first-party R2010 H decoder from the documented 4+4+N*8
+ * wire grammar. Not a copy or adapter of the legacy GPL decoder. */
+static int r2010_link_h(MusaDwgAc1015Bits *bits, uint64_t self,
+                         int owner, uint64_t *target, uint8_t *code_out) {
+    MusaDwgAc1015Bits cur = *bits;
+    uint32_t code = 0u, count = 0u, byte = 0u;
+    if (!musa_dwg_ac1015_bits_read_u(&cur, 4u, &code) ||
+        !musa_dwg_ac1015_bits_read_u(&cur, 4u, &count) ||
+        !(owner ? (code == 4u || code == 12u) : code == 5u) ||
+        count == 0u || count > 8u) return 0;
+    uint64_t value = 0u;
+    for (uint32_t i = 0u; i < count; ++i) {
+        if (!musa_dwg_ac1015_bits_read_u(&cur, 8u, &byte) ||
+            (i == 0u && byte == 0u)) return 0;
+        value = (value << 8u) | byte;
+    }
+    if (value == 0u || (code == 12u && value >= self)) return 0;
+    const uint64_t resolved = code == 12u ? self - value : value;
+    if (resolved == self || resolved == 0u) return 0;
+    *bits = cur; *target = resolved; *code_out = (uint8_t)code;
+    return 1;
+}
+
+/* Only an explicit-owner, no-reactor, no-XDictionary built-in entity.
+ * Authenticates both referenced ORIGINAL target records by CRC/OT/self-H.
+ * Further tail handles, geometry and final paint remain unexamined. */
+int musa_dwg_ac1024_entity_owner_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024OwnerLayerEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !entity_handle || !record_count ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out))) return 0;
+
+    MusaDwgAc1024SelfIdentity entity = {0}, owner = {0}, layer = {0};
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, entity_handle, &entity) ||
+        !musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, entity.record_offset, &meta) ||
+        meta.embedded_absolute_handle != entity_handle ||
+        meta.raw_ot != entity.raw_ot || !meta.original_crc16_verified ||
+        meta.entity_mode != 0u || meta.reactor_count != 0u ||
+        meta.xdictionary_missing != 1u ||
+        meta.payload_start_byte >= object_bytes ||
+        meta.handle_stream_end_bit / 8u >
+            object_bytes - meta.payload_start_byte) return 0;
+
+    MusaDwgAc1015Bits tail = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &tail, objects + meta.payload_start_byte,
+            meta.handle_stream_end_bit / 8u,
+            meta.handle_stream_start_bit, meta.handle_stream_end_bit))
+        return 0;
+    uint64_t owner_h = 0u, layer_h = 0u;
+    uint8_t owner_code = 0u, layer_code = 0u;
+    if (!r2010_link_h(&tail, entity_handle, 1, &owner_h, &owner_code) ||
+        !r2010_link_h(&tail, entity_handle, 0, &layer_h, &layer_code) ||
+        owner_h == layer_h ||
+        !musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, owner_h, &owner) ||
+        !musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, layer_h, &layer) ||
+        owner.raw_ot != 49u || layer.raw_ot != 51u) return 0;
+
+    MusaDwgAc1024SelfPrefix owner_record = {0}, layer_record = {0};
+    if (!musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, owner.record_offset, &owner_record) ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, layer.record_offset, &layer_record) ||
+        owner_record.embedded_absolute_handle != owner_h ||
+        layer_record.embedded_absolute_handle != layer_h ||
+        owner_record.raw_ot != 49u || layer_record.raw_ot != 51u ||
+        !owner_record.frame_crc16_verified ||
+        !layer_record.frame_crc16_verified ||
+        tail.bit_pos > tail.bit_end) return 0;
+
+    const MusaDwgAc1024OwnerLayerEvidence result = {
+        entity_handle, entity.record_offset,
+        owner_h, owner.record_offset, layer_h, layer.record_offset,
+        tail.bit_end - tail.bit_pos, meta.raw_ot,
+        owner_code, layer_code, 1u, 1u
+    };
+    *out = result;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
