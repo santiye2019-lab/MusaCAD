@@ -141,6 +141,23 @@ int musa_dwg_ac1024_line_implicit_layer_probe(
     uint64_t canonical_line_handle,
     MusaDwgAc1024ImplicitLineLayerEvidence *out);
 
+
+/* One-record combined witness for EED-bearing OT19 LINE XYZ + original
+ * handle graph. It proves the layer OT51 is CRC/authenticated, and an
+ * OT49 owner ONLY when explicit mode 0 encodes an owner handle. In modes
+ * 1/2 owner remains zero. Optional XDictionary OT42 is authenticated
+ * only if its own H exists. EED APPID semantics, inherited appearance,
+ * block placement, visibility and scene admission are NOT validated. */
+typedef struct MusaDwgAc1024LineEedJoinedEvidence {
+    MusaDwgAc1024LineFields geometry;
+    MusaDwgAc1024LineEedHandleGraph graph;
+} MusaDwgAc1024LineEedJoinedEvidence;
+
+int musa_dwg_ac1024_line_eed_verified_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024LineEedJoinedEvidence *out);
+
 #ifdef __cplusplus
 }
 #endif
