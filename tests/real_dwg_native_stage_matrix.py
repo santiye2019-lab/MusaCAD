@@ -497,6 +497,19 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("ac1024_reconciliation_failed_despite_valid_census")
         elif recovered_attempted or recovered_ok or recovered_count or recovered_old_matches:
             raise ValueError("unmeasured_ac1024_recovered_index_claim")
+        zero_eed_attempts = hint.get("sampled_zero_eed_attempts")
+        zero_eed_verified = hint.get("sampled_zero_eed_verified")
+        zero_eed_refused = hint.get("sampled_zero_eed_refused")
+        if (any(type(v) is not int or v < 0 for v in (
+                zero_eed_attempts, zero_eed_verified, zero_eed_refused)) or
+                zero_eed_attempts > 2048 or
+                zero_eed_attempts != zero_eed_verified + zero_eed_refused):
+            raise ValueError("invalid_ac1024_zero_eed_sample_contract")
+        if recovered_ok:
+            if zero_eed_attempts != min(handles, 2048):
+                raise ValueError("incomplete_ac1024_zero_eed_sample")
+        elif zero_eed_attempts or zero_eed_verified or zero_eed_refused:
+            raise ValueError("unrecovered_ac1024_zero_eed_claim")
         ms_detail_fields = (
             "mc_invalid_ms_zero", "mc_invalid_ms_one",
             "mc_invalid_ms_2to7", "mc_invalid_ms_extended_zero",
