@@ -39,3 +39,14 @@ raw color sources, and child layer handles are compared byte-for-byte after
 both calls to detect unintended shared-source mutation. This is a post-decode
 unit regression and does not certify authentic AC1032 parsing or rendering.
 No third-party source code or DWG fixture was introduced.
+
+## TrueColor and contradictory source provenance (2fb14db, 2026-11-04)
+
+A synthetic three-record page exercises explicit RGB, layer-zero BYLAYER RGB,
+and BYBLOCK RGB inherited from an INSERT. Distinct 24-bit values must survive
+without ACI substitution; adjacent output sentinels remain unchanged. A
+contradictory already-resolved RGB versus original raw RGB must reject the page
+atomically. All changed fixture records are restored. The test is original
+first-party C11 and consumes predecoded arrays, not authentic DWG bytes; it
+cannot establish AC1032 decoder fidelity, Android rendering, or 3D correctness.
+No GPL/AGPL/LGPL or uncertain-origin code or data was imported.
