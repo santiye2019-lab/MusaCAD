@@ -431,6 +431,121 @@ static int test_xdictionary_original_handle_graph(void) {
     return 1;
 }
 
+/* A genuine CRC-backed R2010 LINE EED application is inserted
+ * between the canonical self-H and common entity DATA. Copying its
+ * original common and geometry bits shifted by exactly 34 bits proves
+ * the new EED API does not guess the LINE decoder's starting cursor.
+ * There is no owner H/scene/AutoCAD geometric parity claim. */
+static int test_eed_line_xyz_provisional(void) {
+    uint8_t base[37] = {0};
+    if (!make_line(base)) return 0;
+    uint8_t record[45] = {0};
+    record[0] = 40u; /* MS=40 payload bytes, CRC at absolute 43 */
+    record[2] = 16u; /* 16-bit H stream, begins at payload bit 304 */
+    uint8_t *const p = record + 3u;
+    set_bits(p, 0u, 2u, 0u);
+    set_bits(p, 2u, 8u, 19u);
+    set_bits(p, 10u, 4u, 0u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 44u);
+    set_bits(p, 26u, 2u, 1u); /* EED BS length=1 */
+    set_bits(p, 28u, 8u, 1u);
+    set_bits(p, 36u, 4u, 5u); /* canonical APPID H5 */
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 42u);
+    set_bits(p, 52u, 8u, 0x70u); /* opaque EED byte */
+    set_bits(p, 60u, 2u, 2u); /* terminating BS zero */
+
+    /* Old fixture zero-EED ended at bit 28; the new EED boundary
+     * ends at bit 62. Retain all post-EED DATA bits through 240. */
+    for (size_t bit = 28u; bit < 240u; ++bit) {
+        const uint8_t old_bit =
+            (uint8_t)((base[3u + bit / 8u] >>
+                      (7u - bit % 8u)) & 1u);
+        set_bits(p, bit + 34u, 1u, old_bit);
+    }
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 43u, &crc))
+        return 0;
+    record[43] = (uint8_t)crc;
+    record[44] = (uint8_t)(crc >> 8u);
+    uint8_t pristine[sizeof(record)];
+    memcpy(pristine, record, sizeof(record));
+
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineFields xyz = {0};
+    if (!musa_dwg_ac1024_record_line_eed_meta_prefix(
+            record, sizeof(record), 0u, &meta) ||
+        meta.embedded_absolute_handle != 44u ||
+        meta.raw_ot != 19u ||
+        meta.data_after_xdic_bit != 68u ||
+        !musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u, &xyz) ||
+        xyz.indexed_handle != 44u ||
+        xyz.geometry_start_bit != 107u ||
+        xyz.geometry_end_bit != 242u ||
+        xyz.start[0] != 1.5 || xyz.end[0] != 1.5 ||
+        xyz.start[1] != -2.0 || xyz.end[1] != -2.0 ||
+        xyz.start[2] != 0.0 || xyz.end[2] != 0.0 ||
+        !xyz.coordinates_decoded ||
+        musa_dwg_ac1024_line_fields_probe(
+            record, sizeof(record), 0u, &xyz) ||
+        memcmp(pristine, record, sizeof(record)))
+        return 0;
+    const MusaDwgAc1024LineFields saved = xyz;
+
+    /* EED-bearing API cannot be tricked by missing APPID handle,
+     * overlong EED, proxy graphics, CRC damage or source alias. */
+    set_bits(p, 36u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 43u, &crc))
+        return 0;
+    record[43] = (uint8_t)crc; record[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u, &xyz) ||
+        memcmp(&saved, &xyz, sizeof(saved))) return 0;
+    memcpy(record, pristine, sizeof(record));
+
+    set_bits(p, 28u, 8u, 40u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 43u, &crc))
+        return 0;
+    record[43] = (uint8_t)crc; record[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u, &xyz) ||
+        memcmp(&saved, &xyz, sizeof(saved))) return 0;
+    memcpy(record, pristine, sizeof(record));
+
+    set_bits(p, 62u, 1u, 1u); /* graphic present; cannot skip proxy */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 43u, &crc))
+        return 0;
+    record[43] = (uint8_t)crc; record[44] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u, &xyz) ||
+        memcmp(&saved, &xyz, sizeof(saved))) return 0;
+    memcpy(record, pristine, sizeof(record));
+
+    record[44] ^= 1u;
+    if (musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u, &xyz) ||
+        memcmp(&saved, &xyz, sizeof(saved))) return 0;
+    memcpy(record, pristine, sizeof(record));
+
+    if (musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u, NULL) ||
+        musa_dwg_ac1024_line_eed_fields_probe(
+            record, sizeof(record), 0u,
+            (MusaDwgAc1024LineFields *)(void *)record) ||
+        memcmp(&saved, &xyz, sizeof(saved)) ||
+        memcmp(pristine, record, sizeof(record)))
+        return 0;
+
+    /* Valid zero-EED LINE cannot be mislabeled as having EED frames. */
+    if (musa_dwg_ac1024_line_eed_fields_probe(
+            base, sizeof(base), 0u, &xyz) ||
+        memcmp(&saved, &xyz, sizeof(saved)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
@@ -654,6 +769,7 @@ int main(void) {
     if (!test_authenticated_line_graph()) return 23;
     if (!test_implicit_line_layer_graph()) return 24;
     if (!test_xdictionary_original_handle_graph()) return 25;
+    if (!test_eed_line_xyz_provisional()) return 26;
     puts("AC1024 LINE common/XYZ/owner/layer synthetic checks: pass; real-DWG parity unproven");
     return 0;
 }
