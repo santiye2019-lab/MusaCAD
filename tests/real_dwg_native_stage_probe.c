@@ -431,6 +431,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_xdic_present_attempts;
     size_t sampled_line_xdic_present_xyz_verified;
     size_t sampled_line_xdic_present_xyz_refused;
+    /* Authenticated original OT42 / OT51 H graph; no scene or style. */
+    size_t sampled_line_xdic_hgraph_attempts;
+    size_t sampled_line_xdic_hgraph_verified;
+    size_t sampled_line_xdic_hgraph_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -1025,8 +1029,26 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                         xyz.coordinates_decoded;
                                     if (xyz_ok) {
                                         ++hint.sampled_line_xyz_verified;
-                                        if (xdic_present)
+                                        if (xdic_present) {
                                             ++hint.sampled_line_xdic_present_xyz_verified;
+                                            ++hint.sampled_line_xdic_hgraph_attempts;
+                                            MusaDwgAc1024LineXDictionaryGraph xdict = {0};
+                                            if (musa_dwg_ac1024_line_xdictionary_graph_probe(
+                                                    objects, nb, recovered, legacy_count,
+                                                    recovered[k].embedded_absolute_handle,
+                                                    &xdict) &&
+                                                xdict.entity_handle ==
+                                                    recovered[k].embedded_absolute_handle &&
+                                                xdict.entity_record_offset ==
+                                                    recovered[k].record_offset &&
+                                                xdict.entity_mode == meta.entity_mode &&
+                                                xdict.xdictionary_handle != 0u &&
+                                                xdict.layer_handle != 0u &&
+                                                xdict.original_records_crc_verified)
+                                                ++hint.sampled_line_xdic_hgraph_verified;
+                                            else
+                                                ++hint.sampled_line_xdic_hgraph_refused;
+                                        }
                                         if (common_ok &&
                                             xyz.geometry_start_bit ==
                                                 common.geometry_start_bit &&
@@ -1539,7 +1561,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_implicit_layer_refused\":%zu,"
                "\"sampled_line_xdic_present_attempts\":%zu,"
                "\"sampled_line_xdic_present_xyz_verified\":%zu,"
-               "\"sampled_line_xdic_present_xyz_refused\":%zu}",
+               "\"sampled_line_xdic_present_xyz_refused\":%zu,"
+               "\"sampled_line_xdic_hgraph_attempts\":%zu,"
+               "\"sampled_line_xdic_hgraph_verified\":%zu,"
+               "\"sampled_line_xdic_hgraph_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1721,7 +1746,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_implicit_layer_refused,
                hint->sampled_line_xdic_present_attempts,
                hint->sampled_line_xdic_present_xyz_verified,
-               hint->sampled_line_xdic_present_xyz_refused);
+               hint->sampled_line_xdic_present_xyz_refused,
+               hint->sampled_line_xdic_hgraph_attempts,
+               hint->sampled_line_xdic_hgraph_verified,
+               hint->sampled_line_xdic_hgraph_refused);
     }
     puts("}");
 }
