@@ -15,15 +15,18 @@ static int overlap(const void *a, size_t an, const void *b, size_t bn) {
     return x <= y ? y - x < an : x - y < bn;
 }
 
-int musa_dwg_ac1024_line_common_probe(
+static int musa_line_common_probe_impl(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
-    MusaDwgAc1024LineCommon *out) {
+    MusaDwgAc1024LineCommon *out, int has_eed) {
     if (!objects || !out || !object_bytes ||
         overlap(objects, object_bytes, out, sizeof(*out))) return 0;
 
     MusaDwgAc1024EntityMetaPrefix meta = {0};
-    if (!musa_dwg_ac1024_record_entity_meta_prefix(
-            objects, object_bytes, indexed_offset, &meta) ||
+    if (!(has_eed ?
+          musa_dwg_ac1024_record_line_eed_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta) :
+          musa_dwg_ac1024_record_entity_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta)) ||
         meta.raw_ot != 19u || !meta.embedded_absolute_handle ||
         !meta.original_crc16_verified ||
         /* R2010 mode 0 has an explicit owner H; modes 1 and 2 are
@@ -97,18 +100,28 @@ int musa_dwg_ac1024_line_common_probe(
     return 1;
 }
 
-int musa_dwg_ac1024_line_fields_probe(
+int musa_dwg_ac1024_line_common_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
-    MusaDwgAc1024LineFields *out) {
+    MusaDwgAc1024LineCommon *out) {
+    return musa_line_common_probe_impl(
+        objects, object_bytes, indexed_offset, out, 0);
+}
+
+static int musa_line_fields_probe_impl(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out, int has_eed) {
     if (!objects || !out || !object_bytes ||
         overlap(objects, object_bytes, out, sizeof(*out))) return 0;
 
     MusaDwgAc1024EntityMetaPrefix meta = {0};
     MusaDwgAc1024LineCommon common = {0};
-    if (!musa_dwg_ac1024_record_entity_meta_prefix(
-            objects, object_bytes, indexed_offset, &meta) ||
-        !musa_dwg_ac1024_line_common_probe(
-            objects, object_bytes, indexed_offset, &common) ||
+    if (!(has_eed ?
+          musa_dwg_ac1024_record_line_eed_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta) :
+          musa_dwg_ac1024_record_entity_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta)) ||
+        !musa_line_common_probe_impl(
+            objects, object_bytes, indexed_offset, &common, has_eed) ||
         common.indexed_handle != meta.embedded_absolute_handle ||
         !common.record_crc_verified ||
         common.geometry_start_bit >= common.data_end_bit ||
@@ -148,6 +161,20 @@ int musa_dwg_ac1024_line_fields_probe(
     next.coordinates_decoded = 1u;
     *out = next;
     return 1;
+}
+
+int musa_dwg_ac1024_line_fields_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out) {
+    return musa_line_fields_probe_impl(
+        objects, object_bytes, indexed_offset, out, 0);
+}
+
+int musa_dwg_ac1024_line_eed_fields_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out) {
+    return musa_line_fields_probe_impl(
+        objects, object_bytes, indexed_offset, out, 1);
 }
 
 /* Never elevate a successfully decoded implicit-space LINE into a scene
