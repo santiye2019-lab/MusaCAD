@@ -426,6 +426,14 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_xyz_verified;
     size_t sampled_line_eed_xyz_refused;
     size_t sampled_line_eed_xyz_distinct_endpoints;
+    /* Original EED LINE coords joined with CRC/OT49/OT51/optional OT42.
+     * No inherited layer visibility, EED APPID semantics or scene claim. */
+    size_t sampled_line_eed_join_attempts;
+    size_t sampled_line_eed_join_verified;
+    size_t sampled_line_eed_join_refused;
+    size_t sampled_line_eed_join_explicit_owner;
+    size_t sampled_line_eed_join_implicit_layer;
+    size_t sampled_line_eed_join_xdictionary;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1098,6 +1106,39 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                             eed_xyz.geometry_end_bit >
                                                                 eed_xyz.geometry_start_bit) {
                                                             ++hint.sampled_line_eed_xyz_verified;
+                                                            ++hint.sampled_line_eed_join_attempts;
+                                                            MusaDwgAc1024LineEedJoinedEvidence joined = {0};
+                                                            if (musa_dwg_ac1024_line_eed_verified_probe(
+                                                                    objects, nb, recovered, legacy_count,
+                                                                    recovered[k].embedded_absolute_handle,
+                                                                    &joined) &&
+                                                                joined.graph.handles.entity_record_offset ==
+                                                                    recovered[k].record_offset &&
+                                                                joined.graph.handles.entity_handle ==
+                                                                    recovered[k].embedded_absolute_handle &&
+                                                                joined.graph.eed.application_count ==
+                                                                    chain.application_count &&
+                                                                joined.geometry.indexed_handle ==
+                                                                    eed_xyz.indexed_handle &&
+                                                                joined.geometry.geometry_start_bit ==
+                                                                    eed_xyz.geometry_start_bit &&
+                                                                joined.geometry.geometry_end_bit ==
+                                                                    eed_xyz.geometry_end_bit &&
+                                                                joined.geometry.start[0] == eed_xyz.start[0] &&
+                                                                joined.geometry.start[1] == eed_xyz.start[1] &&
+                                                                joined.geometry.start[2] == eed_xyz.start[2] &&
+                                                                joined.geometry.end[0] == eed_xyz.end[0] &&
+                                                                joined.geometry.end[1] == eed_xyz.end[1] &&
+                                                                joined.geometry.end[2] == eed_xyz.end[2]) {
+                                                                ++hint.sampled_line_eed_join_verified;
+                                                                if (joined.graph.handles.entity_mode == 0u)
+                                                                    ++hint.sampled_line_eed_join_explicit_owner;
+                                                                else
+                                                                    ++hint.sampled_line_eed_join_implicit_layer;
+                                                                if (joined.graph.handles.xdictionary_handle)
+                                                                    ++hint.sampled_line_eed_join_xdictionary;
+                                                            } else
+                                                                ++hint.sampled_line_eed_join_refused;
                                                             if (eed_xyz.start[0] != eed_xyz.end[0] ||
                                                                 eed_xyz.start[1] != eed_xyz.end[1] ||
                                                                 eed_xyz.start[2] != eed_xyz.end[2])
@@ -1653,6 +1694,12 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_xyz_verified\":%zu,"
                "\"sampled_line_eed_xyz_refused\":%zu,"
                "\"sampled_line_eed_xyz_distinct_endpoints\":%zu,"
+               "\"sampled_line_eed_join_attempts\":%zu,"
+               "\"sampled_line_eed_join_verified\":%zu,"
+               "\"sampled_line_eed_join_refused\":%zu,"
+               "\"sampled_line_eed_join_explicit_owner\":%zu,"
+               "\"sampled_line_eed_join_implicit_layer\":%zu,"
+               "\"sampled_line_eed_join_xdictionary\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -1857,6 +1904,12 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_xyz_verified,
                hint->sampled_line_eed_xyz_refused,
                hint->sampled_line_eed_xyz_distinct_endpoints,
+               hint->sampled_line_eed_join_attempts,
+               hint->sampled_line_eed_join_verified,
+               hint->sampled_line_eed_join_refused,
+               hint->sampled_line_eed_join_explicit_owner,
+               hint->sampled_line_eed_join_implicit_layer,
+               hint->sampled_line_eed_join_xdictionary,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
