@@ -216,6 +216,40 @@ int musa_dwg_ac1024_implicit_layer_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t entity_handle, MusaDwgAc1024ImplicitLayerEvidence *out);
 
+
+/* Original R2010 LINE mode 0/1/2 with XDictionary-present flag.
+ * Verifies H order: [mode-0 owner], original dictionary H (hard owner)
+ * and original layer H (hard pointer). Targets must be independently
+ * recovered CRC-backed OT49 / OT42 / OT51 records respectively.
+ * For implicit mode 1/2 no owner is serialized and NO owner is fabricated.
+ * This is bounded handle-graph evidence only: does not prove geometry,
+ * dictionary contents, layer visibility, inherited style or scene admission.
+ */
+typedef struct MusaDwgAc1024LineXDictionaryGraph {
+    uint64_t entity_handle;
+    uint64_t entity_record_offset;
+    uint64_t owner_handle;
+    uint64_t owner_record_offset;
+    uint64_t xdictionary_handle;
+    uint64_t xdictionary_record_offset;
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t handle_tail_unparsed_bits;
+    uint16_t entity_raw_ot;
+    uint8_t entity_mode;
+    uint8_t owner_raw_h_code;
+    uint8_t xdictionary_raw_h_code;
+    uint8_t layer_raw_h_code;
+    uint8_t original_records_crc_verified;
+} MusaDwgAc1024LineXDictionaryGraph;
+
+/* All-or-nothing and source immutable. Recovered index must originate in
+ * the independently authenticated AcDbHandles mapping. */
+int musa_dwg_ac1024_line_xdictionary_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024LineXDictionaryGraph *out);
+
 #ifdef __cplusplus
 }
 #endif
