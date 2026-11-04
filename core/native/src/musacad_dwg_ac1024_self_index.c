@@ -369,6 +369,127 @@ int musa_dwg_ac1024_implicit_layer_probe(
     return 1;
 }
 
+
+/* A CRC-preserving, source-internal XDictionary graph witness.
+ * R2010 common H order: [explicit owner H in mode 0],
+ * [reactor H repeated count times], [xdicobjhandle hard owner H],
+ * LAYER hard-pointer H. This narrow reader admits zero reactors and
+ * original built-in OT19, and verifies original CRC/OT/self-H for
+ * each nonzero referenced target. No style/scene or dictionary
+ * contents are decoded. */
+int musa_dwg_ac1024_line_xdictionary_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024LineXDictionaryGraph *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !entity_handle || !record_count ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity entity = {0};
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, entity_handle, &entity) ||
+        entity.raw_ot != 19u || !entity.frame_crc16_verified ||
+        !entity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, entity.record_offset, &meta) ||
+        meta.raw_ot != 19u ||
+        meta.embedded_absolute_handle != entity_handle ||
+        !meta.original_crc16_verified ||
+        meta.entity_mode > 2u ||
+        meta.reactor_count != 0u ||
+        meta.xdictionary_missing != 0u ||
+        meta.payload_start_byte >= object_bytes ||
+        meta.handle_stream_end_bit / 8u >
+            object_bytes - meta.payload_start_byte)
+        return 0;
+
+    MusaDwgAc1015Bits tail = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &tail, objects + meta.payload_start_byte,
+            meta.handle_stream_end_bit / 8u,
+            meta.handle_stream_start_bit, meta.handle_stream_end_bit))
+        return 0;
+
+    uint64_t owner_h = 0u, dictionary_h = 0u, layer_h = 0u;
+    uint8_t owner_code = 0u, dictionary_code = 0u, layer_code = 0u;
+    if (meta.entity_mode == 0u &&
+        !r2010_link_h(&tail, entity_handle, 4u, &owner_h, &owner_code))
+        return 0;
+    if (!r2010_link_h(&tail, entity_handle, 3u,
+                      &dictionary_h, &dictionary_code) ||
+        !r2010_link_h(&tail, entity_handle, 5u,
+                      &layer_h, &layer_code) ||
+        dictionary_h == layer_h ||
+        (owner_h && (owner_h == dictionary_h || owner_h == layer_h)) ||
+        tail.bit_pos > tail.bit_end)
+        return 0;
+
+    MusaDwgAc1024SelfIdentity dictionary = {0}, layer = {0}, owner = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, dictionary_h, &dictionary) ||
+        !musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, layer_h, &layer) ||
+        dictionary.raw_ot != 42u || layer.raw_ot != 51u ||
+        !dictionary.frame_crc16_verified || !layer.frame_crc16_verified ||
+        !dictionary.embedded_handle_code0_verified ||
+        !layer.embedded_handle_code0_verified)
+        return 0;
+    if (owner_h &&
+        (!musa_dwg_ac1024_self_index_find(
+             recovered_index, record_count, owner_h, &owner) ||
+         owner.raw_ot != 49u ||
+         !owner.frame_crc16_verified ||
+         !owner.embedded_handle_code0_verified))
+        return 0;
+
+    MusaDwgAc1024SelfPrefix dict_record = {0}, layer_record = {0};
+    MusaDwgAc1024SelfPrefix owner_record = {0};
+    if (!musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, dictionary.record_offset, &dict_record) ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, layer.record_offset, &layer_record) ||
+        dict_record.raw_ot != 42u ||
+        dict_record.embedded_absolute_handle != dictionary_h ||
+        layer_record.raw_ot != 51u ||
+        layer_record.embedded_absolute_handle != layer_h ||
+        !dict_record.frame_crc16_verified ||
+        !layer_record.frame_crc16_verified ||
+        (owner_h &&
+         (!musa_dwg_ac1024_record_self_prefix(
+              objects, object_bytes, owner.record_offset, &owner_record) ||
+          owner_record.raw_ot != 49u ||
+          owner_record.embedded_absolute_handle != owner_h ||
+          !owner_record.frame_crc16_verified)))
+        return 0;
+
+    MusaDwgAc1024LineXDictionaryGraph next = {0};
+    next.entity_handle = entity_handle;
+    next.entity_record_offset = entity.record_offset;
+    next.owner_handle = owner_h;
+    next.owner_record_offset = owner_h ? owner.record_offset : 0u;
+    next.xdictionary_handle = dictionary_h;
+    next.xdictionary_record_offset = dictionary.record_offset;
+    next.layer_handle = layer_h;
+    next.layer_record_offset = layer.record_offset;
+    next.handle_tail_unparsed_bits = tail.bit_end - tail.bit_pos;
+    next.entity_raw_ot = 19u;
+    next.entity_mode = meta.entity_mode;
+    next.owner_raw_h_code = owner_code;
+    next.xdictionary_raw_h_code = dictionary_code;
+    next.layer_raw_h_code = layer_code;
+    next.original_records_crc_verified = 1u;
+    *out = next;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
