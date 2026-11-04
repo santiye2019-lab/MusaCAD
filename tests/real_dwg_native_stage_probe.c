@@ -1335,7 +1335,7 @@ static void report(const char *signature, const char *result,
                "\"sampled_no_proxy_refused\":%zu,"
                "\"sampled_entity_meta_attempts\":%zu,"
                "\"sampled_entity_meta_verified\":%zu,"
-               "\"sampled_entity_meta_refused\":%zu,",
+               "\"sampled_entity_meta_refused\":%zu,"
                "\"sampled_owner_layer_attempts\":%zu,"
                "\"sampled_owner_layer_verified\":%zu,"
                "\"sampled_owner_layer_refused\":%zu}",
