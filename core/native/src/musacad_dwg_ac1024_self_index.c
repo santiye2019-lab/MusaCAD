@@ -499,10 +499,11 @@ int musa_dwg_ac1024_implicit_layer_probe(
  * original built-in OT19, and verifies original CRC/OT/self-H for
  * each nonzero referenced target. No style/scene or dictionary
  * contents are decoded. */
-int musa_dwg_ac1024_line_xdictionary_graph_probe(
+static int musa_line_original_hgraph_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
-    uint64_t entity_handle, MusaDwgAc1024LineXDictionaryGraph *out) {
+    uint64_t entity_handle, MusaDwgAc1024LineXDictionaryGraph *out,
+    int has_eed, int require_xdictionary) {
     if (!objects || !object_bytes || !recovered_index || !out ||
         !entity_handle || !record_count ||
         record_count > MUSA_AC1024_SELF_INDEX_MAX ||
@@ -520,14 +521,17 @@ int musa_dwg_ac1024_line_xdictionary_graph_probe(
             recovered_index, record_count, entity_handle, &entity) ||
         entity.raw_ot != 19u || !entity.frame_crc16_verified ||
         !entity.embedded_handle_code0_verified ||
-        !musa_dwg_ac1024_record_entity_meta_prefix(
-            objects, object_bytes, entity.record_offset, &meta) ||
+        !(has_eed ?
+          musa_dwg_ac1024_record_line_eed_meta_prefix(
+              objects, object_bytes, entity.record_offset, &meta) :
+          musa_dwg_ac1024_record_entity_meta_prefix(
+              objects, object_bytes, entity.record_offset, &meta)) ||
         meta.raw_ot != 19u ||
         meta.embedded_absolute_handle != entity_handle ||
         !meta.original_crc16_verified ||
         meta.entity_mode > 2u ||
         meta.reactor_count != 0u ||
-        meta.xdictionary_missing != 0u ||
+        (require_xdictionary && meta.xdictionary_missing != 0u) ||
         meta.payload_start_byte >= object_bytes ||
         meta.handle_stream_end_bit / 8u >
             object_bytes - meta.payload_start_byte)
@@ -545,23 +549,27 @@ int musa_dwg_ac1024_line_xdictionary_graph_probe(
     if (meta.entity_mode == 0u &&
         !r2010_link_h(&tail, entity_handle, 4u, &owner_h, &owner_code))
         return 0;
-    if (!r2010_link_h(&tail, entity_handle, 3u,
-                      &dictionary_h, &dictionary_code) ||
+    if ((meta.xdictionary_missing == 0u &&
+         !r2010_link_h(&tail, entity_handle, 3u,
+                       &dictionary_h, &dictionary_code)) ||
         !r2010_link_h(&tail, entity_handle, 5u,
                       &layer_h, &layer_code) ||
-        dictionary_h == layer_h ||
+        (dictionary_h && dictionary_h == layer_h) ||
         (owner_h && (owner_h == dictionary_h || owner_h == layer_h)) ||
         tail.bit_pos > tail.bit_end)
         return 0;
 
     MusaDwgAc1024SelfIdentity dictionary = {0}, layer = {0}, owner = {0};
-    if (!musa_dwg_ac1024_self_index_find(
-            recovered_index, record_count, dictionary_h, &dictionary) ||
+    if ((dictionary_h &&
+         (!musa_dwg_ac1024_self_index_find(
+              recovered_index, record_count, dictionary_h, &dictionary) ||
+          dictionary.raw_ot != 42u ||
+          !dictionary.frame_crc16_verified ||
+          !dictionary.embedded_handle_code0_verified)) ||
         !musa_dwg_ac1024_self_index_find(
             recovered_index, record_count, layer_h, &layer) ||
-        dictionary.raw_ot != 42u || layer.raw_ot != 51u ||
-        !dictionary.frame_crc16_verified || !layer.frame_crc16_verified ||
-        !dictionary.embedded_handle_code0_verified ||
+        layer.raw_ot != 51u ||
+        !layer.frame_crc16_verified ||
         !layer.embedded_handle_code0_verified)
         return 0;
     if (owner_h &&
@@ -574,15 +582,16 @@ int musa_dwg_ac1024_line_xdictionary_graph_probe(
 
     MusaDwgAc1024SelfPrefix dict_record = {0}, layer_record = {0};
     MusaDwgAc1024SelfPrefix owner_record = {0};
-    if (!musa_dwg_ac1024_record_self_prefix(
-            objects, object_bytes, dictionary.record_offset, &dict_record) ||
+    if ((dictionary_h &&
+         (!musa_dwg_ac1024_record_self_prefix(
+              objects, object_bytes, dictionary.record_offset, &dict_record) ||
+          dict_record.raw_ot != 42u ||
+          dict_record.embedded_absolute_handle != dictionary_h ||
+          !dict_record.frame_crc16_verified)) ||
         !musa_dwg_ac1024_record_self_prefix(
             objects, object_bytes, layer.record_offset, &layer_record) ||
-        dict_record.raw_ot != 42u ||
-        dict_record.embedded_absolute_handle != dictionary_h ||
         layer_record.raw_ot != 51u ||
         layer_record.embedded_absolute_handle != layer_h ||
-        !dict_record.frame_crc16_verified ||
         !layer_record.frame_crc16_verified ||
         (owner_h &&
          (!musa_dwg_ac1024_record_self_prefix(
@@ -598,7 +607,8 @@ int musa_dwg_ac1024_line_xdictionary_graph_probe(
     next.owner_handle = owner_h;
     next.owner_record_offset = owner_h ? owner.record_offset : 0u;
     next.xdictionary_handle = dictionary_h;
-    next.xdictionary_record_offset = dictionary.record_offset;
+    next.xdictionary_record_offset =
+        dictionary_h ? dictionary.record_offset : 0u;
     next.layer_handle = layer_h;
     next.layer_record_offset = layer.record_offset;
     next.handle_tail_unparsed_bits = tail.bit_end - tail.bit_pos;
@@ -611,6 +621,59 @@ int musa_dwg_ac1024_line_xdictionary_graph_probe(
     *out = next;
     return 1;
 }
+
+/* Preserve original zero-EED/XDictionary-present API and its strict gate.
+ * EED-bearing LINEs must go through the explicitly separate API below. */
+int musa_dwg_ac1024_line_xdictionary_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024LineXDictionaryGraph *out) {
+    return musa_line_original_hgraph_impl(
+        objects, object_bytes, recovered_index, record_count,
+        entity_handle, out, 0, 1);
+}
+
+/* EED application data is independently bounded. Owner and layer refer
+ * only to independently CRC/OT/self-H verified original target records.
+ * An absent XDictionary is serialized as no dictionary H (zero). */
+int musa_dwg_ac1024_line_eed_handle_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t entity_handle, MusaDwgAc1024LineEedHandleGraph *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !entity_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity identity = {0};
+    MusaDwgAc1024LineEedHandleGraph next = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, entity_handle, &identity) ||
+        identity.raw_ot != 19u || !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, identity.record_offset, &next.eed) ||
+        !next.eed.application_count ||
+        next.eed.embedded_absolute_handle != entity_handle ||
+        !next.eed.original_crc16_verified ||
+        !next.eed.eed_boundaries_verified ||
+        !musa_line_original_hgraph_impl(
+            objects, object_bytes, recovered_index, record_count,
+            entity_handle, &next.handles, 1, 0) ||
+        next.handles.entity_handle != entity_handle ||
+        next.handles.entity_record_offset != identity.record_offset ||
+        next.handles.entity_raw_ot != 19u ||
+        !next.handles.original_records_crc_verified)
+        return 0;
+    *out = next;
+    return 1;
+}
+
 
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
