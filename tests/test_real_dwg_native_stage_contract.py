@@ -168,6 +168,8 @@ def ac1024_probe_record():
             "sampled_zero_eed_attempts": 0,
             "sampled_zero_eed_verified": 0,
             "sampled_zero_eed_refused": 0,
+            "sampled_no_proxy_verified": 0,
+            "sampled_no_proxy_refused": 0,
         }
     }
 
@@ -200,6 +202,21 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
         ):
             with self.subTest(field=field, value=value):
                 invalid = deepcopy(record)
+                invalid["ac1024_compatibility_hypothesis"][field] = value
+                with self.assertRaises(ValueError):
+                    validate_fake_result(invalid)
+
+    def test_no_proxy_cannot_exceed_crc_backed_zero_eed_subset(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for field, value in (
+            ("sampled_no_proxy_verified", 1),
+            ("sampled_no_proxy_refused", 1),
+            ("sampled_no_proxy_verified", -1),
+            ("sampled_no_proxy_refused", True),
+        ):
+            with self.subTest(field=field, value=value):
+                invalid = deepcopy(original)
                 invalid["ac1024_compatibility_hypothesis"][field] = value
                 with self.assertRaises(ValueError):
                     validate_fake_result(invalid)
