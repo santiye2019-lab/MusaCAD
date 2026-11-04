@@ -564,6 +564,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_common_reactors_unsupported",
             "sampled_line_common_xdic_unsupported",
             "sampled_line_common_fields_refused",
+            "sampled_line_implicit_paper_xyz_verified",
+            "sampled_line_implicit_model_xyz_verified",
         )
         if any(type(hint.get(k)) is not int or hint[k] < 0
                for k in line_keys):
@@ -573,7 +575,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          line_bounded, line_meta_rejected,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
-         line_fields_rejected) = (hint[k] for k in line_keys)
+         line_fields_rejected, implicit_paper_xyz,
+         implicit_model_xyz) = (hint[k] for k in line_keys)
         if (line_attempts > entity_attempts or
                 line_attempts > 2048 or
                 line_attempts != line_common_ok + line_common_bad or
@@ -585,6 +588,7 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 line_joined > line_bounded or
                 line_joined > link_verified or
                 line_distinct > line_xyz_ok or
+                implicit_paper_xyz + implicit_model_xyz > line_bounded - line_joined or
                 line_meta_rejected > entity_refused or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
