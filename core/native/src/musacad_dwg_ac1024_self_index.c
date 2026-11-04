@@ -18,14 +18,15 @@ static int overlaps(const void *a, size_t n, const void *b, size_t m) {
     return x <= y ? y - x < n : x - y < m;
 }
 
-/* The R2010 common object DATA stream contains absolute H after OT.
- * Read ONLY canonical CODE=0 and length=1..8, in DWG high-byte first
- * order. Payload bounds already require original frame CRC and MC. */
-static int extract_self_h(
-    const uint8_t *objects, size_t object_bytes,
-    uint64_t indexed_offset, uint64_t *out_handle,
-    uint16_t *out_ot) {
-    if (!objects || !out_handle || !out_ot) return 0;
+/* An immutable cursor after the first canonical absolute H. We verify
+ * frame CRC, raw OT and the MC-bounded DATA/handle partition again for
+ * each call. This does NOT establish the rest of the common entity header. */
+int musa_dwg_ac1024_record_self_prefix(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024SelfPrefix *out) {
+    if (!objects || !out ||
+        overlaps(objects, object_bytes, out, sizeof(*out)))
+        return 0;
     MusaDwgAc1024StreamBounds bounds = {0};
     if (!musa_dwg_ac1024_record_stream_bounds(
             objects, object_bytes, indexed_offset, &bounds) ||
@@ -50,9 +51,14 @@ static int extract_self_h(
             return 0;
         handle = (handle << 8u) | (uint64_t)byte;
     }
-    if (!handle) return 0;
-    *out_handle = handle;
-    *out_ot = bounds.raw_object_type;
+    if (!handle || bits.bit_pos > bounds.handle_stream_start_bit)
+        return 0;
+    const MusaDwgAc1024SelfPrefix next = {
+        indexed_offset, handle, bounds.payload_start_byte, bits.bit_pos,
+        bounds.handle_stream_start_bit, bounds.handle_stream_end_bit,
+        bounds.raw_object_type, 1u, 1u
+    };
+    *out = next;
     return 1;
 }
 
@@ -81,19 +87,18 @@ int musa_dwg_ac1024_recover_self_index(
     uint64_t previous = 0u;
     for (size_t i = 0u; i < record_count; i++) {
         const uint64_t offset = offset_in_handle_order[i];
-        uint64_t embedded = 0u;
-        uint16_t raw_ot = 0u;
+        MusaDwgAc1024SelfPrefix prefix = {0};
         if (offset >= (uint64_t)object_bytes ||
-            !extract_self_h(
-                objects, object_bytes, offset, &embedded, &raw_ot) ||
-            embedded <= previous) {
+            !musa_dwg_ac1024_record_self_prefix(
+                objects, object_bytes, offset, &prefix) ||
+            prefix.embedded_absolute_handle <= previous) {
             valid = 0;
             break;
         }
-        previous = embedded;
-        staged[i].embedded_absolute_handle = embedded;
+        previous = prefix.embedded_absolute_handle;
+        staged[i].embedded_absolute_handle = prefix.embedded_absolute_handle;
         staged[i].record_offset = offset;
-        staged[i].raw_ot = raw_ot;
+        staged[i].raw_ot = prefix.raw_ot;
         staged[i].frame_crc16_verified = 1u;
         staged[i].embedded_handle_code0_verified = 1u;
     }
