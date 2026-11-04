@@ -221,6 +221,37 @@ static void failed_page_does_not_poison_other_insert_context(void) {
     assert(memcmp(output,before,sizeof(output[0]))==0);
     assert(memcmp(output+PAGE+1u,before+PAGE+1u,sizeof(output[0]))==0);
 }
+static void independent_insert_contexts_do_not_mutate_source(void) {
+    const MusaDwg1032ResolvedColor red={{1u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor blue={{5u,0u,0u},0u};
+    const MusaDwg1032ResolvedColor layer={{3u,0u,0u},0u};
+    const size_t first=PAGE*4u+2u;
+    MusaDwg1032ResolvedColor first_page[PAGE], second_page[PAGE];
+    MusaDwg1032CadColor original_source[PAGE];
+    MusaDwg1032ResolvedColor original_definition[PAGE];
+    uint64_t original_layers[PAGE];
+    memcpy(original_source,source+first,sizeof(original_source));
+    memcpy(original_definition,definition+first,sizeof(original_definition));
+    memcpy(original_layers,child_layers+first,sizeof(original_layers));
+    assert(musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,PAGE,100u,
+        &red,&layer,first_page));
+    assert(musa_dwg1032_layer_color_apply_insert_context_page(
+        definition,source,child_layers,N,first,PAGE,100u,
+        &blue,&layer,second_page));
+    for (size_t i=0u;i<PAGE;++i) {
+        const size_t index=first+i;
+        if (index%3u==1u) {
+            assert(first_page[i].color.aci==1u);
+            assert(second_page[i].color.aci==5u);
+        } else {
+            assert(memcmp(first_page+i,second_page+i,sizeof(first_page[i]))==0);
+        }
+    }
+    assert(memcmp(source+first,original_source,sizeof(original_source))==0);
+    assert(memcmp(definition+first,original_definition,sizeof(original_definition))==0);
+    assert(memcmp(child_layers+first,original_layers,sizeof(original_layers))==0);
+}
 int main(void) {
     prepare();
     compare_instance(1u,5u);
@@ -233,5 +264,6 @@ int main(void) {
     middle_record_failure_preserves_page();
     retry_after_invalid_middle_record();
     failed_page_does_not_poison_other_insert_context();
+    independent_insert_contexts_do_not_mutate_source();
     return 0;
 }
