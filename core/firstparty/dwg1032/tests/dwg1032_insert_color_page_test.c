@@ -287,7 +287,13 @@ static void truecolor_and_provenance_page(void) {
     source[first+2u]=(MusaDwg1032CadColor){0u,0u,0u};
     /* ByBlock raw provenance requires a canonical unresolved definition. */
     definition[first+2u]=(MusaDwg1032ResolvedColor){{0u,0u,0u},1u};
-    definition[first+2u]=(MusaDwg1032ResolvedColor){{0u,0u,0u},1u};
+    /* Isolate provenance failures before checking the combined page. */
+    for (size_t offset=0u;offset<3u;++offset) {
+        MusaDwg1032ResolvedColor single;
+        assert(musa_dwg1032_layer_color_apply_insert_context_page(
+            definition,source,child_layers,N,first+offset,1u,100u,
+            &insert,&layer,&single));
+    }
     memset(output,0x5a,sizeof(output));
     memcpy(before,output,sizeof(before));
     assert(musa_dwg1032_layer_color_apply_insert_context_page(
