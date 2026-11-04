@@ -73,6 +73,17 @@ int musa_dwg_ac1024_line_fields_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024LineFields *out);
 
+/* Provisional EED-bearing AC1024 LINE DATA only. An independently bounded
+ * and terminated nonzero EED application chain must precede the no-proxy,
+ * entity-mode, common color and RD/DD/BT/BE geometry fields. This is
+ * deliberately separate from the legacy zero-EED-only entry points.
+ * EED application semantics, original owner/layer/dictionary H graph,
+ * AutoCAD parity and scene/render acceptance remain UNPROVEN.
+ * Source is immutable, output is preserved on every failure. */
+int musa_dwg_ac1024_line_eed_fields_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out);
+
 /* A stronger source-internal LINE witness: CRC-verified coordinates
  * AND original self-H -> independently authenticated owner OT49 and
  * layer OT51. This API admits only mode 0 (explicit owner) and refuses
