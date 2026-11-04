@@ -179,9 +179,81 @@ static int test_zero_eed_subset(void) {
     return 1;
 }
 
+static int test_no_proxy_subset(void) {
+    _Alignas(MusaDwgAc1024NoProxyPrefix) uint8_t record[64] = {0};
+    if (!make_record(record, 44u)) return 0;
+    set_bits(record + 3u, 26u, 2u, 2u); /* EED size zero */
+    set_bits(record + 3u, 28u, 1u, 0u); /* No proxy graphic */
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    uint8_t original[13];
+    memcpy(original, record, sizeof(original));
+    MusaDwgAc1024NoProxyPrefix out = {0};
+    if (!musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 13u, 0u, &out) ||
+        out.embedded_absolute_handle != 44u ||
+        out.raw_ot != 19u || out.payload_start_byte != 3u ||
+        out.data_after_no_proxy_flag_bit != 29u ||
+        out.handle_stream_start_bit != 48u ||
+        !out.frame_crc16_verified || !out.zero_eed_verified ||
+        !out.no_proxy_graphic_verified ||
+        memcmp(original, record, sizeof(original)))
+        return 0;
+    const MusaDwgAc1024NoProxyPrefix saved = out;
+
+    /* Flag=1 introduces graphic payload: unsupported and atomic. */
+    set_bits(record + 3u, 28u, 1u, 1u);
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)))
+        return 0;
+
+    /* The zero-EED selector can fit exactly but the next 1-bit flag
+     * must never borrow bits from the separate handle stream. */
+    memcpy(record, original, sizeof(original));
+    record[2] = 36u; /* stream starts at bit 28 */
+    if (!musa_core_crc16_arc(0xc0c1u, record, 11u, &crc))
+        return 0;
+    record[11] = (uint8_t)crc;
+    record[12] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)))
+        return 0;
+
+    memcpy(record, original, sizeof(original));
+    record[12] ^= 0x40u;
+    if (musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 13u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)))
+        return 0;
+    memcpy(record, original, sizeof(original));
+    if (musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 12u, 0u, &out) ||
+        musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 13u, 13u, &out) ||
+        musa_dwg_ac1024_record_no_proxy_prefix(
+            record, 13u, 0u,
+            (MusaDwgAc1024NoProxyPrefix *)(void *)record) ||
+        musa_dwg_ac1024_record_no_proxy_prefix(
+            NULL, 0u, 0u, &out) ||
+        memcmp(&out, &saved, sizeof(saved)) ||
+        memcmp(record, original, sizeof(original)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
+    if (!test_no_proxy_subset()) return 8;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
     if (!make_record(objects, 1u) ||
         !make_record(objects + 13u, 2u))
