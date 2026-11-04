@@ -1,0 +1,6 @@
+// C11 MusaCAD core is shared by Android, Windows and Apple.
+// This module only exposes the stable C ABI; it is not a CAD engine.
+module MusaCADCore {
+  header "MusaCADCoreBridge.h"
+  export *
+}
