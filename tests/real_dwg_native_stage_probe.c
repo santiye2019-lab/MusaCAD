@@ -427,6 +427,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_implicit_layer_attempts;
     size_t sampled_line_implicit_layer_verified;
     size_t sampled_line_implicit_layer_refused;
+    /* XDictionary flag 0: DATA-only LINE XYZ; extra H unvalidated. */
+    size_t sampled_line_xdic_present_attempts;
+    size_t sampled_line_xdic_present_xyz_verified;
+    size_t sampled_line_xdic_present_xyz_refused;
 } MusaAc1024CompatibilityHint;
 
 static MusaAc1024CompatibilityHint ac1024_family_hint(
@@ -981,6 +985,10 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                  * A numeric OT19 is only a candidate LINE. */
                                 if (type == 19u) {
                                     ++hint.sampled_line_attempts;
+                                    const int xdic_present =
+                                        line_meta_ok && meta.xdictionary_missing == 0u;
+                                    if (xdic_present)
+                                        ++hint.sampled_line_xdic_present_attempts;
                                     MusaDwgAc1024LineCommon common = {0};
                                     const int common_ok =
                                         musa_dwg_ac1024_line_common_probe(
@@ -1001,8 +1009,6 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                 ++hint.sampled_line_common_mode_unsupported;
                                             else if (meta.reactor_count != 0u)
                                                 ++hint.sampled_line_common_reactors_unsupported;
-                                            else if (meta.xdictionary_missing != 1u)
-                                                ++hint.sampled_line_common_xdic_unsupported;
                                             else
                                                 ++hint.sampled_line_common_fields_refused;
                                         } else {
@@ -1019,6 +1025,8 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                         xyz.coordinates_decoded;
                                     if (xyz_ok) {
                                         ++hint.sampled_line_xyz_verified;
+                                        if (xdic_present)
+                                            ++hint.sampled_line_xdic_present_xyz_verified;
                                         if (common_ok &&
                                             xyz.geometry_start_bit ==
                                                 common.geometry_start_bit &&
@@ -1055,8 +1063,9 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                     ++hint.sampled_line_graph_verified;
                                                 else
                                                     ++hint.sampled_line_graph_refused;
-                                            } else if (meta.entity_mode == 1u ||
-                                                       meta.entity_mode == 2u) {
+                                            } else if ((meta.entity_mode == 1u ||
+                                                        meta.entity_mode == 2u) &&
+                                                       meta.xdictionary_missing == 1u) {
                                                 if (meta.entity_mode == 1u)
                                                     ++hint.sampled_line_implicit_paper_xyz_verified;
                                                 else
@@ -1095,6 +1104,8 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             ++hint.sampled_line_xyz_distinct_endpoints;
                                     } else {
                                         ++hint.sampled_line_xyz_refused;
+                                        if (xdic_present)
+                                            ++hint.sampled_line_xdic_present_xyz_refused;
                                         if (common_ok)
                                             ++hint.sampled_line_xyz_after_common_refused;
                                     }
@@ -1525,7 +1536,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_graph_refused\":%zu,"
                "\"sampled_line_implicit_layer_attempts\":%zu,"
                "\"sampled_line_implicit_layer_verified\":%zu,"
-               "\"sampled_line_implicit_layer_refused\":%zu}",
+               "\"sampled_line_implicit_layer_refused\":%zu,"
+               "\"sampled_line_xdic_present_attempts\":%zu,"
+               "\"sampled_line_xdic_present_xyz_verified\":%zu,"
+               "\"sampled_line_xdic_present_xyz_refused\":%zu}",
                hint->header ? "true" : "false",
                hint->physical_map ? "true" : "false",
                hint->object_pages ? "true" : "false",
@@ -1704,7 +1718,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_graph_refused,
                hint->sampled_line_implicit_layer_attempts,
                hint->sampled_line_implicit_layer_verified,
-               hint->sampled_line_implicit_layer_refused);
+               hint->sampled_line_implicit_layer_refused,
+               hint->sampled_line_xdic_present_attempts,
+               hint->sampled_line_xdic_present_xyz_verified,
+               hint->sampled_line_xdic_present_xyz_refused);
     }
     puts("}");
 }
