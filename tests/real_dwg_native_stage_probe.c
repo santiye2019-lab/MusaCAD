@@ -410,6 +410,11 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_xyz_bounded_common;
     /* Disjoint refusal stages for bounded raw OT19 samples; zero drawing data. */
     size_t sampled_line_meta_refused;
+    /* First failed independently CRC-bounded metadata prefix stage. */
+    size_t sampled_line_meta_self_refused;
+    size_t sampled_line_meta_eed_refused;
+    size_t sampled_line_meta_proxy_refused;
+    size_t sampled_line_meta_entity_fields_refused;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1017,6 +1022,25 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                 ++hint.sampled_line_common_fields_refused;
                                         } else {
                                             ++hint.sampled_line_meta_refused;
+                                            MusaDwgAc1024SelfPrefix self = {0};
+                                            MusaDwgAc1024ZeroEedPrefix eed = {0};
+                                            MusaDwgAc1024NoProxyPrefix proxy = {0};
+                                            /* Exclusive precedence, not a second
+                                             * attempt to reinterpret unsupported EED. */
+                                            if (!musa_dwg_ac1024_record_self_prefix(
+                                                    objects, nb,
+                                                    recovered[k].record_offset, &self))
+                                                ++hint.sampled_line_meta_self_refused;
+                                            else if (!musa_dwg_ac1024_record_zero_eed_prefix(
+                                                    objects, nb,
+                                                    recovered[k].record_offset, &eed))
+                                                ++hint.sampled_line_meta_eed_refused;
+                                            else if (!musa_dwg_ac1024_record_no_proxy_prefix(
+                                                    objects, nb,
+                                                    recovered[k].record_offset, &proxy))
+                                                ++hint.sampled_line_meta_proxy_refused;
+                                            else
+                                                ++hint.sampled_line_meta_entity_fields_refused;
                                         }
                                     }
                                     MusaDwgAc1024LineFields xyz = {0};
@@ -1545,6 +1569,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_xyz_distinct_endpoints\":%zu,"
                "\"sampled_line_xyz_bounded_common\":%zu,"
                "\"sampled_line_meta_refused\":%zu,"
+               "\"sampled_line_meta_self_refused\":%zu,"
+               "\"sampled_line_meta_eed_refused\":%zu,"
+               "\"sampled_line_meta_proxy_refused\":%zu,"
+               "\"sampled_line_meta_entity_fields_refused\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -1730,6 +1758,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_xyz_distinct_endpoints,
                hint->sampled_line_xyz_bounded_common,
                hint->sampled_line_meta_refused,
+               hint->sampled_line_meta_self_refused,
+               hint->sampled_line_meta_eed_refused,
+               hint->sampled_line_meta_proxy_refused,
+               hint->sampled_line_meta_entity_fields_refused,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
