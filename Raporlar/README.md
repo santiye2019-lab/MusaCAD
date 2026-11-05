@@ -1,8 +1,8 @@
 # MusaCAD — Raporlar
 
-Bu klasör MusaCAD'in gerçek DWG açma ve görüntüleme testlerinden üretilen tanılama raporları için planlanan GitHub kayıt noktasıdır.
+Bu klasör MusaCAD'in gerçek DWG açma ve görüntüleme testlerinden üretilen tanılama raporları için planlanan GitHub kayıt noktasıdır. Kimlik, koordinat veya dosya adı içermeyen **toplu mühendislik kanıtı** ayrıca burada belgelenebilir.
 
-**ÖNEMLİ: Bu MusaCAD deposu PUBLIC (herkese açık).** Bu nedenle kullanıcı cihazından toplanan gerçek raporlar **buraya yüklenmemelidir**. Bu klasör şu anda yalnızca raporlama şeması ve entegrasyon dokümantasyonunu içerir. İzin ve güvenli özel depo bağlantısı sağlanmadan hiçbir otomatik rapor yüklemesi aktif edilmemelidir.
+**ÖNEMLİ: Bu MusaCAD deposu PUBLIC (herkese açık).** Bu nedenle kullanıcı cihazından toplanan gerçek raporlar **buraya yüklenmemelidir**. Bu klasör raporlama şeması, entegrasyon dokümantasyonu ve yalnızca toplu sayıları içeren [AC1024 LINE doğrulama özetini](AC1024_LINE_DOGRULAMA_OZETI_2026-11-05.md) içerir. İzin ve güvenli özel depo bağlantısı sağlanmadan hiçbir otomatik rapor yüklemesi aktif edilmemelidir.
 
 ## Test APK'sı ve kalıcı uygulama için hedef
 
