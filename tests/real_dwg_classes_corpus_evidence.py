@@ -183,7 +183,7 @@ def summarize(stage: dict) -> dict:
         "geometry_verified": False,
         "rendering_verified": False,
         "source_modified": False,
-        "evidence_scope": "drawing-local numeric OT; no TU names, material or layer semantics",
+        "evidence_scope": "per-DWG numeric OT and safe class505 DXF identifier only; material properties and layer semantics unverified",
     }
 
 
