@@ -1399,13 +1399,13 @@ static int test_layer_eed_xdictionary_original_graph(void) {
             &tail_raw) ||
         memcmp(&tail_raw, &tail_saved, sizeof(tail_saved)))
         return 0;
-    memcpy(with_tail, extended_pristine, sizeof(with_tail));
-
-    /* A CRC-resealed oversized token may not be promoted to a shape. */
+    /* A CRC-resealed oversized token must remain refused before restore. */
     if (musa_dwg_ac1024_layer_eed_tail_shape_probe(
             with_tail, sizeof(with_tail), tail_index, 4u, 45u, &shape) ||
         memcmp(&shape, &shape_saved, sizeof(shape_saved)))
         return 0;
+    memcpy(with_tail, extended_pristine, sizeof(with_tail));
+
     /* A damaged original layer CRC or aliased output is always refused. */
     extended_layer[31] ^= 1u;
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
