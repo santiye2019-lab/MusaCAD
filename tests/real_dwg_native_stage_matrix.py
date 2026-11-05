@@ -140,6 +140,51 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                     raise ValueError("unverified_ac1024_r2010_class_prefix")
             elif hint[bits] or hint[maximum]:
                 raise ValueError("unsupported_ac1024_r2010_class_prefix")
+        survey_fields = (
+            "source_classes_survey_begin_at_zero",
+            "source_classes_survey_end_at_eof",
+            "source_classes_survey_begin_in_first64",
+            "source_classes_survey_end_in_last64",
+            "source_classes_survey_declared_byte_area_fits",
+            "source_classes_survey_area_exact_0extra",
+            "source_classes_survey_area_exact_1extra",
+            "source_classes_survey_area_exact_2extra",
+            "source_classes_survey_raw_bits20_in_range",
+            "source_classes_survey_raw_bits24_in_range",
+            "source_classes_survey_preamble_at20",
+            "source_classes_survey_preamble_at24",
+            "source_classes_survey_preamble_at28",
+        )
+        if type(hint.get("source_classes_header_survey_checked")) is not bool:
+            raise ValueError("invalid_ac1024_class_survey_type")
+        if any(type(hint.get(k)) is not bool for k in survey_fields):
+            raise ValueError("invalid_ac1024_class_survey_field")
+        if hint["source_classes_header_survey_checked"]:
+            if not hint["source_classes_extracted"]:
+                raise ValueError("unproven_ac1024_class_survey")
+        elif any(hint[k] for k in survey_fields):
+            raise ValueError("unproven_ac1024_class_survey_flags")
+        survey = lambda k: hint["source_classes_survey_" + k]
+        if (survey("begin_at_zero") and not survey("begin_in_first64")) or (
+            survey("end_at_eof") and not survey("end_in_last64")
+        ):
+            raise ValueError("inconsistent_ac1024_sentinel_survey")
+        if (survey("declared_byte_area_fits") and
+                not survey("begin_at_zero")) or (
+            any(survey(k) for k in (
+                "area_exact_0extra", "area_exact_1extra", "area_exact_2extra"
+            )) and not survey("declared_byte_area_fits")
+        ):
+            raise ValueError("inconsistent_ac1024_size_survey")
+        if sum(int(survey(k)) for k in (
+                "area_exact_0extra", "area_exact_1extra", "area_exact_2extra"
+        )) > 1:
+            raise ValueError("ambiguous_ac1024_size_survey")
+        if not survey("begin_at_zero") and any(survey(k) for k in (
+            "raw_bits20_in_range", "raw_bits24_in_range",
+            "preamble_at20", "preamble_at24", "preamble_at28"
+        )):
+            raise ValueError("unverified_ac1024_numeric_shape")
         keys = ("page_map_header", "physical_page_map",
                 "objects_section_pages", "handles_section_pages",
                 "candidate_handle_index")

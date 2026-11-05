@@ -334,6 +334,8 @@ typedef struct MusaAc1024CompatibilityHint {
     int source_classes_r2010_bitcount_with_extra;
     size_t source_classes_r2010_bits_with_extra;
     size_t source_classes_r2010_max_class_with_extra;
+    int source_classes_header_survey_checked;
+    MusaDwgAc1024ClassesHeaderSurvey source_classes_header_survey;
     size_t candidate_handles;
     size_t object_section_page_count, handle_section_page_count;
     int legacy_frame_probe_completed;
@@ -702,6 +704,15 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         &extracted) &&
                     extracted == logical) {
                     hint.source_classes_extracted = 1;
+                    MusaDwgAc1024ClassesHeaderSurvey survey = {0};
+                    if (musa_dwg_ac1024_classes_header_survey(
+                            bytes, extracted, &survey) &&
+                        !survey.original_section_authenticated &&
+                        !survey.class_name_resolved &&
+                        !survey.display_accepted) {
+                        hint.source_classes_header_survey_checked = 1;
+                        hint.source_classes_header_survey = survey;
+                    }
                     size_t class_count = 0u;
                     if (musa_dwg_ac1024_classes_numeric_records(
                             bytes, extracted,
@@ -2295,6 +2306,20 @@ static void report(const char *signature, const char *result,
                "\"source_classes_r2010_bitcount_with_extra\":%s,"
                "\"source_classes_r2010_bits_with_extra\":%zu,"
                "\"source_classes_r2010_max_class_with_extra\":%zu,"
+               "\"source_classes_header_survey_checked\":%s,"
+               "\"source_classes_survey_begin_at_zero\":%s,"
+               "\"source_classes_survey_end_at_eof\":%s,"
+               "\"source_classes_survey_begin_in_first64\":%s,"
+               "\"source_classes_survey_end_in_last64\":%s,"
+               "\"source_classes_survey_declared_byte_area_fits\":%s,"
+               "\"source_classes_survey_area_exact_0extra\":%s,"
+               "\"source_classes_survey_area_exact_1extra\":%s,"
+               "\"source_classes_survey_area_exact_2extra\":%s,"
+               "\"source_classes_survey_raw_bits20_in_range\":%s,"
+               "\"source_classes_survey_raw_bits24_in_range\":%s,"
+               "\"source_classes_survey_preamble_at20\":%s,"
+               "\"source_classes_survey_preamble_at24\":%s,"
+               "\"source_classes_survey_preamble_at28\":%s,"
                "\"object_section_page_count\":%zu,"
                "\"handle_section_page_count\":%zu,"
                "\"legacy_frame_probe_completed\":%s,"
@@ -2672,6 +2697,20 @@ static void report(const char *signature, const char *result,
                hint->source_classes_r2010_bitcount_with_extra ? "true" : "false",
                hint->source_classes_r2010_bits_with_extra,
                hint->source_classes_r2010_max_class_with_extra,
+               hint->source_classes_header_survey_checked ? "true" : "false",
+               hint->source_classes_header_survey.begin_at_zero ? "true" : "false",
+               hint->source_classes_header_survey.end_at_eof ? "true" : "false",
+               hint->source_classes_header_survey.begin_in_first64 ? "true" : "false",
+               hint->source_classes_header_survey.end_in_last64 ? "true" : "false",
+               hint->source_classes_header_survey.declared_byte_area_fits ? "true" : "false",
+               hint->source_classes_header_survey.area_exact_0extra ? "true" : "false",
+               hint->source_classes_header_survey.area_exact_1extra ? "true" : "false",
+               hint->source_classes_header_survey.area_exact_2extra ? "true" : "false",
+               hint->source_classes_header_survey.raw_bits20_in_range ? "true" : "false",
+               hint->source_classes_header_survey.raw_bits24_in_range ? "true" : "false",
+               hint->source_classes_header_survey.preamble_at20 ? "true" : "false",
+               hint->source_classes_header_survey.preamble_at24 ? "true" : "false",
+               hint->source_classes_header_survey.preamble_at28 ? "true" : "false",
                hint->object_section_page_count,
                hint->handle_section_page_count,
                hint->legacy_frame_probe_completed ? "true" : "false",
