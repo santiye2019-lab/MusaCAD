@@ -451,6 +451,9 @@ typedef struct MusaDwgAc1024LayerEedTailShape {
     size_t raw_h5_zero_length_count;
     size_t other_raw_h_count;
     size_t raw_payload_octets;
+    size_t raw_h5_nonzero_length_count;
+    size_t raw_non_h5_zero_length_count;
+    size_t raw_non_h5_nonzero_length_count;
     uint8_t original_records_crc_verified;
     uint8_t display_accepted;
 } MusaDwgAc1024LayerEedTailShape;
