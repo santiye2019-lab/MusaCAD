@@ -766,6 +766,136 @@ static int test_relative_owner_layer_codes(void) {
 }
 
 
+/* Original CRC-authenticated R2010 LAYER OT51 numerical FLAGS, NOT
+ * an interpreted visual state. Offsets are determined by original
+ * BS/BL/B common-object fields and then the documented LAYER values.
+ * The source record is not modified on success or on any refusal. */
+static int test_layer_raw_flags_preflight(void) {
+    _Alignas(MusaDwgAc1024LayerRawFlagsEvidence)
+    uint8_t source[21] = {0};
+    source[0] = 16u; /* 16-byte payload, CRC at 19 */
+    source[2] = 16u; /* 16 H bits; DATA ends at payload bit112 */
+    uint8_t *const p = source + 3u;
+    set_bits(p, 2u, 8u, 51u); /* original LAYER OT51 */
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 42u); /* original absolute self H42 */
+    set_bits(p, 26u, 2u, 2u); /* BS zero EED */
+    set_bits(p, 28u, 2u, 2u); /* BL zero reactors */
+    set_bits(p, 30u, 1u, 1u); /* XDictionary missing */
+    set_bits(p, 31u, 1u, 0u); /* referenced 64-bit flag */
+    set_bits(p, 32u, 2u, 2u); /* BS zero xref idx+1 */
+    set_bits(p, 34u, 1u, 0u); /* xref-dependent false */
+    set_bits(p, 35u, 2u, 1u); /* BS raw 8-bit flags */
+    set_bits(p, 37u, 8u, 0xabu); /* raw 70/290/370 numeric field */
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
+        return 0;
+    source[19] = (uint8_t)crc;
+    source[20] = (uint8_t)(crc >> 8u);
+    const uint64_t offsets[1] = {0u};
+    MusaDwgAc1024SelfIdentity idx[1] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 1u, idx, 1u))
+        return 0;
+    uint8_t pristine[sizeof(source)];
+    memcpy(pristine, source, sizeof(source));
+    MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
+    if (!musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        flags.layer_handle != 42u ||
+        flags.layer_record_offset != 0u ||
+        flags.raw_flags_start_bit != 31u ||
+        flags.raw_flags_end_bit != 45u ||
+        flags.raw_values_70_290_370 != 0xabu ||
+        flags.unmapped_bits != 0u ||
+        flags.entry_64_flag != 0u ||
+        flags.xref_index_plus_one != 0u ||
+        flags.xref_dependent != 0u ||
+        flags.xdictionary_missing != 1u ||
+        flags.frozen_bit != 1u || flags.on_bit != 1u ||
+        flags.frozen_new_viewports_bit != 0u ||
+        flags.locked_bit != 1u || flags.plotting_bit != 0u ||
+        flags.lineweight_field != 5u ||
+        !flags.original_record_crc_verified ||
+        flags.display_accepted != 0u ||
+        memcmp(source, pristine, sizeof(source)))
+        return 0;
+    const MusaDwgAc1024LayerRawFlagsEvidence saved = flags;
+
+    /* Unknown upper numeric bits are exposed, never ignored or rendered. */
+    set_bits(p, 35u, 2u, 0u); /* BS raw16 */
+    set_bits(p, 37u, 8u, 0xe0u); /* low */
+    set_bits(p, 45u, 8u, 0x80u); /* high -> raw 0x80e0 */
+    if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
+        return 0;
+    source[19] = (uint8_t)crc;
+    source[20] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        flags.raw_values_70_290_370 != 0x80e0u ||
+        flags.unmapped_bits != 0x8000u ||
+        flags.lineweight_field != 7u ||
+        flags.display_accepted != 0u)
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+    flags = saved;
+
+    /* Presence of XDictionary is preserved, but its target is not
+     * verified here, so it cannot authorize visibility or drawing. */
+    set_bits(p, 30u, 1u, 0u);
+    if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
+        return 0;
+    source[19] = (uint8_t)crc;
+    source[20] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        flags.xdictionary_missing != 0u || flags.display_accepted)
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+    flags = saved;
+
+    /* Unsupported reactor data, CRC damage and forged OT all refuse. */
+    set_bits(p, 28u, 2u, 1u); /* BL raw8 reactor count 1 */
+    set_bits(p, 30u, 8u, 1u);
+    if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
+        return 0;
+    source[19] = (uint8_t)crc;
+    source[20] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    source[20] ^= 1u;
+    if (musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    idx[0].raw_ot = 19u;
+    if (musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    idx[0].raw_ot = 51u;
+    if (musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 0u, &flags) ||
+        musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, NULL) ||
+        musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u,
+            (MusaDwgAc1024LayerRawFlagsEvidence *)(void *)source) ||
+        musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u,
+            (MusaDwgAc1024LayerRawFlagsEvidence *)(void *)idx) ||
+        memcmp(&flags, &saved, sizeof(saved)) ||
+        memcmp(source, pristine, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_owner_layer_bridge()) return 11;
     if (!test_relative_owner_layer_codes()) return 12;
@@ -773,6 +903,7 @@ int main(void) {
     if (!test_self_prefix_cursor()) return 6;
     if (!test_zero_eed_subset()) return 7;
     if (!test_eed_chain_bounded()) return 13;
+    if (!test_layer_raw_flags_preflight()) return 14;
     if (!test_no_proxy_subset()) return 8;
     if (!test_entity_meta_subset()) return 9;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
