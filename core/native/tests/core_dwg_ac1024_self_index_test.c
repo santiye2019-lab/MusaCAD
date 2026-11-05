@@ -1377,6 +1377,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         !shape.original_records_crc_verified || shape.display_accepted)
         return 0;
     const MusaDwgAc1024LayerEedTailShape shape_saved = shape;
+    if (musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u) !=
+            MUSA_DWG_LAYER_TAIL_SHAPE_OK)
+        return 0;
     /* An H4 with zero bytes is counted as RAW other-code/zero-size
      * evidence only. It cannot turn into a verified handle target. */
     set_bits(extended_body, 208u, 4u, 4u);
@@ -1404,8 +1408,27 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     uint8_t extended_pristine[sizeof(with_tail)];
     memcpy(extended_pristine, with_tail, sizeof(with_tail));
 
+    /* Valid first H, but the second H length is impossible in its
+     * remaining bits. Stage points to the failing token, not raw data. */
+    set_bits(extended_body, 212u, 4u, 15u);
+    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 30u, &crc))
+        return 0;
+    extended_layer[30] = (uint8_t)crc;
+    extended_layer[31] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u) !=
+            MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH ||
+        musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u, &shape) ||
+        memcmp(&shape, &shape_saved, sizeof(shape_saved)))
+        return 0;
+    memcpy(with_tail, extended_pristine, sizeof(with_tail));
+
     /* The two-link-only source cannot claim a successful full-tail scan. */
-    if (musa_dwg_ac1024_layer_eed_tail_shape_probe(
+    if (musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+            unchanged, sizeof(unchanged), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_TAIL_SHAPE_PRECONDITION ||
+        musa_dwg_ac1024_layer_eed_tail_shape_probe(
             unchanged, sizeof(unchanged), index, 4u, 45u, &shape) ||
         memcmp(&shape, &shape_saved, sizeof(shape_saved)))
         return 0;
