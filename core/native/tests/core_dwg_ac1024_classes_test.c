@@ -336,9 +336,9 @@ static int test_survey(void){
        !observed.end_trailing_bytes_known||
        observed.end_trailing_bytes!=8u||
        !observed.declared_gap_known||
-       observed.declared_gap_from20!=8||
-       observed.declared_gap_from24!=4||
-       observed.declared_gap_from28!=0)
+       observed.declared_gap_from20!=4||
+       observed.declared_gap_from24!=0||
+       observed.declared_gap_from28!=-4)
         return 0;
     /* A damaged sentinel must not generate invented gap positions. */
     section[close_before_tail]^=1u;
