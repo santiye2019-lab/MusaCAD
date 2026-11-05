@@ -302,6 +302,20 @@ def ac1024_probe_record():
             "sampled_layer_eed_tail_shape_refused_payload": 0,
             "sampled_layer_eed_tail_shape_refused_final": 0,
             "sampled_layer_eed_tail_shape_refused_other": 0,
+            "sampled_layer_eed_terminal_fragment_attempts": 0,
+            "sampled_layer_eed_terminal_fragment_verified": 0,
+            "sampled_layer_eed_terminal_fragment_refused": 0,
+            "sampled_layer_eed_terminal_fragment_zero": 0,
+            "sampled_layer_eed_terminal_fragment_nonzero": 0,
+            "sampled_layer_eed_terminal_fragment_tokens": 0,
+            "sampled_layer_eed_terminal_fragment_h5_zero_tokens": 0,
+            "sampled_layer_eed_terminal_fragment_bits_1": 0,
+            "sampled_layer_eed_terminal_fragment_bits_2": 0,
+            "sampled_layer_eed_terminal_fragment_bits_3": 0,
+            "sampled_layer_eed_terminal_fragment_bits_4": 0,
+            "sampled_layer_eed_terminal_fragment_bits_5": 0,
+            "sampled_layer_eed_terminal_fragment_bits_6": 0,
+            "sampled_layer_eed_terminal_fragment_bits_7": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
             "sampled_line_common_mode_unsupported": 0,
@@ -364,7 +378,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_layer_eed_tail_shape_total_bits",
             "sampled_layer_eed_tail_shape_refused_short_header",
             "sampled_layer_eed_tail_shape_refused_length",
-            "sampled_layer_eed_tail_shape_refused_precondition"):
+            "sampled_layer_eed_tail_shape_refused_precondition",
+            "sampled_layer_eed_terminal_fragment_verified",
+            "sampled_layer_eed_terminal_fragment_zero",
+            "sampled_layer_eed_terminal_fragment_bits_3",
+            "sampled_layer_eed_terminal_fragment_tokens"):
             invalid = deepcopy(record)
             invalid["ac1024_compatibility_hypothesis"][field] = 1
             with self.subTest(field=field), self.assertRaises(ValueError):
