@@ -1456,6 +1456,86 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         return 0;
     memcpy(with_tail, extended_pristine, sizeof(with_tail));
 
+
+    /* Synthetic 59-bit H stream: two complete tokens and exactly
+     * three terminal bits. Neither all-zero nor nonzero means padding. */
+    uint8_t with_fragment[72] = {0};
+    memcpy(with_fragment, extended_pristine, sizeof(with_fragment));
+    uint8_t *const fragment_layer = with_fragment + 39u;
+    uint8_t *const fragment_body = fragment_layer + 3u;
+    fragment_layer[0] = 28u;
+    fragment_layer[2] = 59u; /* H stream starts at bit 165 */
+    for (size_t bit = 160u; bit < 224u; ++bit)
+        set_bits(fragment_body, bit, 1u, 0u);
+    set_bits(fragment_body, 165u, 4u, 4u);
+    set_bits(fragment_body, 169u, 4u, 1u);
+    set_bits(fragment_body, 173u, 8u, 41u);
+    set_bits(fragment_body, 181u, 4u, 3u);
+    set_bits(fragment_body, 185u, 4u, 1u);
+    set_bits(fragment_body, 189u, 8u, 43u);
+    set_bits(fragment_body, 197u, 4u, 5u);
+    set_bits(fragment_body, 201u, 4u, 1u);
+    set_bits(fragment_body, 205u, 8u, 44u);
+    set_bits(fragment_body, 213u, 4u, 5u);
+    set_bits(fragment_body, 217u, 4u, 0u);
+    set_bits(fragment_body, 221u, 3u, 0u);
+    if (!musa_core_crc16_arc(0xc0c1u, fragment_layer, 31u, &crc))
+        return 0;
+    fragment_layer[31] = (uint8_t)crc;
+    fragment_layer[32] = (uint8_t)(crc >> 8u);
+    MusaDwgAc1024SelfIdentity fragment_index[4] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            with_fragment, sizeof(with_fragment), offsets, 4u,
+            fragment_index, 4u))
+        return 0;
+    MusaDwgAc1024LayerEedTerminalFragment fragment = {0};
+    if (musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u) != MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER ||
+        !musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, &fragment) ||
+        fragment.layer_handle != 45u ||
+        fragment.layer_record_offset != 39u ||
+        fragment.complete_h_token_count != 2u ||
+        fragment.complete_h5_zero_token_count != 1u ||
+        fragment.terminal_fragment_bit_count != 3u ||
+        !fragment.terminal_fragment_all_zero ||
+        !fragment.original_records_crc_verified ||
+        fragment.display_accepted)
+        return 0;
+    /* The same 3-bit tail can be nonzero: no interpretation is made. */
+    set_bits(fragment_body, 221u, 3u, 5u);
+    if (!musa_core_crc16_arc(0xc0c1u, fragment_layer, 31u, &crc))
+        return 0;
+    fragment_layer[31] = (uint8_t)crc;
+    fragment_layer[32] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, &fragment) ||
+        fragment.terminal_fragment_all_zero ||
+        fragment.terminal_fragment_bit_count != 3u ||
+        fragment.complete_h_token_count != 2u ||
+        fragment.display_accepted)
+        return 0;
+    if (musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            extended_pristine, sizeof(extended_pristine), tail_index,
+            4u, 45u, &fragment))
+        return 0;
+    fragment_layer[32] ^= 1u;
+    if (musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, &fragment) ||
+        fragment.terminal_fragment_bit_count != 3u)
+        return 0;
+    fragment_layer[32] ^= 1u;
+    if (musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, (MusaDwgAc1024LayerEedTerminalFragment *)(void *)with_fragment) ||
+        musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, NULL))
+        return 0;
     /* A damaged original layer CRC or aliased output is always refused. */
     extended_layer[31] ^= 1u;
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
