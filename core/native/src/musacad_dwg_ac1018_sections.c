@@ -472,7 +472,7 @@ int musa_dwg_ac1024_classes_section_probe(
     if(!shared_section_pages(file,file_bytes,MUSA_DWG_AC1018_OBJECTS,
           2,"AcDb:Classes",NULL,0u,&desc,&pages)||
        !pages||pages>R2004_MAX_PAGES||
-       desc.logical_bytes<34u||
+       desc.logical_bytes<16u||
        desc.logical_bytes>8u*1024u*1024u||
        !desc.map_checksum_verified||
        !desc.data_page_checksums_verified)
