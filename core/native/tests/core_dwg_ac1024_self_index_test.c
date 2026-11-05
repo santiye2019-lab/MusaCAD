@@ -1546,6 +1546,78 @@ static int test_layer_eed_xdictionary_original_graph(void) {
             with_fragment, sizeof(with_fragment), fragment_index,
             4u, 45u, NULL))
         return 0;
+
+    /* A raw H5/1 value does not become a layer reference simply by
+     * being syntactically complete. The synthetic value 44 has no
+     * independently indexed original record; H5/0 has no numeric value. */
+    MusaDwgAc1024LayerTailCandidateCensus candidates = {0};
+    if (!musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            &candidates) ||
+        candidates.complete_prefix_h_tokens != 2u ||
+        candidates.absolute_candidates != 1u ||
+        candidates.verified_index_matches != 0u ||
+        candidates.unmatched_or_unverified != 1u ||
+        candidates.nonabsolute_or_empty_tokens != 1u ||
+        candidates.verified_ot49 != 0u ||
+        candidates.verified_ot51 != 0u ||
+        candidates.verified_other_ot != 0u ||
+        !candidates.original_records_crc_verified ||
+        candidates.display_accepted)
+        return 0;
+
+    /* Repoint only the raw absolute H5 value to an independently
+     * CRC-backed OT42 record; classify it as OTHER without granting a
+     * drawing role. Source remains unchanged after restoring bytes. */
+    const MusaDwgAc1024LayerTailCandidateCensus old_candidates = candidates;
+    set_bits(fragment_body, 205u, 8u, 43u);
+    if (!musa_core_crc16_arc(0xc0c1u, fragment_layer, 31u, &crc))
+        return 0;
+    fragment_layer[31] = (uint8_t)crc;
+    fragment_layer[32] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            &candidates) ||
+        candidates.complete_prefix_h_tokens != 2u ||
+        candidates.absolute_candidates != 1u ||
+        candidates.verified_index_matches != 1u ||
+        candidates.unmatched_or_unverified != 0u ||
+        candidates.nonabsolute_or_empty_tokens != 1u ||
+        candidates.verified_ot49 != 0u ||
+        candidates.verified_ot51 != 0u ||
+        candidates.verified_other_ot != 1u ||
+        candidates.display_accepted)
+        return 0;
+    const MusaDwgAc1024LayerTailCandidateCensus matched_candidates = candidates;
+    fragment_layer[32] ^= 1u;
+    if (musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            &candidates) ||
+        memcmp(&candidates, &matched_candidates, sizeof(candidates)))
+        return 0;
+    fragment_layer[32] ^= 1u;
+    set_bits(fragment_body, 205u, 8u, 44u);
+    if (!musa_core_crc16_arc(0xc0c1u, fragment_layer, 31u, &crc))
+        return 0;
+    fragment_layer[31] = (uint8_t)crc;
+    fragment_layer[32] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            &candidates) ||
+        memcmp(&candidates, &old_candidates, sizeof(candidates)) ||
+        musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            extended_pristine, sizeof(extended_pristine),
+            tail_index, 4u, 45u, &candidates) ||
+        musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            (MusaDwgAc1024LayerTailCandidateCensus *)(void *)with_fragment) ||
+        musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            (MusaDwgAc1024LayerTailCandidateCensus *)(void *)fragment_index) ||
+        musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
+            NULL))
+        return 0;
     /* A damaged original layer CRC or aliased output is always refused. */
     extended_layer[31] ^= 1u;
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(

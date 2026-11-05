@@ -487,6 +487,33 @@ int musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerEedTerminalFragment *out);
 
+/* Read-only raw absolute H candidate census for the first 1..4 COMPLETE
+ * tail headers in a CRC-backed OT51 EED SHORT_HEADER diagnostic. Absolute
+ * code 2/3/4/5 plus a canonical nonzero H value may be compared to the
+ * recovered self-H index and independently revalidated by CRC/OT/self-H.
+ * A match is only a source-internal numeric identity coincidence, NOT
+ * linetype/material/color/XREF semantics, ownership, scene or rendering.
+ * Other H codes and zero-size H tokens remain uninterpreted. No handles,
+ * names, coordinates or original source data are returned. */
+typedef struct MusaDwgAc1024LayerTailCandidateCensus {
+    size_t complete_prefix_h_tokens;
+    size_t absolute_candidates;
+    size_t verified_index_matches;
+    size_t unmatched_or_unverified;
+    size_t nonabsolute_or_empty_tokens;
+    size_t verified_ot49;
+    size_t verified_ot51;
+    size_t verified_other_ot;
+    uint8_t original_records_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerTailCandidateCensus;
+
+int musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerTailCandidateCensus *out);
+
 /* First refusal from exactly the same strict tail-shape parser.
  * Diagnosis records only a stage, never source bytes or H values. */
 enum {
