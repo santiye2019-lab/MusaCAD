@@ -531,6 +531,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_tail_shape_other_raw_h;
     size_t sampled_layer_eed_tail_shape_token_count;
     size_t sampled_layer_eed_tail_shape_payload_octets;
+    size_t sampled_layer_eed_tail_shape_h5_payload;
+    size_t sampled_layer_eed_tail_shape_non_h5_zero;
+    size_t sampled_layer_eed_tail_shape_non_h5_payload;
+    size_t sampled_layer_eed_tail_shape_total_bits;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1214,6 +1218,14 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                         shape.h_token_count;
                                                     hint.sampled_layer_eed_tail_shape_payload_octets +=
                                                         shape.raw_payload_octets;
+                                                    hint.sampled_layer_eed_tail_shape_h5_payload +=
+                                                        shape.raw_h5_nonzero_length_count;
+                                                    hint.sampled_layer_eed_tail_shape_non_h5_zero +=
+                                                        shape.raw_non_h5_zero_length_count;
+                                                    hint.sampled_layer_eed_tail_shape_non_h5_payload +=
+                                                        shape.raw_non_h5_nonzero_length_count;
+                                                    hint.sampled_layer_eed_tail_shape_total_bits +=
+                                                        shape.tail_bit_count;
                                                 } else {
                                                     ++hint.sampled_layer_eed_tail_shape_refused;
                                                 }
@@ -2169,6 +2181,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_tail_shape_other_raw_h\":%zu,"
                "\"sampled_layer_eed_tail_shape_token_count\":%zu,"
                "\"sampled_layer_eed_tail_shape_payload_octets\":%zu,"
+               "\"sampled_layer_eed_tail_shape_h5_payload\":%zu,"
+               "\"sampled_layer_eed_tail_shape_non_h5_zero\":%zu,"
+               "\"sampled_layer_eed_tail_shape_non_h5_payload\":%zu,"
+               "\"sampled_layer_eed_tail_shape_total_bits\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2468,6 +2484,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_tail_shape_other_raw_h,
                hint->sampled_layer_eed_tail_shape_token_count,
                hint->sampled_layer_eed_tail_shape_payload_octets,
+               hint->sampled_layer_eed_tail_shape_h5_payload,
+               hint->sampled_layer_eed_tail_shape_non_h5_zero,
+               hint->sampled_layer_eed_tail_shape_non_h5_payload,
+               hint->sampled_layer_eed_tail_shape_total_bits,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
