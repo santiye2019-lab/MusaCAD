@@ -288,10 +288,19 @@ int musa_dwg_ac1024_classes_header_survey(
         if(!memcmp(section+at,start_sentinel,16u)){
             next.begin_in_first64=1u;break;
         }
+    size_t close_at=0u;
+    size_t close_matches=0u;
     for(size_t at=last_begin;at<=len-16u;++at)
         if(!memcmp(section+at,end_sentinel,16u)){
-            next.end_in_last64=1u;break;
+            next.end_in_last64=1u;
+            close_at=at;
+            ++close_matches;
         }
+    if(close_matches==1u){
+        next.end_in_last64_unique=1u;
+        next.end_trailing_bytes_known=1u;
+        next.end_trailing_bytes=(uint8_t)(len-(close_at+16u));
+    }
     if(next.begin_at_zero){
         const uint32_t size=read_le32(section+16u);
         next.declared_byte_area_fits=(uint8_t)(
@@ -313,6 +322,20 @@ int musa_dwg_ac1024_classes_header_survey(
         next.preamble_at20=(uint8_t)class_preamble_at(section,len,20u);
         next.preamble_at24=(uint8_t)class_preamble_at(section,len,24u);
         next.preamble_at28=(uint8_t)class_preamble_at(section,len,28u);
+        if(next.declared_byte_area_fits&&
+           next.end_in_last64_unique){
+            /* All candidates are below 8 MiB by the input bound.
+             * Subtract in a signed 64-bit temporary before narrowing. */
+            const int64_t end=(int64_t)close_at;
+            const int64_t nbytes=(int64_t)size;
+            next.declared_gap_known=1u;
+            next.declared_gap_from20=(int32_t)(
+                end-(20+2+nbytes));
+            next.declared_gap_from24=(int32_t)(
+                end-(24+2+nbytes));
+            next.declared_gap_from28=(int32_t)(
+                end-(28+2+nbytes));
+        }
     }
     *out=next;
     return 1;

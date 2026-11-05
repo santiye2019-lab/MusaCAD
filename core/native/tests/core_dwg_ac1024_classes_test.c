@@ -320,6 +320,37 @@ static int test_survey(void){
        observed.area_exact_0extra||observed.area_exact_1extra||
        !observed.raw_bits24_in_range||!observed.preamble_at28)
         return 0;
+    /* The verified short synthetic extra-RL form places the closing
+     * sentinel exactly after the data and two CRC-placeholder bytes.
+     * Append 8 opaque bytes without changing the closing sentinel. */
+    const size_t close_before_tail=len-16u;
+    for(size_t i=0u;i<8u;i++)section[len+i]=(uint8_t)(i+11u);
+    len+=8u;
+    if(!musa_dwg_ac1024_classes_header_survey(
+            section,len,&observed)||
+       observed.end_at_eof||
+       !observed.end_in_last64_unique||
+       !observed.end_trailing_bytes_known||
+       observed.end_trailing_bytes!=8u||
+       !observed.declared_gap_known||
+       observed.declared_gap_from20!=8||
+       observed.declared_gap_from24!=4||
+       observed.declared_gap_from28!=0)
+        return 0;
+    /* A damaged sentinel must not generate invented gap positions. */
+    section[close_before_tail]^=1u;
+    if(!musa_dwg_ac1024_classes_header_survey(
+          section,len,&observed)||
+       observed.end_in_last64_unique||
+       observed.end_trailing_bytes_known||
+       observed.end_trailing_bytes||
+       observed.declared_gap_known)
+        return 0;
+    section[close_before_tail]^=1u;
+    if(!musa_dwg_ac1024_classes_header_survey(
+          section,len,&observed)||
+       !observed.end_in_last64_unique)
+        return 0;
     const MusaDwgAc1024ClassesHeaderSurvey saved=observed;
     uint8_t untouched[96];
     memcpy(untouched,section,sizeof(section));

@@ -89,6 +89,17 @@ typedef struct MusaDwgAc1024ClassesHeaderSurvey {
     uint8_t preamble_at20;
     uint8_t preamble_at24;
     uint8_t preamble_at28;
+    /* Only last-64-byte sentinel uniqueness + positional arithmetic.
+     * The three signed gaps are (end_sentinel_offset -
+     * (candidate_data_offset + declared_data_bytes + 2 CRC bytes)).
+     * Negative gaps are NOT silently rounded to zero. */
+    uint8_t end_in_last64_unique;
+    uint8_t end_trailing_bytes_known;
+    uint8_t end_trailing_bytes; /* 0..48; no original DWG bytes */
+    uint8_t declared_gap_known;
+    int32_t declared_gap_from20;
+    int32_t declared_gap_from24;
+    int32_t declared_gap_from28;
     uint8_t original_section_authenticated; /* ALWAYS zero */
     uint8_t class_name_resolved;             /* ALWAYS zero */
     uint8_t display_accepted;                /* ALWAYS zero */
