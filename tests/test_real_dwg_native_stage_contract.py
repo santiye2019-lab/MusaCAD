@@ -288,6 +288,10 @@ def ac1024_probe_record():
             "sampled_layer_eed_tail_shape_other_raw_h": 0,
             "sampled_layer_eed_tail_shape_token_count": 0,
             "sampled_layer_eed_tail_shape_payload_octets": 0,
+            "sampled_layer_eed_tail_shape_h5_payload": 0,
+            "sampled_layer_eed_tail_shape_non_h5_zero": 0,
+            "sampled_layer_eed_tail_shape_non_h5_payload": 0,
+            "sampled_layer_eed_tail_shape_total_bits": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
             "sampled_line_common_mode_unsupported": 0,
@@ -343,7 +347,11 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
         for field in ("sampled_layer_eed_tail_shape_attempts",
                       "sampled_layer_eed_tail_shape_verified",
                       "sampled_layer_eed_tail_shape_h5_zero_length",
-                      "sampled_layer_eed_tail_shape_token_count"):
+                      "sampled_layer_eed_tail_shape_token_count",
+            "sampled_layer_eed_tail_shape_h5_payload",
+            "sampled_layer_eed_tail_shape_non_h5_zero",
+            "sampled_layer_eed_tail_shape_non_h5_payload",
+            "sampled_layer_eed_tail_shape_total_bits"):
             invalid = deepcopy(record)
             invalid["ac1024_compatibility_hypothesis"][field] = 1
             with self.subTest(field=field), self.assertRaises(ValueError):
