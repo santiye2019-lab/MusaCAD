@@ -16,6 +16,10 @@ def sample(*, numeric=True, has505=True, obj=True):
             "source_classes_extracted": True,
             "source_classes_r2010_bitcount_with_extra": True,
             "source_classes_r2010_numeric_verified": numeric,
+            "source_classes_r2010_bits_with_extra": 1024,
+            "source_classes_r2010_string_span_bounded": False,
+            "source_classes_r2010_string_bits": 0,
+            "source_classes_r2010_string_wide_length": False,
             "source_classes_r2010_numeric_count": 59 if numeric else 0,
             "source_classes_r2010_max_class_with_extra": 558,
             "source_classes_r2010_ot505_present": has505,
@@ -80,6 +84,29 @@ class NumericClassCensusTest(unittest.TestCase):
             x[field] = value
             with self.subTest(field=field), self.assertRaises(InvalidEvidence):
                 summarize(report(x))
+
+    def test_class_string_span_stays_structural(self):
+        x = sample()
+        h = x["ac1024_compatibility_hypothesis"]
+        h["source_classes_r2010_string_span_bounded"] = True
+        h["source_classes_r2010_string_bits"] = 128
+        outcome = summarize(report(x))
+        self.assertEqual(outcome["bounded_class_string_span_files"], 1)
+        self.assertFalse(outcome["original_class_names_decoded"])
+        self.assertFalse(outcome["cross_file_class_identity_claim"])
+        for field, value in (
+            ("source_classes_section_verified", False),
+            ("source_classes_extracted", False),
+            ("source_classes_r2010_bitcount_with_extra", False),
+            ("source_classes_r2010_string_bits", 1024),
+        ):
+            bad = sample()
+            b = bad["ac1024_compatibility_hypothesis"]
+            b["source_classes_r2010_string_span_bounded"] = True
+            b["source_classes_r2010_string_bits"] = 128
+            b[field] = value
+            with self.subTest(field=field), self.assertRaises(InvalidEvidence):
+                summarize(report(b))
 
     def test_reject_missing_fields_and_bad_count(self):
         x = sample()
