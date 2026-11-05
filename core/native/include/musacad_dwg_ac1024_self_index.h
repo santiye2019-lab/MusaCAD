@@ -365,6 +365,23 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out);
 
+/* Diagnostics use the EXACT strict OT51 proof; no alternative parsing,
+ * fallback flags, or scene/display acceptance. */
+enum {
+    MUSA_DWG_LAYER_FLAGS_OK = 0,
+    MUSA_DWG_LAYER_FLAGS_ARGUMENT = 1,
+    MUSA_DWG_LAYER_FLAGS_INDEX = 2,
+    MUSA_DWG_LAYER_FLAGS_ZERO_EED = 3,
+    MUSA_DWG_LAYER_FLAGS_RECORD_BOUNDS = 4,
+    MUSA_DWG_LAYER_FLAGS_REACTORS = 5,
+    MUSA_DWG_LAYER_FLAGS_XDICTIONARY_BIT = 6,
+    MUSA_DWG_LAYER_FLAGS_NUMERIC = 7
+};
+uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle);
+
 #ifdef __cplusplus
 }
 #endif
