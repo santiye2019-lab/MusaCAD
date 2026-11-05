@@ -464,6 +464,25 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
     uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out);
 
 
+/* Source-only readout of 1..7 terminal bits on a STRICT shape refusal.
+ * Does not claim padding, target identity or render readiness. */
+typedef struct MusaDwgAc1024LayerEedTerminalFragment {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t complete_h_token_count;
+    size_t complete_h5_zero_token_count;
+    size_t terminal_fragment_bit_count;
+    uint8_t terminal_fragment_all_zero;
+    uint8_t original_records_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerEedTerminalFragment;
+
+int musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedTerminalFragment *out);
+
 /* First refusal from exactly the same strict tail-shape parser.
  * Diagnosis records only a stage, never source bytes or H values. */
 enum {
