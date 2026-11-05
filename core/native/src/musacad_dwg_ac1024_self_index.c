@@ -165,10 +165,11 @@ int musa_dwg_ac1024_record_eed_chain_probe(
  * against the independent source-indexed APPID OT67 record. This is
  * intentionally stricter than merely checking EED frame boundaries.
  * No imported GPL library, no EED semantic evaluation, no mutation. */
-int musa_dwg_ac1024_line_eed_appid_probe(
+static int musa_original_eed_appid_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
-    uint64_t canonical_line_handle, MusaDwgAc1024EedAppidEvidence *out) {
+    uint64_t canonical_line_handle, MusaDwgAc1024EedAppidEvidence *out,
+    uint16_t required_ot) {
     if (!objects || !object_bytes || !recovered_index || !out ||
         !canonical_line_handle || !record_count ||
         record_count > MUSA_AC1024_SELF_INDEX_MAX ||
@@ -185,17 +186,17 @@ int musa_dwg_ac1024_line_eed_appid_probe(
     MusaDwgAc1024SelfPrefix original = {0};
     if (!musa_dwg_ac1024_self_index_find(
             recovered_index, record_count, canonical_line_handle, &entity) ||
-        entity.raw_ot != 19u || !entity.frame_crc16_verified ||
+        entity.raw_ot != required_ot || !entity.frame_crc16_verified ||
         !entity.embedded_handle_code0_verified ||
         !musa_dwg_ac1024_record_eed_chain_probe(
             objects, object_bytes, entity.record_offset, &chain) ||
-        chain.raw_ot != 19u ||
+        chain.raw_ot != required_ot ||
         chain.embedded_absolute_handle != canonical_line_handle ||
         !chain.application_count || chain.application_count > 64u ||
         !chain.original_crc16_verified || !chain.eed_boundaries_verified ||
         !musa_dwg_ac1024_record_self_prefix(
             objects, object_bytes, entity.record_offset, &original) ||
-        original.raw_ot != 19u ||
+        original.raw_ot != required_ot ||
         original.embedded_absolute_handle != canonical_line_handle ||
         !original.frame_crc16_verified ||
         original.payload_start_byte >= object_bytes ||
@@ -283,6 +284,25 @@ int musa_dwg_ac1024_line_eed_appid_probe(
     result.original_appid_records_crc_verified = 1u;
     *out = result;
     return 1;
+}
+
+/* Preserve historical OT19-only entry point and add an OT51-only
+ * entry point without weakening either original target-identity gate. */
+int musa_dwg_ac1024_line_eed_appid_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024EedAppidEvidence *out) {
+    return musa_original_eed_appid_impl(
+        objects, object_bytes, recovered_index, record_count,
+        canonical_line_handle, out, 19u);
+}
+int musa_dwg_ac1024_layer_eed_appid_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024EedAppidEvidence *out) {
+    return musa_original_eed_appid_impl(
+        objects, object_bytes, recovered_index, record_count,
+        canonical_layer_handle, out, 51u);
 }
 
 /* Third bounded common DATA field: graphic-present bit, admitted only
