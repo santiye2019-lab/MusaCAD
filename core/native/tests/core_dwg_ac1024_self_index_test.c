@@ -1204,6 +1204,18 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         !result.original_records_crc_verified || result.display_accepted ||
         memcmp(unchanged, bytes, sizeof(bytes)))
         return 0;
+    MusaDwgAc1024LayerEedRawHandleHeader raw = {0};
+    if (!musa_dwg_ac1024_layer_eed_first_h_header_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &raw) ||
+        raw.layer_handle != 45u || raw.layer_record_offset != 39u ||
+        raw.original_handle_start_bit != 160u ||
+        raw.handle_tail_bits != 32u ||
+        raw.first_h_code != 2u || raw.first_h_size != 1u ||
+        !raw.record_crc_verified || raw.display_accepted ||
+        memcmp(unchanged, bytes, sizeof(bytes)))
+        return 0;
+    const MusaDwgAc1024LayerEedRawHandleHeader raw_saved = raw;
+
     const MusaDwgAc1024LayerEedXDictionaryGraph preserved = result;
     if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
             bytes, sizeof(bytes), index, 4u, 45u) !=
@@ -1212,6 +1224,12 @@ static int test_layer_eed_xdictionary_original_graph(void) {
 
     /* A valid layer CRC does not authenticate a broken DICTIONARY CRC. */
     bytes[38] ^= 1u;
+    /* The diagnostic proves only source first H *header*; a damaged
+     * XDictionary target CRC does not alter the raw first H bits. */
+    if (!musa_dwg_ac1024_layer_eed_first_h_header_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &raw) ||
+        memcmp(&raw, &raw_saved, sizeof(raw_saved)))
+        return 0;
     if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
             bytes, sizeof(bytes), index, 4u, 45u) !=
             MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CRC ||
@@ -1262,6 +1280,17 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         return 0;
     memcpy(bytes, unchanged, sizeof(bytes));
 
+    /* Raw-prefix probe is also fail-atomic and source immutable. */
+    if (musa_dwg_ac1024_layer_eed_first_h_header_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, NULL) ||
+        musa_dwg_ac1024_layer_eed_first_h_header_probe(
+            bytes, sizeof(bytes), index, 4u, 45u,
+            (MusaDwgAc1024LayerEedRawHandleHeader *)(void *)bytes) ||
+        musa_dwg_ac1024_layer_eed_first_h_header_probe(
+            bytes, sizeof(bytes), index, 4u, 45u,
+            (MusaDwgAc1024LayerEedRawHandleHeader *)(void *)index) ||
+        memcmp(&raw, &raw_saved, sizeof(raw_saved)))
+        return 0;
     /* No aliasing, NULL, forged handle or source mutation. */
     if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             bytes, sizeof(bytes), index, 4u, 44u, &result) ||
