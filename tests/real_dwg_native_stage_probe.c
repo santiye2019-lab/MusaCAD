@@ -340,6 +340,12 @@ typedef struct MusaAc1024CompatibilityHint {
     int source_classes_r2010_string_span_bounded;
     size_t source_classes_r2010_string_bits;
     int source_classes_r2010_string_wide_length;
+    /* First-party UTF-16 integrity only, names and geometry not exported. */
+    int source_classes_r2010_tu_verified;
+    size_t source_classes_r2010_tu_fields;
+    size_t source_classes_r2010_tu_units;
+    int source_classes_r2010_tu_505_three_nonempty;
+    int source_classes_r2010_tu_505_ascii_only;
     /* The original CRC-backed Classes bytes supply provenance, while
      * the numeric reader supplies only bounded raw class identity.
      * Names, entity graphs and final paint remain disallowed. */
@@ -815,6 +821,30 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                 }
                             }
                             free(numeric);
+                        }
+                        if(hint.source_classes_r2010_numeric_verified &&
+                           hint.source_classes_r2010_string_span_bounded &&
+                           hint.source_classes_r2010_ot505_present){
+                            MusaDwgAc1024ClassesTuAudit audit={0};
+                            if(musa_dwg_ac1024_classes_r2010_tu_audit(
+                                bytes,extracted,
+                                MUSA_AC1024_CLASSES_EXTRA_RL,505u,&audit)&&
+                               audit.complete_bounded_stream&&
+                               !audit.original_section_authenticated&&
+                               !audit.class_semantics_accepted&&
+                               !audit.display_accepted&&
+                               audit.classes_verified==
+                                  hint.source_classes_r2010_numeric_count){
+                                hint.source_classes_r2010_tu_verified=1;
+                                hint.source_classes_r2010_tu_fields=
+                                    audit.tu_fields_verified;
+                                hint.source_classes_r2010_tu_units=
+                                    audit.utf16_code_units_verified;
+                                hint.source_classes_r2010_tu_505_three_nonempty=
+                                    audit.target_three_nonempty;
+                                hint.source_classes_r2010_tu_505_ascii_only=
+                                    audit.target_ascii_only;
+                            }
                         }
                     }
                 }
@@ -2371,6 +2401,11 @@ static void report(const char *signature, const char *result,
                "\"source_classes_r2010_string_span_bounded\":%s,"
                "\"source_classes_r2010_string_bits\":%zu,"
                "\"source_classes_r2010_string_wide_length\":%s,"
+               "\"source_classes_r2010_tu_verified\":%s,"
+               "\"source_classes_r2010_tu_fields\":%zu,"
+               "\"source_classes_r2010_tu_units\":%zu,"
+               "\"source_classes_r2010_tu_505_three_nonempty\":%s,"
+               "\"source_classes_r2010_tu_505_ascii_only\":%s,"
                "\"source_classes_r2010_numeric_verified\":%s,"
                "\"source_classes_r2010_ot505_present\":%s,"
                "\"source_classes_r2010_ot505_entity\":%s,"
@@ -2779,6 +2814,11 @@ static void report(const char *signature, const char *result,
                hint->source_classes_r2010_string_span_bounded ? "true" : "false",
                hint->source_classes_r2010_string_bits,
                hint->source_classes_r2010_string_wide_length ? "true" : "false",
+               hint->source_classes_r2010_tu_verified ? "true" : "false",
+               hint->source_classes_r2010_tu_fields,
+               hint->source_classes_r2010_tu_units,
+               hint->source_classes_r2010_tu_505_three_nonempty ? "true" : "false",
+               hint->source_classes_r2010_tu_505_ascii_only ? "true" : "false",
                hint->source_classes_r2010_numeric_verified ? "true" : "false",
                hint->source_classes_r2010_ot505_present ? "true" : "false",
                hint->source_classes_r2010_ot505_entity ? "true" : "false",
