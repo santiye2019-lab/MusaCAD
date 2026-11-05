@@ -192,6 +192,23 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         # TU Unicode validity establishes bounded class-name fields only.
         # No class-name contents, class semantics, or draw acceptance is emitted.
 
+        dxf_valid = hint.get("source_classes_r2010_505_dxf_identifier_verified")
+        dxf_size = hint.get("source_classes_r2010_505_dxf_identifier_length")
+        dxf_name = hint.get("source_classes_r2010_505_dxf_identifier")
+        valid_name_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_:.-"
+        if (type(dxf_valid) is not bool or type(dxf_size) is not int or
+                not 0 <= dxf_size <= 96 or not isinstance(dxf_name, str)):
+            raise ValueError("invalid_ac1024_class505_dxf_types")
+        if dxf_valid:
+            if (not tu_verified or not tu_nonempty or not tu_ascii or
+                    not 1 <= len(dxf_name) == dxf_size <= 96 or
+                    any(ch not in valid_name_chars for ch in dxf_name)):
+                raise ValueError("unverified_ac1024_class505_dxf_identifier")
+        elif dxf_size or dxf_name:
+            raise ValueError("class505_dxf_identifier_without_proof")
+        # This is only the third TU string of local class 505. Never infer
+        # material, layer inheritance, writer or render admission from it.
+
         numeric_flags = (
             "source_classes_r2010_numeric_verified",
             "source_classes_r2010_ot505_present",
