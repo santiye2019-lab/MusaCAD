@@ -412,6 +412,29 @@ int musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerEedXDictionaryGraph *out);
 
+/* Read-only original OT51 EED first H header, for source-format
+ * diagnosis only. Returns the exact 4-bit H code/size without resolving
+ * target roles. The record, EED APPIDs and XDictionary-present flag
+ * must already pass independent original CRC/H checks. This DOES NOT
+ * authenticate any H target, layer visibility or scene/draw permission.
+ * The output is fail-atomic and contains no file path or coordinates. */
+typedef struct MusaDwgAc1024LayerEedRawHandleHeader {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t original_handle_start_bit;
+    size_t handle_tail_bits;
+    uint8_t first_h_code;
+    uint8_t first_h_size;
+    uint8_t record_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerEedRawHandleHeader;
+
+int musa_dwg_ac1024_layer_eed_first_h_header_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedRawHandleHeader *out);
+
 /* Exact same reader, with its first refusal stage. This is a read-only
  * diagnosis and never a fallback into render/scene acceptance. */
 enum {
