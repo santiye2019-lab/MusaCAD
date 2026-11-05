@@ -604,6 +604,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_flags_locked_bit",
             "sampled_layer_eed_flags_unmapped_bits",
             "sampled_layer_eed_flags_xdictionary_present",
+            "sampled_layer_eed_appid_attempts",
+            "sampled_layer_eed_appid_verified",
+            "sampled_layer_eed_appid_refused",
+            "sampled_layer_eed_appid_refs_verified",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -659,6 +663,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_eed_attempts, layer_eed_ok, layer_eed_bad,
          layer_eed_frozen, layer_eed_on, layer_eed_locked,
          layer_eed_unmapped, layer_eed_xdic,
+         layer_appid_attempts, layer_appid_ok, layer_appid_bad,
+         layer_appid_refs,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -728,6 +734,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 layer_flags_ok + layer_eed_ok > layer_flags_attempts or
                 max(layer_eed_frozen, layer_eed_on, layer_eed_locked,
                     layer_eed_unmapped, layer_eed_xdic) > layer_eed_ok or
+                layer_appid_attempts != layer_eed_attempts or
+                layer_appid_ok + layer_appid_bad != layer_appid_attempts or
+                layer_appid_refs < layer_appid_ok or
+                layer_appid_refs > 64 * layer_appid_ok or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
