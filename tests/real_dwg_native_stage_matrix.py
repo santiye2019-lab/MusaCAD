@@ -591,6 +591,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_common_stage_rgb",
             "sampled_line_common_stage_transparency",
             "sampled_line_common_stage_ltype",
+            "sampled_line_ltype_zero",
+            "sampled_line_ltype_negative",
+            "sampled_line_ltype_nonfinite",
+            "sampled_line_ltype_parse_refused",
             "sampled_line_common_stage_appearance",
             "sampled_line_common_stage_geom_bound",
             "sampled_line_common_stage_other",
@@ -628,6 +632,7 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
          stage_color, stage_rgb, stage_transparency, stage_ltype,
+         ltype_zero, ltype_negative, ltype_nonfinite, ltype_parse,
          stage_appearance, stage_geom_bound, stage_other,
          implicit_paper_xyz,
          implicit_model_xyz, graph_attempts, graph_ok,
@@ -688,7 +693,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 line_common_after_meta_rejected != (
                     stage_color + stage_rgb + stage_transparency +
                     stage_ltype + stage_appearance + stage_geom_bound +
-                    stage_other)):
+                    stage_other) or
+                stage_ltype != (ltype_zero + ltype_negative +
+                                ltype_nonfinite + ltype_parse)):
             raise ValueError("invalid_ac1024_line_sample_counts")
         if not recovered_ok and any(hint[k] for k in line_keys):
             raise ValueError("unrecovered_ac1024_line_sample_claim")
