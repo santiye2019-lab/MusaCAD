@@ -1371,9 +1371,36 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         shape.h_token_count != 2u ||
         shape.raw_h5_zero_length_count != 1u ||
         shape.other_raw_h_count != 1u || shape.raw_payload_octets != 1u ||
+        shape.raw_h5_nonzero_length_count != 1u ||
+        shape.raw_non_h5_zero_length_count != 0u ||
+        shape.raw_non_h5_nonzero_length_count != 0u ||
         !shape.original_records_crc_verified || shape.display_accepted)
         return 0;
     const MusaDwgAc1024LayerEedTailShape shape_saved = shape;
+    /* An H4 with zero bytes is counted as RAW other-code/zero-size
+     * evidence only. It cannot turn into a verified handle target. */
+    set_bits(extended_body, 208u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 30u, &crc))
+        return 0;
+    extended_layer[30] = (uint8_t)crc;
+    extended_layer[31] = (uint8_t)(crc >> 8u);
+    MusaDwgAc1024LayerEedTailShape other_zero_shape = {0};
+    if (!musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u,
+            &other_zero_shape) ||
+        other_zero_shape.h_token_count != 2u ||
+        other_zero_shape.raw_h5_zero_length_count != 0u ||
+        other_zero_shape.raw_h5_nonzero_length_count != 1u ||
+        other_zero_shape.raw_non_h5_zero_length_count != 1u ||
+        other_zero_shape.raw_non_h5_nonzero_length_count != 0u ||
+        other_zero_shape.raw_payload_octets != 1u ||
+        other_zero_shape.display_accepted)
+        return 0;
+    set_bits(extended_body, 208u, 4u, 5u);
+    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 30u, &crc))
+        return 0;
+    extended_layer[30] = (uint8_t)crc;
+    extended_layer[31] = (uint8_t)(crc >> 8u);
     uint8_t extended_pristine[sizeof(with_tail)];
     memcpy(extended_pristine, with_tail, sizeof(with_tail));
 
