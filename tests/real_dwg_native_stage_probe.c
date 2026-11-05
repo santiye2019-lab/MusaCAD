@@ -441,6 +441,15 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_appid_refused;
     size_t sampled_line_eed_appid_references_verified;
     size_t sampled_line_eed_appid_distinct_references_verified;
+    /* Original OT51 raw numeric layer flags, NEVER actual visibility. */
+    size_t sampled_layer_raw_flags_attempts;
+    size_t sampled_layer_raw_flags_verified;
+    size_t sampled_layer_raw_flags_refused;
+    size_t sampled_layer_raw_flags_frozen_bit;
+    size_t sampled_layer_raw_flags_on_bit;
+    size_t sampled_layer_raw_flags_locked_bit;
+    size_t sampled_layer_raw_flags_unmapped_bits;
+    size_t sampled_layer_raw_flags_xdictionary_present;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -992,6 +1001,36 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                    no class guess, no raw handles, no owner,
                                    layer, insert coordinate or scene output. */
                                 const uint16_t type = recovered[k].raw_ot;
+                                if (type == 51u) {
+                                    ++hint.sampled_layer_raw_flags_attempts;
+                                    MusaDwgAc1024LayerRawFlagsEvidence layer = {0};
+                                    if (musa_dwg_ac1024_layer_raw_flags_probe(
+                                            objects, nb, recovered, legacy_count,
+                                            recovered[k].embedded_absolute_handle,
+                                            &layer) &&
+                                        layer.layer_handle ==
+                                            recovered[k].embedded_absolute_handle &&
+                                        layer.layer_record_offset ==
+                                            recovered[k].record_offset &&
+                                        layer.raw_flags_end_bit >
+                                            layer.raw_flags_start_bit &&
+                                        layer.original_record_crc_verified &&
+                                        layer.display_accepted == 0u) {
+                                        ++hint.sampled_layer_raw_flags_verified;
+                                        if (layer.frozen_bit)
+                                            ++hint.sampled_layer_raw_flags_frozen_bit;
+                                        if (layer.on_bit)
+                                            ++hint.sampled_layer_raw_flags_on_bit;
+                                        if (layer.locked_bit)
+                                            ++hint.sampled_layer_raw_flags_locked_bit;
+                                        if (layer.unmapped_bits)
+                                            ++hint.sampled_layer_raw_flags_unmapped_bits;
+                                        if (layer.xdictionary_missing == 0u)
+                                            ++hint.sampled_layer_raw_flags_xdictionary_present;
+                                    } else {
+                                        ++hint.sampled_layer_raw_flags_refused;
+                                    }
+                                }
                                 int line_owner_layer_joinable = 0;
                                 int line_meta_ok = 0;
                                 MusaDwgAc1024EntityMetaPrefix meta = {0};
@@ -1757,6 +1796,14 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_appid_refused\":%zu,"
                "\"sampled_line_eed_appid_references_verified\":%zu,"
                "\"sampled_line_eed_appid_distinct_references_verified\":%zu,"
+               "\"sampled_layer_raw_flags_attempts\":%zu,"
+               "\"sampled_layer_raw_flags_verified\":%zu,"
+               "\"sampled_layer_raw_flags_refused\":%zu,"
+               "\"sampled_layer_raw_flags_frozen_bit\":%zu,"
+               "\"sampled_layer_raw_flags_on_bit\":%zu,"
+               "\"sampled_layer_raw_flags_locked_bit\":%zu,"
+               "\"sampled_layer_raw_flags_unmapped_bits\":%zu,"
+               "\"sampled_layer_raw_flags_xdictionary_present\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -1976,6 +2023,14 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_appid_refused,
                hint->sampled_line_eed_appid_references_verified,
                hint->sampled_line_eed_appid_distinct_references_verified,
+               hint->sampled_layer_raw_flags_attempts,
+               hint->sampled_layer_raw_flags_verified,
+               hint->sampled_layer_raw_flags_refused,
+               hint->sampled_layer_raw_flags_frozen_bit,
+               hint->sampled_layer_raw_flags_on_bit,
+               hint->sampled_layer_raw_flags_locked_bit,
+               hint->sampled_layer_raw_flags_unmapped_bits,
+               hint->sampled_layer_raw_flags_xdictionary_present,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
