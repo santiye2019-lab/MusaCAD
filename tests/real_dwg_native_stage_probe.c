@@ -545,6 +545,21 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_tail_shape_refused_payload;
     size_t sampled_layer_eed_tail_shape_refused_final;
     size_t sampled_layer_eed_tail_shape_refused_other;
+    /* Refused 1..7-bit terminal witness: not a padding acceptance. */
+    size_t sampled_layer_eed_terminal_fragment_attempts;
+    size_t sampled_layer_eed_terminal_fragment_verified;
+    size_t sampled_layer_eed_terminal_fragment_refused;
+    size_t sampled_layer_eed_terminal_fragment_zero;
+    size_t sampled_layer_eed_terminal_fragment_nonzero;
+    size_t sampled_layer_eed_terminal_fragment_tokens;
+    size_t sampled_layer_eed_terminal_fragment_h5_zero_tokens;
+    size_t sampled_layer_eed_terminal_fragment_bits_1;
+    size_t sampled_layer_eed_terminal_fragment_bits_2;
+    size_t sampled_layer_eed_terminal_fragment_bits_3;
+    size_t sampled_layer_eed_terminal_fragment_bits_4;
+    size_t sampled_layer_eed_terminal_fragment_bits_5;
+    size_t sampled_layer_eed_terminal_fragment_bits_6;
+    size_t sampled_layer_eed_terminal_fragment_bits_7;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1248,8 +1263,46 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                         ++hint.sampled_layer_eed_tail_shape_refused_stream; break;
                                                     case MUSA_DWG_LAYER_TAIL_SHAPE_TOKEN_LIMIT:
                                                         ++hint.sampled_layer_eed_tail_shape_refused_token_limit; break;
-                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER:
-                                                        ++hint.sampled_layer_eed_tail_shape_refused_short_header; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER: {
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_short_header;
+                                                        ++hint.sampled_layer_eed_terminal_fragment_attempts;
+                                                        MusaDwgAc1024LayerEedTerminalFragment fragment = {0};
+                                                        if (musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+                                                                objects, nb, recovered, legacy_count,
+                                                                recovered[k].embedded_absolute_handle,
+                                                                &fragment) &&
+                                                            fragment.layer_handle ==
+                                                                recovered[k].embedded_absolute_handle &&
+                                                            fragment.layer_record_offset ==
+                                                                recovered[k].record_offset &&
+                                                            fragment.original_records_crc_verified &&
+                                                            fragment.terminal_fragment_bit_count >= 1u &&
+                                                            fragment.terminal_fragment_bit_count <= 7u &&
+                                                            fragment.display_accepted == 0u) {
+                                                            ++hint.sampled_layer_eed_terminal_fragment_verified;
+                                                            if (fragment.terminal_fragment_all_zero)
+                                                                ++hint.sampled_layer_eed_terminal_fragment_zero;
+                                                            else
+                                                                ++hint.sampled_layer_eed_terminal_fragment_nonzero;
+                                                            hint.sampled_layer_eed_terminal_fragment_tokens +=
+                                                                fragment.complete_h_token_count;
+                                                            hint.sampled_layer_eed_terminal_fragment_h5_zero_tokens +=
+                                                                fragment.complete_h5_zero_token_count;
+                                                            switch (fragment.terminal_fragment_bit_count) {
+                                                            case 1u: ++hint.sampled_layer_eed_terminal_fragment_bits_1; break;
+                                                            case 2u: ++hint.sampled_layer_eed_terminal_fragment_bits_2; break;
+                                                            case 3u: ++hint.sampled_layer_eed_terminal_fragment_bits_3; break;
+                                                            case 4u: ++hint.sampled_layer_eed_terminal_fragment_bits_4; break;
+                                                            case 5u: ++hint.sampled_layer_eed_terminal_fragment_bits_5; break;
+                                                            case 6u: ++hint.sampled_layer_eed_terminal_fragment_bits_6; break;
+                                                            case 7u: ++hint.sampled_layer_eed_terminal_fragment_bits_7; break;
+                                                            default: break;
+                                                            }
+                                                        } else {
+                                                            ++hint.sampled_layer_eed_terminal_fragment_refused;
+                                                        }
+                                                        break;
+                                                    }
                                                     case MUSA_DWG_LAYER_TAIL_SHAPE_HEADER_READ:
                                                         ++hint.sampled_layer_eed_tail_shape_refused_header_read; break;
                                                     case MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH:
@@ -2230,6 +2283,20 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_tail_shape_refused_payload\":%zu,"
                "\"sampled_layer_eed_tail_shape_refused_final\":%zu,"
                "\"sampled_layer_eed_tail_shape_refused_other\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_attempts\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_verified\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_refused\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_zero\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_nonzero\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_tokens\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_h5_zero_tokens\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_1\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_2\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_3\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_4\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_5\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_6\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_bits_7\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2543,6 +2610,20 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_tail_shape_refused_payload,
                hint->sampled_layer_eed_tail_shape_refused_final,
                hint->sampled_layer_eed_tail_shape_refused_other,
+               hint->sampled_layer_eed_terminal_fragment_attempts,
+               hint->sampled_layer_eed_terminal_fragment_verified,
+               hint->sampled_layer_eed_terminal_fragment_refused,
+               hint->sampled_layer_eed_terminal_fragment_zero,
+               hint->sampled_layer_eed_terminal_fragment_nonzero,
+               hint->sampled_layer_eed_terminal_fragment_tokens,
+               hint->sampled_layer_eed_terminal_fragment_h5_zero_tokens,
+               hint->sampled_layer_eed_terminal_fragment_bits_1,
+               hint->sampled_layer_eed_terminal_fragment_bits_2,
+               hint->sampled_layer_eed_terminal_fragment_bits_3,
+               hint->sampled_layer_eed_terminal_fragment_bits_4,
+               hint->sampled_layer_eed_terminal_fragment_bits_5,
+               hint->sampled_layer_eed_terminal_fragment_bits_6,
+               hint->sampled_layer_eed_terminal_fragment_bits_7,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
