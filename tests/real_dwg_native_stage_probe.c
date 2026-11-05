@@ -336,6 +336,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t source_classes_r2010_max_class_with_extra;
     int source_classes_r2010_tail8_with_extra;
     int source_classes_r2010_extent_exact_with_extra;
+    /* Bounded detached TU string envelope, not decoded class names. */
+    int source_classes_r2010_string_span_bounded;
+    size_t source_classes_r2010_string_bits;
+    int source_classes_r2010_string_wide_length;
     /* The original CRC-backed Classes bytes supply provenance, while
      * the numeric reader supplies only bounded raw class identity.
      * Names, entity graphs and final paint remain disallowed. */
@@ -770,6 +774,19 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             prefix.end_sentinel_followed_by_eight_bytes;
                         hint.source_classes_r2010_extent_exact_with_extra =
                             prefix.byte_area_extent_exact;
+                        MusaDwgAc1024ClassesStringSpan strings={0};
+                        if(musa_dwg_ac1024_classes_r2010_string_span_probe(
+                               bytes,extracted,
+                               MUSA_AC1024_CLASSES_EXTRA_RL,&strings)&&
+                           strings.bounded&&
+                           !strings.original_section_authenticated&&
+                           !strings.class_name_resolved&&!strings.display_accepted){
+                            hint.source_classes_r2010_string_span_bounded=1;
+                            hint.source_classes_r2010_string_bits=
+                                strings.stream_bits;
+                            hint.source_classes_r2010_string_wide_length=
+                                strings.wide_size_word;
+                        }
                         size_t class_count=0u;
                         if (musa_dwg_ac1024_classes_r2010_numeric_records(
                                 bytes, extracted,
@@ -2351,6 +2368,9 @@ static void report(const char *signature, const char *result,
                "\"source_classes_r2010_max_class_with_extra\":%zu,"
                "\"source_classes_r2010_tail8_with_extra\":%s,"
                "\"source_classes_r2010_extent_exact_with_extra\":%s,"
+               "\"source_classes_r2010_string_span_bounded\":%s,"
+               "\"source_classes_r2010_string_bits\":%zu,"
+               "\"source_classes_r2010_string_wide_length\":%s,"
                "\"source_classes_r2010_numeric_verified\":%s,"
                "\"source_classes_r2010_ot505_present\":%s,"
                "\"source_classes_r2010_ot505_entity\":%s,"
@@ -2756,6 +2776,9 @@ static void report(const char *signature, const char *result,
                hint->source_classes_r2010_max_class_with_extra,
                hint->source_classes_r2010_tail8_with_extra ? "true" : "false",
                hint->source_classes_r2010_extent_exact_with_extra ? "true" : "false",
+               hint->source_classes_r2010_string_span_bounded ? "true" : "false",
+               hint->source_classes_r2010_string_bits,
+               hint->source_classes_r2010_string_wide_length ? "true" : "false",
                hint->source_classes_r2010_numeric_verified ? "true" : "false",
                hint->source_classes_r2010_ot505_present ? "true" : "false",
                hint->source_classes_r2010_ot505_entity ? "true" : "false",
