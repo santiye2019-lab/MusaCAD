@@ -88,6 +88,39 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             or not hint.get("physical_page_map")
         ):
             raise ValueError("unverified_ac1024_original_page_comparison")
+        cls_bool = (
+            "source_classes_section_verified",
+            "source_classes_extracted",
+            "source_classes_numeric_no_extra",
+            "source_classes_numeric_with_extra",
+        )
+        cls_int = (
+            "source_classes_page_count", "source_classes_logical_bytes",
+            "source_classes_count_no_extra", "source_classes_count_with_extra",
+        )
+        if any(type(hint.get(k)) is not bool for k in cls_bool) or any(
+            type(hint.get(k)) is not int or hint[k] < 0 for k in cls_int
+        ):
+            raise ValueError("invalid_ac1024_original_classes_type")
+        if hint["source_classes_section_verified"]:
+            if (not hint["source_physical_page_map"]
+                    or not 1 <= hint["source_classes_page_count"] <= 65536
+                    or not 16 <= hint["source_classes_logical_bytes"] <= 8 * 1024 * 1024):
+                raise ValueError("invalid_ac1024_original_classes_pages")
+        elif (hint["source_classes_extracted"]
+              or hint["source_classes_page_count"]
+              or hint["source_classes_logical_bytes"]):
+            raise ValueError("unsupported_ac1024_original_classes_evidence")
+        if hint["source_classes_extracted"] and not hint["source_classes_section_verified"]:
+            raise ValueError("unverified_ac1024_original_classes_transfer")
+        for present, count_key in (
+            ("source_classes_numeric_no_extra", "source_classes_count_no_extra"),
+            ("source_classes_numeric_with_extra", "source_classes_count_with_extra"),
+        ):
+            count = hint[count_key]
+            if (hint[present] != (1 <= count <= 4096)
+                    or (hint[present] and not hint["source_classes_extracted"])):
+                raise ValueError("unsupported_ac1024_numeric_class_claim")
         keys = ("page_map_header", "physical_page_map",
                 "objects_section_pages", "handles_section_pages",
                 "candidate_handle_index")

@@ -30,6 +30,14 @@ def ac1024_probe_record():
             "source_physical_page_map": False,
             "source_physical_page_count": 0,
             "source_patched_page_count_equal": False,
+            "source_classes_section_verified": False,
+            "source_classes_extracted": False,
+            "source_classes_page_count": 0,
+            "source_classes_logical_bytes": 0,
+            "source_classes_numeric_no_extra": False,
+            "source_classes_count_no_extra": 0,
+            "source_classes_numeric_with_extra": False,
+            "source_classes_count_with_extra": 0,
             "object_section_page_count": 558,
             "handle_section_page_count": 77,
             "legacy_frame_probe_completed": False,
@@ -403,6 +411,36 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_original_ac1024_classes_require_original_crc_provenance(self):
+        valid = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(valid), valid)
+        for field, value in (
+            ("source_classes_section_verified", True),
+            ("source_classes_extracted", True),
+            ("source_classes_logical_bytes", 32),
+            ("source_classes_page_count", 1),
+            ("source_classes_numeric_no_extra", True),
+            ("source_classes_numeric_with_extra", True),
+            ("source_classes_count_no_extra", 2),
+            ("source_classes_count_with_extra", 1),
+        ):
+            bad = deepcopy(valid)
+            bad["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_fake_result(bad)
+        good = deepcopy(valid)
+        hint = good["ac1024_compatibility_hypothesis"]
+        hint["source_page_map_header"] = True
+        hint["source_physical_page_map"] = True
+        hint["source_physical_page_count"] = 3
+        hint["source_classes_section_verified"] = True
+        hint["source_classes_extracted"] = True
+        hint["source_classes_logical_bytes"] = 128
+        hint["source_classes_page_count"] = 1
+        hint["source_classes_numeric_no_extra"] = True
+        hint["source_classes_count_no_extra"] = 1
+        self.assertEqual(validate_fake_result(good), good)
+
     def test_original_ac1024_page_map_claims_are_fail_closed(self):
         valid = ac1024_probe_record()
         self.assertEqual(validate_fake_result(valid), valid)

@@ -15,6 +15,7 @@
 #include "musacad_crc16.h"
 #include "musacad_dwg_ac1015_values.h"
 #include "musacad_dwg_ac1024_record.h"
+#include "musacad_dwg_ac1024_classes.h"
 #include "musacad_dwg_ac1024_self_index.h"
 #include "musacad_dwg_ac1024_line.h"
 #include "musacad_dwg_ac1015_handle_refs.h"
@@ -315,6 +316,16 @@ typedef struct MusaAc1024CompatibilityHint {
     int source_page_map_header, source_physical_page_map;
     int source_patched_page_count_equal;
     size_t source_physical_page_count;
+    /* CRC-verified original AcDb:Classes *section*, then still-untrusted
+     * class numeric/string grammar; all original source bytes immutable. */
+    int source_classes_section_verified;
+    int source_classes_extracted;
+    int source_classes_numeric_no_extra;
+    int source_classes_numeric_with_extra;
+    size_t source_classes_page_count;
+    size_t source_classes_logical_bytes;
+    size_t source_classes_count_no_extra;
+    size_t source_classes_count_with_extra;
     size_t candidate_handles;
     size_t object_section_page_count, handle_section_page_count;
     int legacy_frame_probe_completed;
@@ -661,6 +672,50 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
             source_count == original_header.page_count;
         if (hint.source_physical_page_map)
             hint.source_physical_page_count = source_count;
+    }
+    /* Resolve original-signature AcDb:Classes only after physical
+     * source-page authentication. Even a parsed numeric count has
+     * neither Unicode names nor image/visibility rights. */
+    if (hint.source_physical_page_map) {
+        uint64_t logical = 0u;
+        size_t pages = 0u;
+        if (musa_dwg_ac1024_classes_section_probe(
+                scratch, length, &logical, &pages) &&
+            logical > 0u && logical <= 8u * 1024u * 1024u &&
+            pages > 0u && pages <= 65536u) {
+            hint.source_classes_section_verified = 1;
+            hint.source_classes_logical_bytes = (size_t)logical;
+            hint.source_classes_page_count = pages;
+            uint8_t *bytes = (uint8_t *)malloc((size_t)logical);
+            if (bytes) {
+                size_t extracted = 0u;
+                if (musa_dwg_ac1024_extract_classes_section(
+                        scratch, length, bytes, (size_t)logical,
+                        &extracted) &&
+                    extracted == logical) {
+                    hint.source_classes_extracted = 1;
+                    size_t class_count = 0u;
+                    if (musa_dwg_ac1024_classes_numeric_records(
+                            bytes, extracted,
+                            MUSA_AC1024_CLASSES_NO_EXTRA_RL,
+                            NULL, 0u, &class_count) &&
+                        class_count > 0u && class_count <= 4096u) {
+                        hint.source_classes_numeric_no_extra = 1;
+                        hint.source_classes_count_no_extra = class_count;
+                    }
+                    class_count = 0u;
+                    if (musa_dwg_ac1024_classes_numeric_records(
+                            bytes, extracted,
+                            MUSA_AC1024_CLASSES_EXTRA_RL,
+                            NULL, 0u, &class_count) &&
+                        class_count > 0u && class_count <= 4096u) {
+                        hint.source_classes_numeric_with_extra = 1;
+                        hint.source_classes_count_with_extra = class_count;
+                    }
+                }
+                free(bytes);
+            }
+        }
     }
     /* Borrowed R2004-family sections and handle index still run on a
        disposable copy for DIAGNOSTICS only. */
@@ -2192,6 +2247,14 @@ static void report(const char *signature, const char *result,
                "\"source_physical_page_map\":%s,"
                "\"source_physical_page_count\":%zu,"
                "\"source_patched_page_count_equal\":%s,"
+               "\"source_classes_section_verified\":%s,"
+               "\"source_classes_extracted\":%s,"
+               "\"source_classes_page_count\":%zu,"
+               "\"source_classes_logical_bytes\":%zu,"
+               "\"source_classes_numeric_no_extra\":%s,"
+               "\"source_classes_count_no_extra\":%zu,"
+               "\"source_classes_numeric_with_extra\":%s,"
+               "\"source_classes_count_with_extra\":%zu,"
                "\"object_section_page_count\":%zu,"
                "\"handle_section_page_count\":%zu,"
                "\"legacy_frame_probe_completed\":%s,"
@@ -2555,6 +2618,14 @@ static void report(const char *signature, const char *result,
                hint->source_physical_page_map ? "true" : "false",
                hint->source_physical_page_count,
                hint->source_patched_page_count_equal ? "true" : "false",
+               hint->source_classes_section_verified ? "true" : "false",
+               hint->source_classes_extracted ? "true" : "false",
+               hint->source_classes_page_count,
+               hint->source_classes_logical_bytes,
+               hint->source_classes_numeric_no_extra ? "true" : "false",
+               hint->source_classes_count_no_extra,
+               hint->source_classes_numeric_with_extra ? "true" : "false",
+               hint->source_classes_count_with_extra,
                hint->object_section_page_count,
                hint->handle_section_page_count,
                hint->legacy_frame_probe_completed ? "true" : "false",
