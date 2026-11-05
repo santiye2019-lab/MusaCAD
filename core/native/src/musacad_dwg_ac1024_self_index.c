@@ -1204,6 +1204,84 @@ uint8_t musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
 }
 
 
+
+/* Continue ONLY the proven OT50/H4 -> OT42/H3 source prefix.
+ * Inspect the next eight raw H-header bits without interpreting the
+ * subsequent target or assigning linetype/material/plotstyle roles.
+ * The canonical original CRC-backed graph is a required prerequisite. */
+int musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedTailRawHeader *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024LayerEedXDictionaryGraph graph = {0};
+    MusaDwgAc1024EedChainEvidence chain = {0};
+    if (!musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &graph) ||
+        !graph.original_records_crc_verified || graph.display_accepted ||
+        !musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, graph.layer_record_offset, &chain) ||
+        chain.raw_ot != 51u ||
+        chain.embedded_absolute_handle != canonical_layer_handle ||
+        chain.payload_start_byte >= object_bytes ||
+        chain.handle_stream_end_bit / 8u >
+            object_bytes - chain.payload_start_byte)
+        return 0;
+
+    MusaDwgAc1015Bits tail = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &tail, objects + chain.payload_start_byte,
+            chain.handle_stream_end_bit / 8u,
+            chain.handle_stream_start_bit, chain.handle_stream_end_bit))
+        return 0;
+    uint64_t control_h = 0u, dictionary_h = 0u;
+    uint8_t control_code = 0u, dictionary_code = 0u;
+    if (!r2010_link_h(&tail, canonical_layer_handle, 4u,
+                      &control_h, &control_code) ||
+        !r2010_link_h(&tail, canonical_layer_handle, 3u,
+                      &dictionary_h, &dictionary_code) ||
+        control_h != graph.layer_control_handle ||
+        dictionary_h != graph.xdictionary_handle ||
+        control_code != graph.layer_control_raw_h_code ||
+        dictionary_code != graph.xdictionary_raw_h_code ||
+        tail.bit_pos > tail.bit_end ||
+        tail.bit_end - tail.bit_pos != graph.remaining_handle_tail_bits ||
+        graph.remaining_handle_tail_bits < 8u)
+        return 0;
+
+    const size_t start = tail.bit_pos;
+    uint32_t raw_code = 0u, raw_size = 0u;
+    if (!musa_dwg_ac1015_bits_read_u(&tail, 4u, &raw_code) ||
+        !musa_dwg_ac1015_bits_read_u(&tail, 4u, &raw_size) ||
+        raw_code > 15u || raw_size > 8u ||
+        raw_size > (tail.bit_end - tail.bit_pos) / 8u)
+        return 0;
+
+    MusaDwgAc1024LayerEedTailRawHeader next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = graph.layer_record_offset;
+    next.original_tail_start_bit = start;
+    next.remaining_handle_tail_bits = graph.remaining_handle_tail_bits;
+    next.raw_h_code = (uint8_t)raw_code;
+    next.raw_h_size = (uint8_t)raw_size;
+    next.original_records_crc_verified = 1u;
+    next.display_accepted = 0u;
+    *out = next;
+    return 1;
+}
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
