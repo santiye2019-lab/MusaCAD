@@ -509,3 +509,115 @@ int musa_dwg_ac1024_classes_r2010_string_span_probe(
     *out=next;
     return 1;
 }
+
+/* Original first-party R2010 detached Unicode-stream reader.
+ * A TU is a bounded BS character count followed by UTF-16LE code units.
+ * This reader never exports original names and never upgrades class
+ * semantics or file-rendering claims. */
+int musa_dwg_ac1024_classes_r2010_tu_audit(
+    const uint8_t *section,size_t len,uint8_t extra,
+    uint16_t target_class,MusaDwgAc1024ClassesTuAudit *out){
+    if(!section||!out||extra>1u||target_class<500u||
+       overlaps(section,len,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1024ClassesStringSpan span={0};
+    MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_r2010_string_span_probe(
+            section,len,extra,&span)||!span.bounded||
+       !musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+            section,len,extra,&prefix)||!prefix.byte_area_extent_exact)
+        return 0;
+    const size_t data_bytes=prefix.declared_data_area_bytes-(extra?4u:0u);
+    if(prefix.bitstream_start_byte>len||
+       data_bytes>len-prefix.bitstream_start_byte||
+       span.stream_begin_bit>span.stream_end_bit||
+       span.stream_end_bit>data_bytes*8u)
+        return 0;
+    size_t count=0u;
+    if(!musa_dwg_ac1024_classes_r2010_numeric_records(
+           section,len,extra,NULL,0u,&count)||
+       !count||count>4096u||count>SIZE_MAX/sizeof(MusaDwgAc1024ClassNumeric))
+        return 0;
+    MusaDwgAc1024ClassNumeric *classes=
+        (MusaDwgAc1024ClassNumeric *)calloc(count,sizeof(*classes));
+    if(!classes)return 0;
+    int ok=musa_dwg_ac1024_classes_r2010_numeric_records(
+        section,len,extra,classes,count,&count);
+    if(!ok){free(classes);return 0;}
+    const uint8_t *data=section+prefix.bitstream_start_byte;
+    size_t pos=span.stream_begin_bit;
+    MusaDwgAc1024ClassesTuAudit next={0};
+    next.target_class_number=target_class;
+    next.target_ascii_only=1u;
+    uint64_t fingerprint=UINT64_C(14695981039346656037);
+    for(size_t i=0u;i<count&&ok;i++){
+        const int is_target=(classes[i].class_number==target_class);
+        if(is_target)next.target_found=1u;
+        for(size_t field=0u;field<3u&&ok;field++){
+            uint16_t units=0u;
+            if(pos>span.stream_end_bit||
+               !bit_short(data,data_bytes,&pos,&units)||
+               pos>span.stream_end_bit||units>1024u||
+               (size_t)units>(span.stream_end_bit-pos)/16u){
+                ok=0;break;
+            }
+            if(is_target){
+                next.target_name_code_units[field]=units;
+                fingerprint^=(uint64_t)(field+1u);
+                fingerprint*=UINT64_C(1099511628211);
+                fingerprint^=(uint64_t)units;
+                fingerprint*=UINT64_C(1099511628211);
+            }
+            int waiting_for_low=0;
+            for(uint16_t j=0u;j<units;j++){
+                uint32_t lo=0u,hi=0u;
+                if(!bit_read(data,data_bytes,&pos,8u,&lo)||
+                   !bit_read(data,data_bytes,&pos,8u,&hi)||
+                   pos>span.stream_end_bit){ok=0;break;}
+                const uint16_t ch=(uint16_t)(lo|(hi<<8u));
+                /* NUL is never a valid class-name character. Surrogates
+                 * must occur in pairs within a single TU field. */
+                if(!ch){ok=0;break;}
+                if(waiting_for_low){
+                    if(ch<0xdc00u||ch>0xdfffu){ok=0;break;}
+                    waiting_for_low=0;
+                }else if(ch>=0xd800u&&ch<=0xdbffu){
+                    waiting_for_low=1;
+                }else if(ch>=0xdc00u&&ch<=0xdfffu){
+                    ok=0;break;
+                }
+                if(is_target){
+                    if(ch>0x7fu)next.target_ascii_only=0u;
+                    fingerprint^=(uint64_t)lo;
+                    fingerprint*=UINT64_C(1099511628211);
+                    fingerprint^=(uint64_t)hi;
+                    fingerprint*=UINT64_C(1099511628211);
+                }
+                next.utf16_code_units_verified++;
+            }
+            if(waiting_for_low)ok=0;
+            if(ok)next.tu_fields_verified++;
+        }
+        next.classes_verified++;
+    }
+    free(classes);
+    if(!ok||!next.target_found||next.classes_verified!=count||
+       next.tu_fields_verified!=count*3u||
+       pos>span.stream_end_bit||
+       span.stream_end_bit-pos>7u)
+        return 0;
+    const size_t padding=span.stream_end_bit-pos;
+    for(size_t j=0u;j<padding;j++){
+        uint32_t b=0u;
+        if(!bit_read(data,data_bytes,&pos,1u,&b)||b)return 0;
+    }
+    next.trailing_padding_bits=padding;
+    next.target_three_nonempty=(uint8_t)(
+        next.target_name_code_units[0]!=0u&&
+        next.target_name_code_units[1]!=0u&&
+        next.target_name_code_units[2]!=0u);
+    next.target_triplet_fingerprint=fingerprint;
+    next.complete_bounded_stream=1u;
+    *out=next;
+    return 1;
+}
