@@ -675,6 +675,20 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_tail_shape_refused_payload",
             "sampled_layer_eed_tail_shape_refused_final",
             "sampled_layer_eed_tail_shape_refused_other",
+            "sampled_layer_eed_terminal_fragment_attempts",
+            "sampled_layer_eed_terminal_fragment_verified",
+            "sampled_layer_eed_terminal_fragment_refused",
+            "sampled_layer_eed_terminal_fragment_zero",
+            "sampled_layer_eed_terminal_fragment_nonzero",
+            "sampled_layer_eed_terminal_fragment_tokens",
+            "sampled_layer_eed_terminal_fragment_h5_zero_tokens",
+            "sampled_layer_eed_terminal_fragment_bits_1",
+            "sampled_layer_eed_terminal_fragment_bits_2",
+            "sampled_layer_eed_terminal_fragment_bits_3",
+            "sampled_layer_eed_terminal_fragment_bits_4",
+            "sampled_layer_eed_terminal_fragment_bits_5",
+            "sampled_layer_eed_terminal_fragment_bits_6",
+            "sampled_layer_eed_terminal_fragment_bits_7",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -755,6 +769,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_shape_refused_header_read, layer_shape_refused_length,
          layer_shape_refused_length_overrun, layer_shape_refused_payload,
          layer_shape_refused_final, layer_shape_refused_other,
+         fragment_attempts, fragment_verified, fragment_refused,
+         fragment_zero, fragment_nonzero, fragment_tokens,
+         fragment_h5_zero_tokens,
+         fragment_bits_1, fragment_bits_2, fragment_bits_3,
+         fragment_bits_4, fragment_bits_5, fragment_bits_6, fragment_bits_7,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -855,6 +874,15 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                     layer_shape_refused_header_read + layer_shape_refused_length +
                     layer_shape_refused_length_overrun + layer_shape_refused_payload +
                     layer_shape_refused_final + layer_shape_refused_other) or
+                fragment_attempts != layer_shape_refused_short_header or
+                fragment_verified + fragment_refused != fragment_attempts or
+                fragment_zero + fragment_nonzero != fragment_verified or
+                (fragment_bits_1 + fragment_bits_2 + fragment_bits_3 +
+                 fragment_bits_4 + fragment_bits_5 + fragment_bits_6 +
+                 fragment_bits_7) != fragment_verified or
+                fragment_tokens < fragment_verified or
+                fragment_tokens > 64 * fragment_verified or
+                fragment_h5_zero_tokens > fragment_tokens or
                 layer_shape_verified > layer_tail_verified or
                 layer_shape_tokens < layer_shape_verified or
                 layer_shape_tokens > 64 * layer_shape_verified or
