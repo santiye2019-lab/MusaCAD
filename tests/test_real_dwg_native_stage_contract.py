@@ -477,6 +477,7 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
         hint["source_classes_logical_bytes"] = 4096
         hint["source_classes_header_survey_checked"] = True
         hint["source_classes_survey_begin_at_zero"] = True
+        hint["source_classes_survey_begin_in_first64"] = True
         hint["source_classes_survey_end_in_last64"] = True
         hint["source_classes_survey_declared_byte_area_fits"] = True
         hint["source_classes_survey_end_in_last64_unique"] = True
