@@ -535,6 +535,16 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_tail_shape_non_h5_zero;
     size_t sampled_layer_eed_tail_shape_non_h5_payload;
     size_t sampled_layer_eed_tail_shape_total_bits;
+    size_t sampled_layer_eed_tail_shape_refused_precondition;
+    size_t sampled_layer_eed_tail_shape_refused_stream;
+    size_t sampled_layer_eed_tail_shape_refused_token_limit;
+    size_t sampled_layer_eed_tail_shape_refused_short_header;
+    size_t sampled_layer_eed_tail_shape_refused_header_read;
+    size_t sampled_layer_eed_tail_shape_refused_length;
+    size_t sampled_layer_eed_tail_shape_refused_length_overrun;
+    size_t sampled_layer_eed_tail_shape_refused_payload;
+    size_t sampled_layer_eed_tail_shape_refused_final;
+    size_t sampled_layer_eed_tail_shape_refused_other;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1228,6 +1238,31 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                         shape.tail_bit_count;
                                                 } else {
                                                     ++hint.sampled_layer_eed_tail_shape_refused;
+                                                    switch (musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+                                                            objects, nb, recovered, legacy_count,
+                                                            recovered[k].embedded_absolute_handle)) {
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_PRECONDITION:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_precondition; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_STREAM:
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_PREFIX:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_stream; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_TOKEN_LIMIT:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_token_limit; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_short_header; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_HEADER_READ:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_header_read; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_length; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH_OVERRUN:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_length_overrun; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_PAYLOAD:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_payload; break;
+                                                    case MUSA_DWG_LAYER_TAIL_SHAPE_FINAL:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_final; break;
+                                                    default:
+                                                        ++hint.sampled_layer_eed_tail_shape_refused_other; break;
+                                                    }
                                                 }
                                             }
                                         } else {
@@ -2185,6 +2220,16 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_tail_shape_non_h5_zero\":%zu,"
                "\"sampled_layer_eed_tail_shape_non_h5_payload\":%zu,"
                "\"sampled_layer_eed_tail_shape_total_bits\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_precondition\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_stream\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_token_limit\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_short_header\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_header_read\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_length\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_length_overrun\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_payload\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_final\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused_other\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2488,6 +2533,16 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_tail_shape_non_h5_zero,
                hint->sampled_layer_eed_tail_shape_non_h5_payload,
                hint->sampled_layer_eed_tail_shape_total_bits,
+               hint->sampled_layer_eed_tail_shape_refused_precondition,
+               hint->sampled_layer_eed_tail_shape_refused_stream,
+               hint->sampled_layer_eed_tail_shape_refused_token_limit,
+               hint->sampled_layer_eed_tail_shape_refused_short_header,
+               hint->sampled_layer_eed_tail_shape_refused_header_read,
+               hint->sampled_layer_eed_tail_shape_refused_length,
+               hint->sampled_layer_eed_tail_shape_refused_length_overrun,
+               hint->sampled_layer_eed_tail_shape_refused_payload,
+               hint->sampled_layer_eed_tail_shape_refused_final,
+               hint->sampled_layer_eed_tail_shape_refused_other,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
