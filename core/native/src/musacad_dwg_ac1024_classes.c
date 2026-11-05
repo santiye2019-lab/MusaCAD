@@ -354,3 +354,88 @@ int musa_dwg_ac1024_classes_header_survey(
     *out=next;
     return 1;
 }
+
+/* Numeric R2010 class stream. It is independently decoded and
+ * never upgrades layout evidence into class name or rendering truth. */
+int musa_dwg_ac1024_classes_r2010_numeric_records(
+    const uint8_t *section,size_t len,uint8_t extra,
+    MusaDwgAc1024ClassNumeric *records,size_t capacity,size_t *out_count){
+    if(!section||!out_count||extra>1u||(!records&&capacity)||
+       (records&&capacity>SIZE_MAX/sizeof(*records))||
+       overlaps(section,len,out_count,sizeof(*out_count))||
+       (records&&(
+          overlaps(section,len,records,capacity*sizeof(*records))||
+          overlaps(records,capacity*sizeof(*records),
+                   out_count,sizeof(*out_count)))))
+        return 0;
+    MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+            section,len,extra,&prefix)||
+       !prefix.structural_prefix_verified||
+       !prefix.byte_area_extent_exact||
+       prefix.original_section_authenticated||
+       prefix.class_name_resolved||prefix.display_accepted||
+       prefix.maximum_class_number<500u||
+       prefix.maximum_class_number>5000u)
+        return 0;
+    const size_t limit=(size_t)prefix.maximum_class_number-499u;
+    if(!limit||limit>4096u)return 0;
+    const size_t preceding_rl=extra?4u:0u;
+    if(prefix.declared_data_area_bytes<preceding_rl||
+       prefix.declared_data_bits<(extra?32u:0u))
+        return 0;
+    const size_t bytes=prefix.declared_data_area_bytes-preceding_rl;
+    const size_t bits=prefix.declared_data_bits-(extra?32u:0u);
+    if(bytes>len||prefix.bitstream_start_byte>len||
+       bytes>len-prefix.bitstream_start_byte||
+       bytes>SIZE_MAX/8u||bits>bytes*8u||
+       prefix.numeric_records_start_bit>=bits)
+        return 0;
+    MusaDwgAc1024ClassNumeric *tmp=
+        (MusaDwgAc1024ClassNumeric *)calloc(limit,sizeof(*tmp));
+    if(!tmp)return 0;
+    const uint8_t *data=section+prefix.bitstream_start_byte;
+    size_t pos=prefix.numeric_records_start_bit;
+    size_t n=0u;
+    uint16_t prev=499u;
+    int ok=1;
+    while(prev<prefix.maximum_class_number&&n<limit){
+        uint16_t classnum=0u,proxy=0u,item=0u,dwg=0u,maint=0u;
+        uint32_t zombie=0u,instances=0u,unknown1=0u,unknown2=0u;
+        if(pos>=bits||
+           !bit_short(data,bytes,&pos,&classnum)||
+           !bit_short(data,bytes,&pos,&proxy)||
+           !bit_read(data,bytes,&pos,1u,&zombie)||
+           !bit_short(data,bytes,&pos,&item)||
+           !bit_long(data,bytes,&pos,&instances)||
+           !bit_short(data,bytes,&pos,&dwg)||
+           !bit_short(data,bytes,&pos,&maint)||
+           !bit_long(data,bytes,&pos,&unknown1)||
+           !bit_long(data,bytes,&pos,&unknown2)||
+           pos>bits||
+           classnum<=prev||classnum>prefix.maximum_class_number||
+           (item!=0x1f2u&&item!=0x1f3u)){
+            ok=0;break;
+        }
+        MusaDwgAc1024ClassNumeric record={0};
+        record.class_number=classnum;
+        record.proxy_flags=proxy;
+        record.item_class_id=item;
+        record.dwg_version=dwg;
+        record.maintenance_version=maint;
+        record.object_instance_count=instances;
+        record.unknown1=unknown1;
+        record.unknown2=unknown2;
+        record.was_proxy=(uint8_t)zombie;
+        tmp[n++]=record;
+        prev=classnum;
+    }
+    if(prev!=prefix.maximum_class_number||!n||
+       (records&&capacity<n))ok=0;
+    if(ok){
+        if(records)memcpy(records,tmp,n*sizeof(*tmp));
+        *out_count=n;
+    }
+    free(tmp);
+    return ok;
+}

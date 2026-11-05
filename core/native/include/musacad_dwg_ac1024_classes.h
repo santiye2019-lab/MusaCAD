@@ -139,6 +139,21 @@ int musa_dwg_ac1024_classes_numeric_records(
     const uint8_t *logical_classes,size_t logical_bytes,
     uint8_t extra_rl_present,
     MusaDwgAc1024ClassNumeric *records,size_t capacity,size_t *out_count);
+
+/* Numeric custom class records from a CRC-backed logical R2010 Classes
+ * section supplied by the caller. This function does NOT authenticate
+ * original physical DWG pages; only the file-level Classes extractor
+ * can supply that provenance. It never reads TU names or permits paint.
+ *
+ * Requires a structurally exact R2010 RL bitcount prefix (0/8-byte
+ * ending form), bounded source bits and ascending, unique class IDs.
+ * Query with records=NULL,capacity=0. On any rejection, neither caller
+ * records nor out_count is modified. The copied record flags always
+ * carry zero original-source/name/display admission. */
+int musa_dwg_ac1024_classes_r2010_numeric_records(
+    const uint8_t *logical_classes,size_t logical_bytes,
+    uint8_t extra_rl_present,
+    MusaDwgAc1024ClassNumeric *records,size_t capacity,size_t *out_count);
 /* First-party original AC1024 *physical* Classes section:
  * source signature, protected map and page CRC/Adler checked.
  * Only opaque logical bytes are exposed. No CLASS names, semantics,

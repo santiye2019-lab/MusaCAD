@@ -312,6 +312,88 @@ static int test_r2010_end_sentinel_tail(int extra){
         return 0;
     return 1;
 }
+
+static size_t r2010_numeric_fixture(uint8_t *bytes,int extra,int tail){
+    const size_t original_len=r2010_bitcount_fixture(bytes,extra);
+    const size_t start=24u+(extra?4u:0u);
+    /* Declare enough source bits for class fields (92 data bits).
+     * Extra-RL form counts the 32-bit size RL within total bitcount. */
+    bytes[20u+(extra?4u:0u)]=(uint8_t)(extra?128u:96u);
+    bit_set(bytes+start,35u,2u,0u);   /* BS 505 */
+    bit_set(bytes+start,37u,8u,0xf9u);
+    bit_set(bytes+start,45u,8u,1u);
+    bit_set(bytes+start,53u,2u,2u);   /* proxy BS 0 */
+    bit_set(bytes+start,55u,1u,0u);   /* no zombie */
+    bit_set(bytes+start,56u,2u,0u);   /* item BS 0x1f3 */
+    bit_set(bytes+start,58u,8u,0xf3u);
+    bit_set(bytes+start,66u,8u,1u);
+    bit_set(bytes+start,74u,2u,2u);   /* instances BL 0 */
+    bit_set(bytes+start,76u,2u,1u);   /* version BS 24 */
+    bit_set(bytes+start,78u,8u,24u);
+    bit_set(bytes+start,86u,2u,2u);   /* maint BS 0 */
+    bit_set(bytes+start,88u,2u,2u);   /* unknown1 BL 0 */
+    bit_set(bytes+start,90u,2u,2u);   /* unknown2 BL 0 */
+    if(tail){
+        for(size_t j=0u;j<8u;j++)bytes[original_len+j]=(uint8_t)(j+10u);
+        return original_len+8u;
+    }
+    return original_len;
+}
+static int test_r2010_numeric(int extra,int tail){
+    _Alignas(MusaDwgAc1024ClassNumeric) uint8_t bytes[96]={0};
+    const size_t len=r2010_numeric_fixture(bytes,extra,tail);
+    uint8_t original[96];
+    memcpy(original,bytes,sizeof(bytes));
+    size_t count=19u;
+    if(!musa_dwg_ac1024_classes_r2010_numeric_records(
+          bytes,len,(uint8_t)extra,NULL,0u,&count)||
+       count!=1u)return 0;
+    MusaDwgAc1024ClassNumeric records[2]={{0}};
+    if(!musa_dwg_ac1024_classes_r2010_numeric_records(
+          bytes,len,(uint8_t)extra,records,2u,&count)||
+       count!=1u||records[0].class_number!=505u||
+       records[0].item_class_id!=0x1f3u||
+       records[0].proxy_flags||records[0].was_proxy||
+       records[0].object_instance_count||
+       records[0].dwg_version!=24u||
+       records[0].maintenance_version||
+       records[0].unknown1||records[0].unknown2||
+       records[0].original_section_authenticated||
+       records[0].class_name_resolved||records[0].display_accepted||
+       memcmp(original,bytes,sizeof(bytes)))return 0;
+    const MusaDwgAc1024ClassNumeric saved=records[0];
+    const size_t start=24u+(extra?4u:0u);
+#define REFUSE_NUMERIC() do{\
+    if(musa_dwg_ac1024_classes_r2010_numeric_records(\
+       bytes,len,(uint8_t)extra,records,2u,&count)||\
+       count!=1u||memcmp(records,&saved,sizeof(saved)))return 0;\
+    }while(0)
+    bit_set(bytes+start,37u,8u,0xf8u);REFUSE_NUMERIC();
+    bit_set(bytes+start,37u,8u,0xf9u);
+    bit_set(bytes+start,58u,8u,0xf1u);REFUSE_NUMERIC();
+    bit_set(bytes+start,58u,8u,0xf3u);
+    bytes[20u+(extra?4u:0u)]=(uint8_t)(extra?100u:68u);
+    REFUSE_NUMERIC();
+    bytes[20u+(extra?4u:0u)]=(uint8_t)(extra?128u:96u);
+    bit_set(bytes+start,88u,2u,3u);REFUSE_NUMERIC();
+    bit_set(bytes+start,88u,2u,2u);
+    bytes[len-(tail?24u:16u)]^=1u;REFUSE_NUMERIC();
+    bytes[len-(tail?24u:16u)]^=1u;
+    if(musa_dwg_ac1024_classes_r2010_numeric_records(
+         bytes,len,(uint8_t)extra,records,0u,&count)||
+       musa_dwg_ac1024_classes_r2010_numeric_records(
+         bytes,len,(uint8_t)extra,NULL,1u,&count)||
+       musa_dwg_ac1024_classes_r2010_numeric_records(
+         bytes,len,(uint8_t)extra,records,2u,NULL)||
+       musa_dwg_ac1024_classes_r2010_numeric_records(
+         bytes,len,(uint8_t)extra,
+         (MusaDwgAc1024ClassNumeric *)(void *)bytes,1u,&count)||
+       count!=1u||memcmp(records,&saved,sizeof(saved))||
+       memcmp(original,bytes,sizeof(bytes)))
+        return 0;
+#undef REFUSE_NUMERIC
+    return 1;
+}
 static int test_survey(void){
     _Alignas(MusaDwgAc1024ClassesHeaderSurvey) uint8_t section[96]={0};
     MusaDwgAc1024ClassesHeaderSurvey observed={0};
@@ -401,6 +483,10 @@ int main(void){
     if(!test_survey())return 17;
     if(!test_r2010_end_sentinel_tail(0))return 18;
     if(!test_r2010_end_sentinel_tail(1))return 19;
+    if(!test_r2010_numeric(0,0))return 20;
+    if(!test_r2010_numeric(0,1))return 21;
+    if(!test_r2010_numeric(1,0))return 22;
+    if(!test_r2010_numeric(1,1))return 23;
     puts("AC1024 Classes numeric prefix only; no CRC, names or source acceptance");
     return 0;
 }
