@@ -435,6 +435,31 @@ int musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerEedTailRawHeader *out);
 
+
+/* Experimental shape-only scan of ALL H tokens remaining after the
+ * CRC/authenticated OT51 -> OT50 + OT42 graph. The reader enforces
+ * a 64-token budget, byte counts and exact bit termination; H codes
+ * are NOT mapped to target types, color/linetype, or XREF visibility.
+ * H5 with zero payload is counted, never treated as proof of any role.
+ * No source mutations, no implicit scene permission, fail-atomic. */
+typedef struct MusaDwgAc1024LayerEedTailShape {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t tail_start_bit;
+    size_t tail_bit_count;
+    size_t h_token_count;
+    size_t raw_h5_zero_length_count;
+    size_t other_raw_h_count;
+    size_t raw_payload_octets;
+    uint8_t original_records_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerEedTailShape;
+
+int musa_dwg_ac1024_layer_eed_tail_shape_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out);
+
 /* Read-only original OT51 EED first H header, for source-format
  * diagnosis only. Returns the exact 4-bit H code/size without resolving
  * target roles. The record, EED APPIDs and XDictionary-present flag

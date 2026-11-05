@@ -523,6 +523,14 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_tail_header_size_0;
     size_t sampled_layer_eed_tail_header_size_1;
     size_t sampled_layer_eed_tail_header_size_other;
+    /* Strict raw H-token grammar only, NO object/paint role claims. */
+    size_t sampled_layer_eed_tail_shape_attempts;
+    size_t sampled_layer_eed_tail_shape_verified;
+    size_t sampled_layer_eed_tail_shape_refused;
+    size_t sampled_layer_eed_tail_shape_h5_zero_length;
+    size_t sampled_layer_eed_tail_shape_other_raw_h;
+    size_t sampled_layer_eed_tail_shape_token_count;
+    size_t sampled_layer_eed_tail_shape_payload_octets;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1181,6 +1189,33 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                         ++hint.sampled_layer_eed_tail_header_size_other;
                                                 } else {
                                                     ++hint.sampled_layer_eed_tail_header_refused;
+                                                }
+                                                ++hint.sampled_layer_eed_tail_shape_attempts;
+                                                MusaDwgAc1024LayerEedTailShape shape = {0};
+                                                if (musa_dwg_ac1024_layer_eed_tail_shape_probe(
+                                                        objects, nb, recovered, legacy_count,
+                                                        recovered[k].embedded_absolute_handle,
+                                                        &shape) &&
+                                                    shape.layer_handle ==
+                                                        recovered[k].embedded_absolute_handle &&
+                                                    shape.layer_record_offset ==
+                                                        recovered[k].record_offset &&
+                                                    shape.tail_bit_count ==
+                                                        layer_graph.remaining_handle_tail_bits &&
+                                                    shape.h_token_count &&
+                                                    shape.original_records_crc_verified &&
+                                                    shape.display_accepted == 0u) {
+                                                    ++hint.sampled_layer_eed_tail_shape_verified;
+                                                    hint.sampled_layer_eed_tail_shape_h5_zero_length +=
+                                                        shape.raw_h5_zero_length_count;
+                                                    hint.sampled_layer_eed_tail_shape_other_raw_h +=
+                                                        shape.other_raw_h_count;
+                                                    hint.sampled_layer_eed_tail_shape_token_count +=
+                                                        shape.h_token_count;
+                                                    hint.sampled_layer_eed_tail_shape_payload_octets +=
+                                                        shape.raw_payload_octets;
+                                                } else {
+                                                    ++hint.sampled_layer_eed_tail_shape_refused;
                                                 }
                                             }
                                         } else {
@@ -2127,6 +2162,13 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_tail_header_size_0\":%zu,"
                "\"sampled_layer_eed_tail_header_size_1\":%zu,"
                "\"sampled_layer_eed_tail_header_size_other\":%zu,"
+               "\"sampled_layer_eed_tail_shape_attempts\":%zu,"
+               "\"sampled_layer_eed_tail_shape_verified\":%zu,"
+               "\"sampled_layer_eed_tail_shape_refused\":%zu,"
+               "\"sampled_layer_eed_tail_shape_h5_zero_length\":%zu,"
+               "\"sampled_layer_eed_tail_shape_other_raw_h\":%zu,"
+               "\"sampled_layer_eed_tail_shape_token_count\":%zu,"
+               "\"sampled_layer_eed_tail_shape_payload_octets\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2419,6 +2461,13 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_tail_header_size_0,
                hint->sampled_layer_eed_tail_header_size_1,
                hint->sampled_layer_eed_tail_header_size_other,
+               hint->sampled_layer_eed_tail_shape_attempts,
+               hint->sampled_layer_eed_tail_shape_verified,
+               hint->sampled_layer_eed_tail_shape_refused,
+               hint->sampled_layer_eed_tail_shape_h5_zero_length,
+               hint->sampled_layer_eed_tail_shape_other_raw_h,
+               hint->sampled_layer_eed_tail_shape_token_count,
+               hint->sampled_layer_eed_tail_shape_payload_octets,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,

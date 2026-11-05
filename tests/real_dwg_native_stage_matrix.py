@@ -654,6 +654,13 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_tail_header_size_0",
             "sampled_layer_eed_tail_header_size_1",
             "sampled_layer_eed_tail_header_size_other",
+            "sampled_layer_eed_tail_shape_attempts",
+            "sampled_layer_eed_tail_shape_verified",
+            "sampled_layer_eed_tail_shape_refused",
+            "sampled_layer_eed_tail_shape_h5_zero_length",
+            "sampled_layer_eed_tail_shape_other_raw_h",
+            "sampled_layer_eed_tail_shape_token_count",
+            "sampled_layer_eed_tail_shape_payload_octets",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -725,6 +732,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_tail_attempts, layer_tail_verified, layer_tail_refused,
          layer_tail_code_5, layer_tail_code_other,
          layer_tail_size_0, layer_tail_size_1, layer_tail_size_other,
+         layer_shape_attempts, layer_shape_verified, layer_shape_refused,
+         layer_shape_h5_zero, layer_shape_other, layer_shape_tokens, layer_shape_octets,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -817,6 +826,13 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 layer_tail_verified + layer_tail_refused != layer_tail_attempts or
                 layer_tail_code_5 + layer_tail_code_other != layer_tail_verified or
                 layer_tail_size_0 + layer_tail_size_1 + layer_tail_size_other != layer_tail_verified or
+                layer_shape_attempts != layer_xdic_graph_has_tail or
+                layer_shape_verified + layer_shape_refused != layer_shape_attempts or
+                layer_shape_verified > layer_tail_verified or
+                layer_shape_tokens < layer_shape_verified or
+                layer_shape_tokens > 64 * layer_shape_verified or
+                layer_shape_h5_zero + layer_shape_other != layer_shape_tokens or
+                layer_shape_octets > 8 * layer_shape_tokens or
                 layer_first_h_attempts !=
                     layer_first_h_verified + layer_first_h_refused or
                 layer_first_h_attempts != layer_eed_attempts or

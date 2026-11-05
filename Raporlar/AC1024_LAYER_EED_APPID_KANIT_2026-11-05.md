@@ -46,3 +46,10 @@ EED içermeyen tek katmanın EED'ye özel okuyucuda reddedilmesi **beklenen ayr�
 3. Kaynak-içi doğrulamadan sonra ayrı, bağımsız görüntü eşdeğerliği testi yapmak; onaydan önce nesneleri sahneye almamak.
 
 **Ana dala birleştirme ve final APK:** Bu rapor kapsamında yapılmadı.
+
+
+## R2010 OT51 remaining H-token shape preflight — 2026-11-05
+
+Source-only evidence at CI [42014832418](https://github.com/santiye2019-lab/MusaCAD/actions/runs/42014832418): among **14** tested original EED-bearing OT51 layer records across five Karagümrük drawings, **14/14** CRC-backed original OT50/H4 and OT42/H3 target chains passed. The next raw H header had code **5** and **zero payload bytes** in **14/14**, but this does **not** assign linetype, plotstyle, material, viewport or color semantics.
+
+A new strictly bounded **shape-only** scan now counts all remaining H token headers and their declared payload octets after the two proven references, with 64-token cap, exact bit termination and original source CRC validation. It intentionally refuses malformed, excessive or incomplete spans. Synthetic and real-DWG CI for this NEW scan are pending; no semantic or rendering parity is claimed. Production `display_accepted=0` is unchanged.

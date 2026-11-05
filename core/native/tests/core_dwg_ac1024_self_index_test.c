@@ -1328,15 +1328,17 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     memcpy(with_tail, unchanged, sizeof(unchanged));
     uint8_t *const extended_layer = with_tail + 39u;
     uint8_t *const extended_body = extended_layer + 3u;
-    extended_layer[0] = 26u; /* payload now 26 bytes, CRC at offset 29 */
-    extended_layer[2] = 48u; /* 3 H refs at bit 160 through bit 207 */
+    extended_layer[0] = 27u; /* 27-byte payload, CRC at offset 30 */
+    extended_layer[2] = 56u; /* 4 H refs at bits 160 through 215 */
     set_bits(extended_body, 192u, 4u, 5u);
     set_bits(extended_body, 196u, 4u, 1u);
     set_bits(extended_body, 200u, 8u, 44u);
-    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 29u, &crc))
+    set_bits(extended_body, 208u, 4u, 5u); /* opaque next H5, no payload */
+    set_bits(extended_body, 212u, 4u, 0u);
+    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 30u, &crc))
         return 0;
-    extended_layer[29] = (uint8_t)crc;
-    extended_layer[30] = (uint8_t)(crc >> 8u);
+    extended_layer[30] = (uint8_t)crc;
+    extended_layer[31] = (uint8_t)(crc >> 8u);
     MusaDwgAc1024SelfIdentity tail_index[4] = {{0}};
     if (!musa_dwg_ac1024_recover_self_index(
             with_tail, sizeof(with_tail), offsets, 4u, tail_index, 4u))
@@ -1346,7 +1348,7 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     if (!musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             with_tail, sizeof(with_tail), tail_index, 4u, 45u,
             &tail_graph) ||
-        tail_graph.remaining_handle_tail_bits != 16u ||
+        tail_graph.remaining_handle_tail_bits != 24u ||
         tail_graph.display_accepted ||
         !musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
             with_tail, sizeof(with_tail), tail_index, 4u, 45u,
@@ -1354,15 +1356,32 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         tail_raw.layer_handle != 45u ||
         tail_raw.layer_record_offset != 39u ||
         tail_raw.original_tail_start_bit != 192u ||
-        tail_raw.remaining_handle_tail_bits != 16u ||
+        tail_raw.remaining_handle_tail_bits != 24u ||
         tail_raw.raw_h_code != 5u || tail_raw.raw_h_size != 1u ||
         !tail_raw.original_records_crc_verified ||
         tail_raw.display_accepted)
         return 0;
     const MusaDwgAc1024LayerEedTailRawHeader tail_saved = tail_raw;
+
+    MusaDwgAc1024LayerEedTailShape shape = {0};
+    if (!musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u, &shape) ||
+        shape.layer_handle != 45u || shape.layer_record_offset != 39u ||
+        shape.tail_start_bit != 192u || shape.tail_bit_count != 24u ||
+        shape.h_token_count != 2u ||
+        shape.raw_h5_zero_length_count != 1u ||
+        shape.other_raw_h_count != 1u || shape.raw_payload_octets != 1u ||
+        !shape.original_records_crc_verified || shape.display_accepted)
+        return 0;
+    const MusaDwgAc1024LayerEedTailShape shape_saved = shape;
     uint8_t extended_pristine[sizeof(with_tail)];
     memcpy(extended_pristine, with_tail, sizeof(with_tail));
 
+    /* The two-link-only source cannot claim a successful full-tail scan. */
+    if (musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            unchanged, sizeof(unchanged), index, 4u, 45u, &shape) ||
+        memcmp(&shape, &shape_saved, sizeof(shape_saved)))
+        return 0;
     /* No remaining H bits: a valid two-link graph is NOT a tail proof. */
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
             unchanged, sizeof(unchanged), index, 4u, 45u, &tail_raw) ||
@@ -1371,10 +1390,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
 
     /* Resigned original CRC does not legitimize an overlong H value. */
     set_bits(extended_body, 196u, 4u, 15u);
-    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 29u, &crc))
+    if (!musa_core_crc16_arc(0xc0c1u, extended_layer, 30u, &crc))
         return 0;
-    extended_layer[29] = (uint8_t)crc;
-    extended_layer[30] = (uint8_t)(crc >> 8u);
+    extended_layer[30] = (uint8_t)crc;
+    extended_layer[31] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
             with_tail, sizeof(with_tail), tail_index, 4u, 45u,
             &tail_raw) ||
@@ -1382,12 +1401,21 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         return 0;
     memcpy(with_tail, extended_pristine, sizeof(with_tail));
 
+    /* A CRC-resealed oversized token may not be promoted to a shape. */
+    if (musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u, &shape) ||
+        memcmp(&shape, &shape_saved, sizeof(shape_saved)))
+        return 0;
     /* A damaged original layer CRC or aliased output is always refused. */
-    extended_layer[30] ^= 1u;
+    extended_layer[31] ^= 1u;
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
             with_tail, sizeof(with_tail), tail_index, 4u, 45u,
             &tail_raw) ||
-        memcmp(&tail_raw, &tail_saved, sizeof(tail_saved)))
+        memcmp(&tail_raw, &tail_saved, sizeof(tail_saved)) ||
+        musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u,
+            &shape) ||
+        memcmp(&shape, &shape_saved, sizeof(shape_saved)))
         return 0;
     memcpy(with_tail, extended_pristine, sizeof(with_tail));
     if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
@@ -1400,6 +1428,18 @@ static int test_layer_eed_xdictionary_original_graph(void) {
             with_tail, sizeof(with_tail), tail_index, 4u, 45u, NULL) ||
         memcmp(&tail_raw, &tail_saved, sizeof(tail_saved)) ||
         memcmp(with_tail, extended_pristine, sizeof(with_tail)))
+        return 0;
+
+
+    if (musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u,
+            (MusaDwgAc1024LayerEedTailShape *)(void *)with_tail) ||
+        musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u,
+            (MusaDwgAc1024LayerEedTailShape *)(void *)tail_index) ||
+        musa_dwg_ac1024_layer_eed_tail_shape_probe(
+            with_tail, sizeof(with_tail), tail_index, 4u, 45u, NULL) ||
+        memcmp(&shape, &shape_saved, sizeof(shape_saved)))
         return 0;
 
     return 1;
