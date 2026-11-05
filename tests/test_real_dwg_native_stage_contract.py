@@ -273,6 +273,14 @@ def ac1024_probe_record():
             "sampled_layer_eed_first_h_size_2": 0,
             "sampled_layer_eed_first_h_size_other": 0,
             "sampled_layer_eed_xdic_graph_has_tail": 0,
+            "sampled_layer_eed_tail_header_attempts": 0,
+            "sampled_layer_eed_tail_header_verified": 0,
+            "sampled_layer_eed_tail_header_refused": 0,
+            "sampled_layer_eed_tail_header_code_5": 0,
+            "sampled_layer_eed_tail_header_code_other": 0,
+            "sampled_layer_eed_tail_header_size_0": 0,
+            "sampled_layer_eed_tail_header_size_1": 0,
+            "sampled_layer_eed_tail_header_size_other": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
             "sampled_line_common_mode_unsupported": 0,
@@ -323,6 +331,20 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_unverified_layer_tail_cannot_claim_source_success(self):
+        record = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(record), record)
+        for field in (
+            "sampled_layer_eed_tail_header_attempts",
+            "sampled_layer_eed_tail_header_verified",
+            "sampled_layer_eed_tail_header_code_5",
+            "sampled_layer_eed_tail_header_size_1",
+        ):
+            invalid = deepcopy(record)
+            invalid["ac1024_compatibility_hypothesis"][field] = 1
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_fake_result(invalid)
+
     def test_zero_eed_evidence_is_bounded_and_never_geometry(self):
         record = ac1024_probe_record()
         self.assertEqual(validate_fake_result(record), record)
