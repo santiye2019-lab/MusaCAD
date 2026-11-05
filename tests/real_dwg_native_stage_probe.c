@@ -457,6 +457,16 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_raw_flags_locked_bit;
     size_t sampled_layer_raw_flags_unmapped_bits;
     size_t sampled_layer_raw_flags_xdictionary_present;
+    /* Separate NONZERO-EED OT51 DATA-only preflight: layer numeric flags
+     * remain raw evidence, never a verified visibility or CMC color. */
+    size_t sampled_layer_eed_flags_attempts;
+    size_t sampled_layer_eed_flags_verified;
+    size_t sampled_layer_eed_flags_refused;
+    size_t sampled_layer_eed_flags_frozen_bit;
+    size_t sampled_layer_eed_flags_on_bit;
+    size_t sampled_layer_eed_flags_locked_bit;
+    size_t sampled_layer_eed_flags_unmapped_bits;
+    size_t sampled_layer_eed_flags_xdictionary_present;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1009,6 +1019,34 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                    layer, insert coordinate or scene output. */
                                 const uint16_t type = recovered[k].raw_ot;
                                 if (type == 51u) {
+                                    ++hint.sampled_layer_eed_flags_attempts;
+                                    MusaDwgAc1024LayerRawFlagsEvidence eed_layer = {0};
+                                    if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
+                                            objects, nb, recovered, legacy_count,
+                                            recovered[k].embedded_absolute_handle,
+                                            &eed_layer) &&
+                                        eed_layer.layer_handle ==
+                                            recovered[k].embedded_absolute_handle &&
+                                        eed_layer.layer_record_offset ==
+                                            recovered[k].record_offset &&
+                                        eed_layer.raw_flags_end_bit >
+                                            eed_layer.raw_flags_start_bit &&
+                                        eed_layer.original_record_crc_verified &&
+                                        eed_layer.display_accepted == 0u) {
+                                        ++hint.sampled_layer_eed_flags_verified;
+                                        if (eed_layer.frozen_bit)
+                                            ++hint.sampled_layer_eed_flags_frozen_bit;
+                                        if (eed_layer.on_bit)
+                                            ++hint.sampled_layer_eed_flags_on_bit;
+                                        if (eed_layer.locked_bit)
+                                            ++hint.sampled_layer_eed_flags_locked_bit;
+                                        if (eed_layer.unmapped_bits)
+                                            ++hint.sampled_layer_eed_flags_unmapped_bits;
+                                        if (eed_layer.xdictionary_missing == 0u)
+                                            ++hint.sampled_layer_eed_flags_xdictionary_present;
+                                    } else {
+                                        ++hint.sampled_layer_eed_flags_refused;
+                                    }
                                     ++hint.sampled_layer_raw_flags_attempts;
                                     MusaDwgAc1024LayerRawFlagsEvidence layer = {0};
                                     if (musa_dwg_ac1024_layer_raw_flags_probe(
@@ -1836,6 +1874,14 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_raw_flags_locked_bit\":%zu,"
                "\"sampled_layer_raw_flags_unmapped_bits\":%zu,"
                "\"sampled_layer_raw_flags_xdictionary_present\":%zu,"
+               "\"sampled_layer_eed_flags_attempts\":%zu,"
+               "\"sampled_layer_eed_flags_verified\":%zu,"
+               "\"sampled_layer_eed_flags_refused\":%zu,"
+               "\"sampled_layer_eed_flags_frozen_bit\":%zu,"
+               "\"sampled_layer_eed_flags_on_bit\":%zu,"
+               "\"sampled_layer_eed_flags_locked_bit\":%zu,"
+               "\"sampled_layer_eed_flags_unmapped_bits\":%zu,"
+               "\"sampled_layer_eed_flags_xdictionary_present\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2070,6 +2116,14 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_raw_flags_locked_bit,
                hint->sampled_layer_raw_flags_unmapped_bits,
                hint->sampled_layer_raw_flags_xdictionary_present,
+               hint->sampled_layer_eed_flags_attempts,
+               hint->sampled_layer_eed_flags_verified,
+               hint->sampled_layer_eed_flags_refused,
+               hint->sampled_layer_eed_flags_frozen_bit,
+               hint->sampled_layer_eed_flags_on_bit,
+               hint->sampled_layer_eed_flags_locked_bit,
+               hint->sampled_layer_eed_flags_unmapped_bits,
+               hint->sampled_layer_eed_flags_xdictionary_present,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
