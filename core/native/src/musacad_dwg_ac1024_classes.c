@@ -621,3 +621,86 @@ int musa_dwg_ac1024_classes_r2010_tu_audit(
     *out=next;
     return 1;
 }
+
+/* An explicit, strictly limited DXF CLASS identifier lookup.
+ * This is first-party C11 and reuses the full UTF-16 + numeric stream audit.
+ * No layer name, object data, user TEXT or other CLASS name is emitted. */
+static int is_safe_class_identifier_char(uint32_t c){
+    return (c>='A'&&c<='Z')||(c>='a'&&c<='z')||
+           (c>='0'&&c<='9')||c=='_'||c==':'||c=='.'||c=='-';
+}
+int musa_dwg_ac1024_classes_r2010_dxf_identifier(
+    const uint8_t *section,size_t len,uint8_t extra,
+    uint16_t target_class,char *output,size_t capacity,size_t *out_length){
+    if(!section||!output||!out_length||extra>1u||
+       target_class<500u||capacity<2u||
+       overlaps(section,len,output,capacity)||
+       overlaps(section,len,out_length,sizeof(*out_length))||
+       overlaps(output,capacity,out_length,sizeof(*out_length)))
+        return 0;
+    MusaDwgAc1024ClassesTuAudit audit={0};
+    MusaDwgAc1024ClassesStringSpan span={0};
+    MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_r2010_tu_audit(
+           section,len,extra,target_class,&audit)||
+       !audit.complete_bounded_stream||!audit.target_found||
+       !audit.target_three_nonempty||!audit.target_ascii_only||
+       audit.original_section_authenticated||audit.class_semantics_accepted||
+       audit.display_accepted||
+       !musa_dwg_ac1024_classes_r2010_string_span_probe(
+           section,len,extra,&span)||
+       !musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           section,len,extra,&prefix))
+        return 0;
+    size_t count=0u;
+    if(!musa_dwg_ac1024_classes_r2010_numeric_records(
+           section,len,extra,NULL,0u,&count)||
+       !count||count>4096u||
+       count>SIZE_MAX/sizeof(MusaDwgAc1024ClassNumeric))
+        return 0;
+    MusaDwgAc1024ClassNumeric *classes=
+        (MusaDwgAc1024ClassNumeric*)calloc(count,sizeof(*classes));
+    if(!classes)return 0;
+    int ok=musa_dwg_ac1024_classes_r2010_numeric_records(
+        section,len,extra,classes,count,&count);
+    const size_t data_bytes=prefix.declared_data_area_bytes-(extra?4u:0u);
+    const uint8_t *data=section+prefix.bitstream_start_byte;
+    size_t pos=span.stream_begin_bit;
+    char name[97]={0};
+    size_t out_n=0u;
+    int found=0;
+    for(size_t i=0u;i<count&&ok;i++){
+        for(unsigned field=0u;field<3u&&ok;field++){
+            uint16_t units=0u;
+            if(!bit_short(data,data_bytes,&pos,&units)||
+               pos>span.stream_end_bit||
+               (size_t)units>(span.stream_end_bit-pos)/16u){
+                ok=0;break;
+            }
+            if(classes[i].class_number==target_class&&field==2u){
+                if(!units||units>96u||units>=capacity){ok=0;break;}
+                for(uint16_t j=0u;j<units;j++){
+                    uint32_t lo=0u,hi=0u;
+                    if(!bit_read(data,data_bytes,&pos,8u,&lo)||
+                       !bit_read(data,data_bytes,&pos,8u,&hi)||
+                       hi||!is_safe_class_identifier_char(lo)){
+                        ok=0;break;
+                    }
+                    name[j]=(char)lo;
+                }
+                if(ok){name[units]='\0';out_n=units;found=1;}
+            }else{
+                pos+=(size_t)units*16u; /* audited full source first */
+            }
+        }
+    }
+    free(classes);
+    if(!ok||!found||!out_n||pos>span.stream_end_bit||
+       span.stream_end_bit-pos>7u)
+        return 0;
+    /* Commit atomically only after the ENTIRE source stream was audited,
+     * target DXF identifier syntax checked and all lengths fitted. */
+    memcpy(output,name,out_n+1u);
+    *out_length=out_n;
+    return 1;
+}
