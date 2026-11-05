@@ -807,7 +807,7 @@ static int musa_layer_raw_flags_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out,
-    uint8_t *stage) {
+    uint8_t *stage, int nonzero_eed) {
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_ARGUMENT;
     if (!objects || !object_bytes || !recovered_index || !record_count ||
         !layer_handle || !out ||
@@ -822,6 +822,7 @@ static int musa_layer_raw_flags_impl(
 
     MusaDwgAc1024SelfIdentity identity = {0};
     MusaDwgAc1024ZeroEedPrefix zero = {0};
+    MusaDwgAc1024EedChainEvidence chain = {0};
     MusaDwgAc1024SelfPrefix original = {0};
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_INDEX;
     if (!musa_dwg_ac1024_self_index_find(
@@ -830,39 +831,64 @@ static int musa_layer_raw_flags_impl(
         !identity.embedded_handle_code0_verified)
         return 0;
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_ZERO_EED;
-    if (!musa_dwg_ac1024_record_zero_eed_prefix(
-            objects, object_bytes, identity.record_offset, &zero))
+    if (nonzero_eed) {
+        if (!musa_dwg_ac1024_record_eed_chain_probe(
+                objects, object_bytes, identity.record_offset, &chain) ||
+            chain.application_count == 0u ||
+            !chain.original_crc16_verified ||
+            !chain.eed_boundaries_verified)
+            return 0;
+    } else if (!musa_dwg_ac1024_record_zero_eed_prefix(
+                   objects, object_bytes, identity.record_offset, &zero))
         return 0;
+
+    const size_t payload_start_byte = nonzero_eed ?
+        chain.payload_start_byte : zero.payload_start_byte;
+    const size_t data_after_eed_bit = nonzero_eed ?
+        chain.data_after_eed_bit : zero.data_after_zero_eed_bit;
+    const size_t handle_stream_start_bit = nonzero_eed ?
+        chain.handle_stream_start_bit : zero.handle_stream_start_bit;
+    const size_t handle_stream_end_bit = nonzero_eed ?
+        chain.handle_stream_end_bit : zero.handle_stream_end_bit;
+
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_RECORD_BOUNDS;
     if (!musa_dwg_ac1024_record_self_prefix(
             objects, object_bytes, identity.record_offset, &original) ||
-        zero.raw_ot != 51u || original.raw_ot != 51u ||
-        zero.indexed_object_offset != identity.record_offset ||
+        original.raw_ot != 51u ||
         original.indexed_object_offset != identity.record_offset ||
-        zero.embedded_absolute_handle != layer_handle ||
         original.embedded_absolute_handle != layer_handle ||
-        !zero.record_crc16_verified || !zero.zero_eed_verified ||
         !original.frame_crc16_verified ||
         !original.embedded_handle_code0_verified ||
-        zero.payload_start_byte >= object_bytes ||
-        zero.handle_stream_end_bit / 8u >
-            object_bytes - zero.payload_start_byte ||
-        zero.data_after_zero_eed_bit >= zero.handle_stream_start_bit)
+        payload_start_byte != original.payload_start_byte ||
+        handle_stream_start_bit != original.handle_stream_start_bit ||
+        handle_stream_end_bit != original.handle_stream_end_bit ||
+        payload_start_byte >= object_bytes ||
+        handle_stream_end_bit / 8u >
+            object_bytes - payload_start_byte ||
+        data_after_eed_bit >= handle_stream_start_bit ||
+        (nonzero_eed ?
+         (chain.raw_ot != 51u ||
+          chain.indexed_object_offset != identity.record_offset ||
+          chain.embedded_absolute_handle != layer_handle) :
+         (zero.raw_ot != 51u ||
+          zero.indexed_object_offset != identity.record_offset ||
+          zero.embedded_absolute_handle != layer_handle ||
+          !zero.record_crc16_verified || !zero.zero_eed_verified)))
         return 0;
 
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_REACTORS;
     MusaDwgAc1015Bits bits = {0};
     uint32_t reactors = UINT32_MAX, xdic = 2u;
     if (!musa_dwg_ac1015_bits_init(
-            &bits, objects + zero.payload_start_byte,
-            zero.handle_stream_end_bit / 8u,
-            zero.data_after_zero_eed_bit, zero.handle_stream_start_bit) ||
+            &bits, objects + payload_start_byte,
+            handle_stream_end_bit / 8u,
+            data_after_eed_bit, handle_stream_start_bit) ||
         !musa_dwg_ac1015_bits_read_bl(&bits, &reactors) ||
         reactors != 0u)
         return 0;
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_XDICTIONARY_BIT;
     if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &xdic) ||
-        bits.bit_pos >= zero.handle_stream_start_bit)
+        bits.bit_pos >= handle_stream_start_bit)
         return 0;
 
     if (stage) *stage = MUSA_DWG_LAYER_FLAGS_NUMERIC;
@@ -873,7 +899,7 @@ static int musa_layer_raw_flags_impl(
         !musa_dwg_ac1015_bits_read_bs(&bits, &xref_plus_one) ||
         !musa_dwg_ac1015_bits_read_u(&bits, 1u, &dependent) ||
         !musa_dwg_ac1015_bits_read_bs(&bits, &raw) ||
-        bits.bit_pos >= zero.handle_stream_start_bit)
+        bits.bit_pos >= handle_stream_start_bit)
         return 0;
 
     MusaDwgAc1024LayerRawFlagsEvidence next = {0};
@@ -906,7 +932,16 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
     uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out) {
     return musa_layer_raw_flags_impl(
         objects, object_bytes, recovered_index, record_count,
-        layer_handle, out, NULL);
+        layer_handle, out, NULL, 0);
+}
+
+int musa_dwg_ac1024_layer_eed_raw_flags_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out) {
+    return musa_layer_raw_flags_impl(
+        objects, object_bytes, recovered_index, record_count,
+        layer_handle, out, NULL, 1);
 }
 uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
     const uint8_t *objects, size_t object_bytes,
@@ -916,7 +951,7 @@ uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
     uint8_t stage = MUSA_DWG_LAYER_FLAGS_ARGUMENT;
     (void)musa_layer_raw_flags_impl(
         objects, object_bytes, recovered_index, record_count,
-        layer_handle, &ignored, &stage);
+        layer_handle, &ignored, &stage, 0);
     return stage;
 }
 
