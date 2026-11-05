@@ -463,6 +463,28 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out);
 
+
+/* First refusal from exactly the same strict tail-shape parser.
+ * Diagnosis records only a stage, never source bytes or H values. */
+enum {
+    MUSA_DWG_LAYER_TAIL_SHAPE_OK = 0,
+    MUSA_DWG_LAYER_TAIL_SHAPE_ARGUMENT = 1,
+    MUSA_DWG_LAYER_TAIL_SHAPE_PRECONDITION = 2,
+    MUSA_DWG_LAYER_TAIL_SHAPE_STREAM = 3,
+    MUSA_DWG_LAYER_TAIL_SHAPE_PREFIX = 4,
+    MUSA_DWG_LAYER_TAIL_SHAPE_TOKEN_LIMIT = 5,
+    MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER = 6,
+    MUSA_DWG_LAYER_TAIL_SHAPE_HEADER_READ = 7,
+    MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH = 8,
+    MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH_OVERRUN = 9,
+    MUSA_DWG_LAYER_TAIL_SHAPE_PAYLOAD = 10,
+    MUSA_DWG_LAYER_TAIL_SHAPE_FINAL = 11
+};
+uint8_t musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle);
+
 /* Read-only original OT51 EED first H header, for source-format
  * diagnosis only. Returns the exact 4-bit H code/size without resolving
  * target roles. The record, EED APPIDs and XDictionary-present flag
