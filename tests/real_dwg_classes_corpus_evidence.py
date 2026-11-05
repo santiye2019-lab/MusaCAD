@@ -50,6 +50,7 @@ def summarize(stage: dict) -> dict:
     tu_fields_total = 0
     tu_code_units_total = 0
     tu_505_complete_triplets = 0
+    class505_dxf_identifiers = {}
     for record in files:
         if not isinstance(record, dict):
             raise InvalidEvidence("invalid_file_record")
@@ -130,6 +131,24 @@ def summarize(stage: dict) -> dict:
             tu_505_complete_triplets += int(target_three)
         elif tu_fields or tu_units or target_three or target_ascii:
             raise InvalidEvidence("tu_evidence_without_decoder")
+        dxf_ok = boolean(hint.get("source_classes_r2010_505_dxf_identifier_verified"),
+                         "505_dxf_verified")
+        dxf_name = hint.get("source_classes_r2010_505_dxf_identifier")
+        dxf_length = bounded_integer(
+            hint.get("source_classes_r2010_505_dxf_identifier_length"),
+            "505_dxf_length", 96)
+        safe_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_:.-"
+        if not isinstance(dxf_name, str):
+            raise InvalidEvidence("invalid_class505_dxf_name_type")
+        if dxf_ok:
+            if (not tu_ok or not target_three or not target_ascii or
+                    not 1 <= dxf_length == len(dxf_name) <= 96 or
+                    any(ch not in safe_chars for ch in dxf_name)):
+                raise InvalidEvidence("unproven_class505_dxf_name")
+            class505_dxf_identifiers[dxf_name] = (
+                class505_dxf_identifiers.get(dxf_name, 0) + 1)
+        elif dxf_name or dxf_length:
+            raise InvalidEvidence("class505_dxf_name_without_audit")
         if has505:
             if not numeric_ok or (entity505 == object505):
                 raise InvalidEvidence("505_without_unique_kind")
@@ -152,6 +171,9 @@ def summarize(stage: dict) -> dict:
         "verified_utf16_tu_fields": tu_fields_total,
         "verified_utf16_tu_code_units": tu_code_units_total,
         "ot505_three_nonempty_tu_fields_files": tu_505_complete_triplets,
+        "class505_dxf_identified_files": sum(class505_dxf_identifiers.values()),
+        "class505_dxf_identifier_counts": dict(sorted(class505_dxf_identifiers.items())),
+        "class_semantics_accepted": False,
         "class505_number_present_files": observed505,
         "class505_object_kind_files": objects505,
         "class505_entity_kind_files": entities505,
