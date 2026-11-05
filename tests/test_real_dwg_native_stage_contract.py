@@ -292,6 +292,16 @@ def ac1024_probe_record():
             "sampled_layer_eed_tail_shape_non_h5_zero": 0,
             "sampled_layer_eed_tail_shape_non_h5_payload": 0,
             "sampled_layer_eed_tail_shape_total_bits": 0,
+            "sampled_layer_eed_tail_shape_refused_precondition": 0,
+            "sampled_layer_eed_tail_shape_refused_stream": 0,
+            "sampled_layer_eed_tail_shape_refused_token_limit": 0,
+            "sampled_layer_eed_tail_shape_refused_short_header": 0,
+            "sampled_layer_eed_tail_shape_refused_header_read": 0,
+            "sampled_layer_eed_tail_shape_refused_length": 0,
+            "sampled_layer_eed_tail_shape_refused_length_overrun": 0,
+            "sampled_layer_eed_tail_shape_refused_payload": 0,
+            "sampled_layer_eed_tail_shape_refused_final": 0,
+            "sampled_layer_eed_tail_shape_refused_other": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
             "sampled_line_common_mode_unsupported": 0,
@@ -351,7 +361,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_layer_eed_tail_shape_h5_payload",
             "sampled_layer_eed_tail_shape_non_h5_zero",
             "sampled_layer_eed_tail_shape_non_h5_payload",
-            "sampled_layer_eed_tail_shape_total_bits"):
+            "sampled_layer_eed_tail_shape_total_bits",
+            "sampled_layer_eed_tail_shape_refused_short_header",
+            "sampled_layer_eed_tail_shape_refused_length",
+            "sampled_layer_eed_tail_shape_refused_precondition"):
             invalid = deepcopy(record)
             invalid["ac1024_compatibility_hypothesis"][field] = 1
             with self.subTest(field=field), self.assertRaises(ValueError):
