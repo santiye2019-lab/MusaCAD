@@ -46,6 +46,11 @@ def ac1024_probe_record():
             "source_classes_r2010_max_class_with_extra": 0,
             "source_classes_r2010_tail8_with_extra": False,
             "source_classes_r2010_extent_exact_with_extra": False,
+            "source_classes_r2010_numeric_verified": False,
+            "source_classes_r2010_ot505_present": False,
+            "source_classes_r2010_ot505_entity": False,
+            "source_classes_r2010_ot505_object": False,
+            "source_classes_r2010_numeric_count": 0,
             "source_classes_header_survey_checked": False,
             "source_classes_survey_begin_at_zero": False,
             "source_classes_survey_end_at_eof": False,
@@ -440,6 +445,41 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_r2010_ot505_numeric_source_requirements(self):
+        baseline = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(baseline), baseline)
+        for key,value in (
+            ("source_classes_r2010_numeric_verified", True),
+            ("source_classes_r2010_numeric_count", 1),
+            ("source_classes_r2010_ot505_present", True),
+            ("source_classes_r2010_ot505_entity", True),
+            ("source_classes_r2010_ot505_object", True),
+        ):
+            bad=deepcopy(baseline)
+            bad["ac1024_compatibility_hypothesis"][key]=value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_fake_result(bad)
+        valid=deepcopy(baseline)
+        hint=valid["ac1024_compatibility_hypothesis"]
+        hint["source_page_map_header"]=True
+        hint["source_physical_page_map"]=True
+        hint["source_physical_page_count"]=2
+        hint["source_classes_section_verified"]=True
+        hint["source_classes_extracted"]=True
+        hint["source_classes_page_count"]=1
+        hint["source_classes_logical_bytes"]=100
+        hint["source_classes_r2010_bitcount_with_extra"]=True
+        hint["source_classes_r2010_bits_with_extra"]=512
+        hint["source_classes_r2010_max_class_with_extra"]=505
+        hint["source_classes_r2010_numeric_verified"]=True
+        hint["source_classes_r2010_numeric_count"]=1
+        hint["source_classes_r2010_ot505_present"]=True
+        hint["source_classes_r2010_ot505_object"]=True
+        self.assertEqual(validate_fake_result(valid),valid)
+        hint["source_classes_r2010_ot505_entity"]=True
+        with self.assertRaises(ValueError):
+            validate_fake_result(valid)
+
     def test_r2010_tail_evidence_requires_validated_header(self):
         record = ac1024_probe_record()
         self.assertEqual(validate_fake_result(record), record)

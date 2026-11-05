@@ -336,6 +336,14 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t source_classes_r2010_max_class_with_extra;
     int source_classes_r2010_tail8_with_extra;
     int source_classes_r2010_extent_exact_with_extra;
+    /* The original CRC-backed Classes bytes supply provenance, while
+     * the numeric reader supplies only bounded raw class identity.
+     * Names, entity graphs and final paint remain disallowed. */
+    int source_classes_r2010_numeric_verified;
+    size_t source_classes_r2010_numeric_count;
+    int source_classes_r2010_ot505_present;
+    int source_classes_r2010_ot505_entity;
+    int source_classes_r2010_ot505_object;
     int source_classes_header_survey_checked;
     MusaDwgAc1024ClassesHeaderSurvey source_classes_header_survey;
     size_t candidate_handles;
@@ -762,6 +770,35 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             prefix.end_sentinel_followed_by_eight_bytes;
                         hint.source_classes_r2010_extent_exact_with_extra =
                             prefix.byte_area_extent_exact;
+                        size_t class_count=0u;
+                        if (musa_dwg_ac1024_classes_r2010_numeric_records(
+                                bytes, extracted,
+                                MUSA_AC1024_CLASSES_EXTRA_RL,
+                                NULL, 0u, &class_count) &&
+                            class_count>0u && class_count<=4096u) {
+                            MusaDwgAc1024ClassNumeric *numeric=
+                                (MusaDwgAc1024ClassNumeric *)calloc(
+                                    class_count,sizeof(*numeric));
+                            size_t checked=0u;
+                            if(numeric&&
+                               musa_dwg_ac1024_classes_r2010_numeric_records(
+                                   bytes,extracted,
+                                   MUSA_AC1024_CLASSES_EXTRA_RL,
+                                   numeric,class_count,&checked)&&
+                               checked==class_count){
+                                hint.source_classes_r2010_numeric_verified=1;
+                                hint.source_classes_r2010_numeric_count=checked;
+                                for(size_t i=0u;i<checked;i++){
+                                    if(numeric[i].class_number!=505u)continue;
+                                    hint.source_classes_r2010_ot505_present=1;
+                                    hint.source_classes_r2010_ot505_entity=
+                                        numeric[i].item_class_id==0x1f2u;
+                                    hint.source_classes_r2010_ot505_object=
+                                        numeric[i].item_class_id==0x1f3u;
+                                }
+                            }
+                            free(numeric);
+                        }
                     }
                 }
                 free(bytes);
@@ -2314,6 +2351,11 @@ static void report(const char *signature, const char *result,
                "\"source_classes_r2010_max_class_with_extra\":%zu,"
                "\"source_classes_r2010_tail8_with_extra\":%s,"
                "\"source_classes_r2010_extent_exact_with_extra\":%s,"
+               "\"source_classes_r2010_numeric_verified\":%s,"
+               "\"source_classes_r2010_ot505_present\":%s,"
+               "\"source_classes_r2010_ot505_entity\":%s,"
+               "\"source_classes_r2010_ot505_object\":%s,"
+               "\"source_classes_r2010_numeric_count\":%zu,"
                "\"source_classes_header_survey_checked\":%s,"
                "\"source_classes_survey_begin_at_zero\":%s,"
                "\"source_classes_survey_end_at_eof\":%s,"
@@ -2714,6 +2756,11 @@ static void report(const char *signature, const char *result,
                hint->source_classes_r2010_max_class_with_extra,
                hint->source_classes_r2010_tail8_with_extra ? "true" : "false",
                hint->source_classes_r2010_extent_exact_with_extra ? "true" : "false",
+               hint->source_classes_r2010_numeric_verified ? "true" : "false",
+               hint->source_classes_r2010_ot505_present ? "true" : "false",
+               hint->source_classes_r2010_ot505_entity ? "true" : "false",
+               hint->source_classes_r2010_ot505_object ? "true" : "false",
+               hint->source_classes_r2010_numeric_count,
                hint->source_classes_header_survey_checked ? "true" : "false",
                hint->source_classes_header_survey.begin_at_zero ? "true" : "false",
                hint->source_classes_header_survey.end_at_eof ? "true" : "false",

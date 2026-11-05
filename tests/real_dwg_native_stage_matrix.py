@@ -148,6 +148,36 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("invalid_ac1024_class_tail_type")
             if hint[tail_field] and not hint["source_classes_r2010_bitcount_with_extra"]:
                 raise ValueError("unverified_ac1024_class_tail_evidence")
+
+        numeric_flags = (
+            "source_classes_r2010_numeric_verified",
+            "source_classes_r2010_ot505_present",
+            "source_classes_r2010_ot505_entity",
+            "source_classes_r2010_ot505_object",
+        )
+        if any(type(hint.get(k)) is not bool for k in numeric_flags):
+            raise ValueError("invalid_ac1024_r2010_numeric_flag")
+        numeric_count = hint.get("source_classes_r2010_numeric_count")
+        if type(numeric_count) is not int or numeric_count < 0:
+            raise ValueError("invalid_ac1024_r2010_numeric_count")
+        if hint["source_classes_r2010_numeric_verified"]:
+            if (not hint["source_classes_extracted"] or
+                    not hint["source_classes_r2010_bitcount_with_extra"] or
+                    not 1 <= numeric_count <= min(
+                        4096,hint["source_classes_r2010_max_class_with_extra"]-499
+                    )):
+                raise ValueError("unsupported_ac1024_r2010_numeric_provenance")
+        elif numeric_count:
+            raise ValueError("unverified_ac1024_r2010_numeric_count")
+        has505 = hint["source_classes_r2010_ot505_present"]
+        entity = hint["source_classes_r2010_ot505_entity"]
+        obj = hint["source_classes_r2010_ot505_object"]
+        if has505:
+            if (not hint["source_classes_r2010_numeric_verified"]
+                    or not (entity ^ obj)):
+                raise ValueError("unproven_ac1024_ot505_numeric_class")
+        elif entity or obj:
+            raise ValueError("unsupported_ac1024_ot505_kind")
         survey_fields = (
             "source_classes_survey_begin_at_zero",
             "source_classes_survey_end_at_eof",
