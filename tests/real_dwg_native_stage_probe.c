@@ -560,6 +560,17 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_fragment_bits_5;
     size_t sampled_layer_eed_terminal_fragment_bits_6;
     size_t sampled_layer_eed_terminal_fragment_bits_7;
+    /* Complete first-four RAW H header forms; no target interpretation. */
+    size_t sampled_layer_eed_terminal_fragment_prefix_count;
+    size_t sampled_layer_eed_terminal_fragment_prefix_code_5;
+    size_t sampled_layer_eed_terminal_fragment_prefix_code_other;
+    size_t sampled_layer_eed_terminal_fragment_prefix_size_zero;
+    size_t sampled_layer_eed_terminal_fragment_prefix_size_nonzero;
+    size_t sampled_layer_eed_terminal_fragment_prefix_four_tokens;
+    size_t sampled_layer_eed_terminal_fragment_ordinal_1_code5;
+    size_t sampled_layer_eed_terminal_fragment_ordinal_2_code5;
+    size_t sampled_layer_eed_terminal_fragment_ordinal_3_code5;
+    size_t sampled_layer_eed_terminal_fragment_ordinal_4_code5;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1278,6 +1289,11 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                             fragment.original_records_crc_verified &&
                                                             fragment.terminal_fragment_bit_count >= 1u &&
                                                             fragment.terminal_fragment_bit_count <= 7u &&
+                                                            fragment.prefix_h_token_count > 0u &&
+                                                            fragment.prefix_h_token_count <= 4u &&
+                                                            fragment.prefix_h_token_count ==
+                                                                (fragment.complete_h_token_count < 4u ?
+                                                                    fragment.complete_h_token_count : 4u) &&
                                                             fragment.display_accepted == 0u) {
                                                             ++hint.sampled_layer_eed_terminal_fragment_verified;
                                                             if (fragment.terminal_fragment_all_zero)
@@ -1288,6 +1304,30 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                 fragment.complete_h_token_count;
                                                             hint.sampled_layer_eed_terminal_fragment_h5_zero_tokens +=
                                                                 fragment.complete_h5_zero_token_count;
+                                                            hint.sampled_layer_eed_terminal_fragment_prefix_count +=
+                                                                fragment.prefix_h_token_count;
+                                                            if (fragment.prefix_h_token_count == 4u)
+                                                                ++hint.sampled_layer_eed_terminal_fragment_prefix_four_tokens;
+                                                            for (size_t ordinal = 0u;
+                                                                 ordinal < fragment.prefix_h_token_count;
+                                                                 ++ordinal) {
+                                                                if (fragment.prefix_h_code[ordinal] == 5u) {
+                                                                    ++hint.sampled_layer_eed_terminal_fragment_prefix_code_5;
+                                                                    switch (ordinal) {
+                                                                    case 0u: ++hint.sampled_layer_eed_terminal_fragment_ordinal_1_code5; break;
+                                                                    case 1u: ++hint.sampled_layer_eed_terminal_fragment_ordinal_2_code5; break;
+                                                                    case 2u: ++hint.sampled_layer_eed_terminal_fragment_ordinal_3_code5; break;
+                                                                    case 3u: ++hint.sampled_layer_eed_terminal_fragment_ordinal_4_code5; break;
+                                                                    default: break;
+                                                                    }
+                                                                } else {
+                                                                    ++hint.sampled_layer_eed_terminal_fragment_prefix_code_other;
+                                                                }
+                                                                if (fragment.prefix_h_size[ordinal] == 0u)
+                                                                    ++hint.sampled_layer_eed_terminal_fragment_prefix_size_zero;
+                                                                else
+                                                                    ++hint.sampled_layer_eed_terminal_fragment_prefix_size_nonzero;
+                                                            }
                                                             switch (fragment.terminal_fragment_bit_count) {
                                                             case 1u: ++hint.sampled_layer_eed_terminal_fragment_bits_1; break;
                                                             case 2u: ++hint.sampled_layer_eed_terminal_fragment_bits_2; break;
@@ -2297,6 +2337,16 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_fragment_bits_5\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_bits_6\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_bits_7\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_prefix_count\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_prefix_code_5\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_prefix_code_other\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_prefix_size_zero\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_prefix_size_nonzero\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_prefix_four_tokens\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_ordinal_1_code5\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_ordinal_2_code5\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_ordinal_3_code5\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_ordinal_4_code5\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2624,6 +2674,16 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_fragment_bits_5,
                hint->sampled_layer_eed_terminal_fragment_bits_6,
                hint->sampled_layer_eed_terminal_fragment_bits_7,
+               hint->sampled_layer_eed_terminal_fragment_prefix_count,
+               hint->sampled_layer_eed_terminal_fragment_prefix_code_5,
+               hint->sampled_layer_eed_terminal_fragment_prefix_code_other,
+               hint->sampled_layer_eed_terminal_fragment_prefix_size_zero,
+               hint->sampled_layer_eed_terminal_fragment_prefix_size_nonzero,
+               hint->sampled_layer_eed_terminal_fragment_prefix_four_tokens,
+               hint->sampled_layer_eed_terminal_fragment_ordinal_1_code5,
+               hint->sampled_layer_eed_terminal_fragment_ordinal_2_code5,
+               hint->sampled_layer_eed_terminal_fragment_ordinal_3_code5,
+               hint->sampled_layer_eed_terminal_fragment_ordinal_4_code5,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
