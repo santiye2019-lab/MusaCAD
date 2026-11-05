@@ -46,6 +46,10 @@ def summarize(stage: dict) -> dict:
     unsupported = 0
     string_spans = 0
     extended_lengths = 0
+    tu_complete = 0
+    tu_fields_total = 0
+    tu_code_units_total = 0
+    tu_505_complete_triplets = 0
     for record in files:
         if not isinstance(record, dict):
             raise InvalidEvidence("invalid_file_record")
@@ -103,6 +107,29 @@ def summarize(stage: dict) -> dict:
             extended_lengths += int(span_wide)
         elif span_bits or span_wide:
             raise InvalidEvidence("span_values_without_proof")
+        tu_ok = boolean(hint.get("source_classes_r2010_tu_verified"),
+                        "tu_verified")
+        tu_fields = bounded_integer(hint.get("source_classes_r2010_tu_fields"),
+                                    "tu_fields", 12288)
+        tu_units = bounded_integer(hint.get("source_classes_r2010_tu_units"),
+                                   "tu_units", 8 * 1024 * 1024)
+        target_three = boolean(
+            hint.get("source_classes_r2010_tu_505_three_nonempty"),
+            "target_three_nonempty")
+        target_ascii = boolean(hint.get("source_classes_r2010_tu_505_ascii_only"),
+                               "target_ascii")
+        if tu_ok:
+            if (not span_ok or not numeric_ok or not has505
+                    or tu_fields != 3 * count
+                    or tu_units < 3 * int(target_three)
+                    or tu_units > span_bits // 16):
+                raise InvalidEvidence("tu_without_verified_class_provenance")
+            tu_complete += 1
+            tu_fields_total += tu_fields
+            tu_code_units_total += tu_units
+            tu_505_complete_triplets += int(target_three)
+        elif tu_fields or tu_units or target_three or target_ascii:
+            raise InvalidEvidence("tu_evidence_without_decoder")
         if has505:
             if not numeric_ok or (entity505 == object505):
                 raise InvalidEvidence("505_without_unique_kind")
@@ -121,6 +148,10 @@ def summarize(stage: dict) -> dict:
         "verified_numeric_class_record_total": numerical_classes,
         "bounded_class_string_span_files": string_spans,
         "extended_string_length_word_files": extended_lengths,
+        "complete_utf16_tu_class_files": tu_complete,
+        "verified_utf16_tu_fields": tu_fields_total,
+        "verified_utf16_tu_code_units": tu_code_units_total,
+        "ot505_three_nonempty_tu_fields_files": tu_505_complete_triplets,
         "class505_number_present_files": observed505,
         "class505_object_kind_files": objects505,
         "class505_entity_kind_files": entities505,
