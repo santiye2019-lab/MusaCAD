@@ -120,7 +120,7 @@ class NumericClassCensusTest(unittest.TestCase):
         h["source_classes_r2010_string_bits"]=1024
         h["source_classes_r2010_tu_verified"]=True
         h["source_classes_r2010_tu_fields"]=177
-        h["source_classes_r2010_tu_units"]=120
+        h["source_classes_r2010_tu_units"]=45
         h["source_classes_r2010_tu_505_three_nonempty"]=True
         h["source_classes_r2010_tu_505_ascii_only"]=True
         outcome=summarize(report(x))
