@@ -1345,6 +1345,7 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
 
     const size_t start = bits.bit_pos;
     size_t count = 0u, h5_zero = 0u, other = 0u, octets = 0u;
+    size_t h5_payload = 0u, other_zero = 0u, other_payload = 0u;
     while (bits.bit_pos < bits.bit_end) {
         uint32_t code = 0u, length = 0u, value = 0u;
         if (count >= 64u || bits.bit_end - bits.bit_pos < 8u ||
@@ -1361,13 +1362,24 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
         octets += length;
         if (code == 5u && length == 0u)
             ++h5_zero;
-        else
+        else {
             ++other;
+            if (code == 5u)
+                ++h5_payload;
+            else if (length == 0u)
+                ++other_zero;
+            else
+                ++other_payload;
+        }
     }
     if (!count || bits.bit_pos != bits.bit_end ||
         start != first.original_tail_start_bit ||
         bits.bit_pos - start != graph.remaining_handle_tail_bits ||
-        count != h5_zero + other)
+        count != h5_zero + other ||
+        other != h5_payload + other_zero + other_payload ||
+        octets > SIZE_MAX - count ||
+        count + octets > SIZE_MAX / 8u ||
+        (count + octets) * 8u != bits.bit_pos - start)
         return 0;
 
     MusaDwgAc1024LayerEedTailShape next = {0};
@@ -1379,6 +1391,9 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
     next.raw_h5_zero_length_count = h5_zero;
     next.other_raw_h_count = other;
     next.raw_payload_octets = octets;
+    next.raw_h5_nonzero_length_count = h5_payload;
+    next.raw_non_h5_zero_length_count = other_zero;
+    next.raw_non_h5_nonzero_length_count = other_payload;
     next.original_records_crc_verified = 1u;
     next.display_accepted = 0u;
     *out = next;
