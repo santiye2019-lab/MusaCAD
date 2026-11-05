@@ -472,6 +472,10 @@ typedef struct MusaDwgAc1024LayerEedTerminalFragment {
     size_t complete_h_token_count;
     size_t complete_h5_zero_token_count;
     size_t terminal_fragment_bit_count;
+    /* First up to four complete raw H headers; never handle roles. */
+    uint8_t prefix_h_token_count;
+    uint8_t prefix_h_code[4];
+    uint8_t prefix_h_size[4];
     uint8_t terminal_fragment_all_zero;
     uint8_t original_records_crc_verified;
     uint8_t display_accepted;
