@@ -29,6 +29,17 @@ int musa_dwg_ac1018_page_map_header(const uint8_t *file,size_t file_size,
  * Separate per-data-page authentication remains required. */
 int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t file_size,
     MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *out_count);
+
+/* R2010/AC1024 protected R2004-family HEADER/page-map *structure*
+ * on the ORIGINAL AC1024 file signature, with no signature rewriting.
+ * The same strict seed/checksum/page-map validation is reused, but this
+ * is NOT an authenticated AcDb:Classes logical section, decoded class
+ * name, DWG scene, renderable entity, or file-version admission.
+ * Original source remains immutable; outputs are fail-atomic. */
+int musa_dwg_ac1024_page_map_header(const uint8_t *file,size_t file_size,
+                                    MusaDwgAc1018FileMapHeader *out);
+int musa_dwg_ac1024_page_locations(const uint8_t *file,size_t file_size,
+    MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *out_count);
 #ifdef __cplusplus
 }
 #endif
