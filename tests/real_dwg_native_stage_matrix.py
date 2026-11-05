@@ -646,6 +646,14 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_first_h_size_2",
             "sampled_layer_eed_first_h_size_other",
             "sampled_layer_eed_xdic_graph_has_tail",
+            "sampled_layer_eed_tail_header_attempts",
+            "sampled_layer_eed_tail_header_verified",
+            "sampled_layer_eed_tail_header_refused",
+            "sampled_layer_eed_tail_header_code_5",
+            "sampled_layer_eed_tail_header_code_other",
+            "sampled_layer_eed_tail_header_size_0",
+            "sampled_layer_eed_tail_header_size_1",
+            "sampled_layer_eed_tail_header_size_other",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -714,6 +722,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_first_h_code_12, layer_first_h_code_13, layer_first_h_code_14, layer_first_h_code_15, layer_first_h_size_0,
          layer_first_h_size_1, layer_first_h_size_2, layer_first_h_size_other,
          layer_xdic_graph_has_tail,
+         layer_tail_attempts, layer_tail_verified, layer_tail_refused,
+         layer_tail_code_5, layer_tail_code_other,
+         layer_tail_size_0, layer_tail_size_1, layer_tail_size_other,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -802,6 +813,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                     layer_xdic_refused_target_class +
                     layer_xdic_refused_target_crc + layer_xdic_refused_other) or
                 layer_xdic_graph_has_tail > layer_xdic_graph_ok or
+                layer_tail_attempts != layer_xdic_graph_has_tail or
+                layer_tail_verified + layer_tail_refused != layer_tail_attempts or
+                layer_tail_code_5 + layer_tail_code_other != layer_tail_verified or
+                layer_tail_size_0 + layer_tail_size_1 + layer_tail_size_other != layer_tail_verified or
                 layer_first_h_attempts !=
                     layer_first_h_verified + layer_first_h_refused or
                 layer_first_h_attempts != layer_eed_attempts or
