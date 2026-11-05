@@ -60,6 +60,13 @@ def ac1024_probe_record():
             "source_classes_survey_preamble_at20": False,
             "source_classes_survey_preamble_at24": False,
             "source_classes_survey_preamble_at28": False,
+            "source_classes_survey_end_in_last64_unique": False,
+            "source_classes_survey_end_trailing_bytes_known": False,
+            "source_classes_survey_declared_gap_known": False,
+            "source_classes_survey_end_trailing_bytes": 0,
+            "source_classes_survey_declared_gap_from20": 0,
+            "source_classes_survey_declared_gap_from24": 0,
+            "source_classes_survey_declared_gap_from28": 0,
             "object_section_page_count": 558,
             "handle_section_page_count": 77,
             "legacy_frame_probe_completed": False,
@@ -444,6 +451,45 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             bad["ac1024_compatibility_hypothesis"][key] = True
             with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_fake_result(bad)
+
+    def test_real_class_close_gap_contract_is_fail_closed(self):
+        record = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(record), record)
+        for field,value in (
+            ("source_classes_survey_end_in_last64_unique", True),
+            ("source_classes_survey_end_trailing_bytes_known", True),
+            ("source_classes_survey_declared_gap_known", True),
+            ("source_classes_survey_end_trailing_bytes", 8),
+            ("source_classes_survey_declared_gap_from28", -4),
+        ):
+            bad = deepcopy(record)
+            bad["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_fake_result(bad)
+        good = deepcopy(record)
+        hint = good["ac1024_compatibility_hypothesis"]
+        hint["source_page_map_header"] = True
+        hint["source_physical_page_map"] = True
+        hint["source_physical_page_count"] = 2
+        hint["source_classes_section_verified"] = True
+        hint["source_classes_extracted"] = True
+        hint["source_classes_page_count"] = 1
+        hint["source_classes_logical_bytes"] = 4096
+        hint["source_classes_header_survey_checked"] = True
+        hint["source_classes_survey_begin_at_zero"] = True
+        hint["source_classes_survey_end_in_last64"] = True
+        hint["source_classes_survey_declared_byte_area_fits"] = True
+        hint["source_classes_survey_end_in_last64_unique"] = True
+        hint["source_classes_survey_end_trailing_bytes_known"] = True
+        hint["source_classes_survey_end_trailing_bytes"] = 8
+        hint["source_classes_survey_declared_gap_known"] = True
+        hint["source_classes_survey_declared_gap_from20"] = 8
+        hint["source_classes_survey_declared_gap_from24"] = 4
+        hint["source_classes_survey_declared_gap_from28"] = 0
+        self.assertEqual(validate_fake_result(good), good)
+        hint["source_classes_survey_declared_gap_from24"] = 3
+        with self.assertRaises(ValueError):
+            validate_fake_result(good)
 
     def test_original_class_survey_is_strictly_structural(self):
         valid = ac1024_probe_record()

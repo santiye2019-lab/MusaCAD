@@ -2328,6 +2328,13 @@ static void report(const char *signature, const char *result,
                "\"source_classes_survey_preamble_at20\":%s,"
                "\"source_classes_survey_preamble_at24\":%s,"
                "\"source_classes_survey_preamble_at28\":%s,"
+               "\"source_classes_survey_end_in_last64_unique\":%s,"
+               "\"source_classes_survey_end_trailing_bytes_known\":%s,"
+               "\"source_classes_survey_declared_gap_known\":%s,"
+               "\"source_classes_survey_end_trailing_bytes\":%d,"
+               "\"source_classes_survey_declared_gap_from20\":%d,"
+               "\"source_classes_survey_declared_gap_from24\":%d,"
+               "\"source_classes_survey_declared_gap_from28\":%d,"
                "\"object_section_page_count\":%zu,"
                "\"handle_section_page_count\":%zu,"
                "\"legacy_frame_probe_completed\":%s,"
@@ -2721,6 +2728,13 @@ static void report(const char *signature, const char *result,
                hint->source_classes_header_survey.preamble_at20 ? "true" : "false",
                hint->source_classes_header_survey.preamble_at24 ? "true" : "false",
                hint->source_classes_header_survey.preamble_at28 ? "true" : "false",
+               hint->source_classes_header_survey.end_in_last64_unique ? "true" : "false",
+               hint->source_classes_header_survey.end_trailing_bytes_known ? "true" : "false",
+               hint->source_classes_header_survey.declared_gap_known ? "true" : "false",
+               (int)hint->source_classes_header_survey.end_trailing_bytes,
+               (int)hint->source_classes_header_survey.declared_gap_from20,
+               (int)hint->source_classes_header_survey.declared_gap_from24,
+               (int)hint->source_classes_header_survey.declared_gap_from28,
                hint->object_section_page_count,
                hint->handle_section_page_count,
                hint->legacy_frame_probe_completed ? "true" : "false",

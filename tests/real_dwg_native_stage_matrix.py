@@ -172,6 +172,57 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 raise ValueError("unproven_ac1024_class_survey")
         elif any(hint[k] for k in survey_fields):
             raise ValueError("unproven_ac1024_class_survey_flags")
+
+        positional_bool = (
+            "source_classes_survey_end_in_last64_unique",
+            "source_classes_survey_end_trailing_bytes_known",
+            "source_classes_survey_declared_gap_known",
+        )
+        positional_int = (
+            "source_classes_survey_end_trailing_bytes",
+            "source_classes_survey_declared_gap_from20",
+            "source_classes_survey_declared_gap_from24",
+            "source_classes_survey_declared_gap_from28",
+        )
+        if any(type(hint.get(k)) is not bool for k in positional_bool):
+            raise ValueError("invalid_ac1024_class_position_boolean")
+        if any(type(hint.get(k)) is not int for k in positional_int):
+            raise ValueError("invalid_ac1024_class_position_integer")
+        if hint["source_classes_survey_end_in_last64_unique"] and not (
+            hint["source_classes_header_survey_checked"]
+            and hint["source_classes_survey_end_in_last64"]
+        ):
+            raise ValueError("unverified_ac1024_unique_close")
+        if hint["source_classes_survey_end_trailing_bytes_known"] != (
+            hint["source_classes_survey_end_in_last64_unique"]
+        ):
+            raise ValueError("inconsistent_ac1024_close_position")
+        trailing = hint["source_classes_survey_end_trailing_bytes"]
+        if not 0 <= trailing <= 48 or (
+            not hint["source_classes_survey_end_trailing_bytes_known"]
+            and trailing != 0
+        ) or (
+            hint["source_classes_survey_end_at_eof"]
+            and hint["source_classes_survey_end_trailing_bytes_known"]
+            and trailing != 0
+        ):
+            raise ValueError("invalid_ac1024_trailing_length")
+        gap_keys = (
+            "source_classes_survey_declared_gap_from20",
+            "source_classes_survey_declared_gap_from24",
+            "source_classes_survey_declared_gap_from28",
+        )
+        gaps = tuple(hint[k] for k in gap_keys)
+        if hint["source_classes_survey_declared_gap_known"]:
+            if not (hint["source_classes_survey_end_in_last64_unique"]
+                    and hint["source_classes_survey_begin_at_zero"]
+                    and hint["source_classes_survey_declared_byte_area_fits"]
+                    and all(-8 * 1024 * 1024 <= x <= 8 * 1024 * 1024 for x in gaps)
+                    and gaps[0] - gaps[1] == 4
+                    and gaps[1] - gaps[2] == 4):
+                raise ValueError("invalid_ac1024_class_size_gap")
+        elif any(gaps):
+            raise ValueError("unverified_ac1024_class_size_gap")
         survey = lambda k: hint["source_classes_survey_" + k]
         if (survey("begin_at_zero") and not survey("begin_in_first64")) or (
             survey("end_at_eof") and not survey("end_in_last64")
