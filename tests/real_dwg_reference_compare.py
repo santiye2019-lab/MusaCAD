@@ -38,21 +38,28 @@ def observable_inventory(payload: object) -> dict:
     entity = Counter()
     other = Counter()
     unknown = 0
+    ambiguous = 0
     for record in objects:
         if not isinstance(record, dict):
             unknown += 1
             continue
-        # LibreDWG JSON distinguishes {"entity":"LINE"} and {"object":"LAYER"}.
-        # Do not interpret 'type': usually a numeric internal DWG class number.
-        kind = record.get("entity")
-        if isinstance(kind, str) and SAFE_TYPE.fullmatch(kind):
+        # Exactly one top-level type tag is required. Do not silently
+        # count conflicting entity and object labels as CAD evidence.
+        has_entity = "entity" in record
+        has_object = "object" in record
+        if has_entity == has_object:
+            unknown += 1
+            if has_entity:
+                ambiguous += 1
+            continue
+        kind = record["entity"] if has_entity else record["object"]
+        if not isinstance(kind, str) or not SAFE_TYPE.fullmatch(kind):
+            unknown += 1
+            continue
+        if has_entity:
             entity[kind] += 1
-            continue
-        kind = record.get("object")
-        if isinstance(kind, str) and SAFE_TYPE.fullmatch(kind):
+        else:
             other[kind] += 1
-            continue
-        unknown += 1
     if not entity and not other:
         raise ValueError("reference_has_no_typed_objects")
     return {
@@ -60,6 +67,7 @@ def observable_inventory(payload: object) -> dict:
         "reference_typed_entity_count": sum(entity.values()),
         "reference_typed_nonentity_count": sum(other.values()),
         "reference_unclassified_count": unknown,
+        "reference_ambiguous_type_records": ambiguous,
         "reference_entities_by_type": dict(sorted(entity.items())),
         "reference_layer_record_count": other.get("LAYER", 0),
         "reference_block_header_record_count": other.get("BLOCK_HEADER", 0),
@@ -81,11 +89,15 @@ def observable_inventory_stream(stream) -> dict:
     entity = Counter()
     other = Counter()
     unknown = 0
+    ambiguous = 0
     total = 0
     seen_objects = False
     in_record = False
     record_entity = None
     record_object = None
+    record_entity_present = False
+    record_object_present = False
+    duplicate_type_tag = False
     decoder_warning_mask = None
 
     for prefix, event, value in ijson.parse(stream):
@@ -100,11 +112,24 @@ def observable_inventory_stream(stream) -> dict:
                 in_record = True
                 record_entity = None
                 record_object = None
+                record_entity_present = False
+                record_object_present = False
+                duplicate_type_tag = False
+            elif event == "map_key" and in_record:
+                if value == "entity":
+                    duplicate_type_tag |= record_entity_present
+                    record_entity_present = True
+                elif value == "object":
+                    duplicate_type_tag |= record_object_present
+                    record_object_present = True
             elif event == "end_map" and in_record:
                 total += 1
-                if record_entity is not None:
+                if duplicate_type_tag or (record_entity_present and record_object_present):
+                    ambiguous += 1
+                    unknown += 1
+                elif record_entity_present and record_entity is not None:
                     entity[record_entity] += 1
-                elif record_object is not None:
+                elif record_object_present and record_object is not None:
                     other[record_object] += 1
                 else:
                     unknown += 1
@@ -135,6 +160,7 @@ def observable_inventory_stream(stream) -> dict:
         "reference_typed_entity_count": sum(entity.values()),
         "reference_typed_nonentity_count": sum(other.values()),
         "reference_unclassified_count": unknown,
+        "reference_ambiguous_type_records": ambiguous,
         "reference_entities_by_type": dict(sorted(entity.items())),
         "reference_layer_record_count": other.get("LAYER", 0),
         "reference_block_header_record_count": other.get("BLOCK_HEADER", 0),

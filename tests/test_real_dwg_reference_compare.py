@@ -33,6 +33,36 @@ class ObservableReferenceTest(unittest.TestCase):
         for secret in ("private", "secret-layer", "secret-block", "never-exported"):
             self.assertNotIn(secret, dump)
 
+    def test_conflicting_type_tags_are_unclassified_in_both_readers(self):
+        # An inconsistent reference record must not contribute to
+        # independent named-type count evidence.
+        source = {"OBJECTS": [
+            {"entity": "LINE", "object": "LAYER"},
+            {"entity": "LINE"},
+            {"object": "LAYER"},
+            {"entity": None, "object": "LAYER"},
+        ]}
+        expected = observable_inventory(source)
+        streamed = observable_inventory_stream(
+            BytesIO(json.dumps(source).encode("utf-8")))
+        self.assertEqual(streamed, expected)
+        self.assertEqual(expected["reference_typed_entity_count"], 1)
+        self.assertEqual(expected["reference_typed_nonentity_count"], 1)
+        self.assertEqual(expected["reference_unclassified_count"], 2)
+        self.assertEqual(expected["reference_ambiguous_type_records"], 2)
+
+    def test_duplicate_json_type_keys_cannot_spoof_the_stream_census(self):
+        # Duplicated keys may be silently overwritten by json.loads;
+        # reject them in the streaming reference census.
+        raw = (b'{"OBJECTS":[{"entity":"LINE","entity":"CIRCLE"},'
+               b'{"object":"LAYER"}]}')
+        observed = observable_inventory_stream(BytesIO(raw))
+        self.assertEqual(observed["reference_total_object_records"], 2)
+        self.assertEqual(observed["reference_entities_by_type"], {})
+        self.assertEqual(observed["reference_layer_record_count"], 1)
+        self.assertEqual(observed["reference_unclassified_count"], 1)
+        self.assertEqual(observed["reference_ambiguous_type_records"], 1)
+
     def test_schema_missing_must_not_look_like_zero_entities(self):
         for invalid in ([], {}, {"objects": []}, {"OBJECTS": "[]" },
                         {"OBJECTS": [{"type": 4, "name": "unknown"}]}):
