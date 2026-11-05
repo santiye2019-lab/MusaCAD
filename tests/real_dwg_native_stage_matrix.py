@@ -665,6 +665,16 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_tail_shape_non_h5_zero",
             "sampled_layer_eed_tail_shape_non_h5_payload",
             "sampled_layer_eed_tail_shape_total_bits",
+            "sampled_layer_eed_tail_shape_refused_precondition",
+            "sampled_layer_eed_tail_shape_refused_stream",
+            "sampled_layer_eed_tail_shape_refused_token_limit",
+            "sampled_layer_eed_tail_shape_refused_short_header",
+            "sampled_layer_eed_tail_shape_refused_header_read",
+            "sampled_layer_eed_tail_shape_refused_length",
+            "sampled_layer_eed_tail_shape_refused_length_overrun",
+            "sampled_layer_eed_tail_shape_refused_payload",
+            "sampled_layer_eed_tail_shape_refused_final",
+            "sampled_layer_eed_tail_shape_refused_other",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -740,6 +750,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_shape_h5_zero, layer_shape_other, layer_shape_tokens, layer_shape_octets,
          layer_shape_h5_payload, layer_shape_non_h5_zero,
          layer_shape_non_h5_payload, layer_shape_total_bits,
+         layer_shape_refused_precondition, layer_shape_refused_stream,
+         layer_shape_refused_token_limit, layer_shape_refused_short_header,
+         layer_shape_refused_header_read, layer_shape_refused_length,
+         layer_shape_refused_length_overrun, layer_shape_refused_payload,
+         layer_shape_refused_final, layer_shape_refused_other,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -834,6 +849,12 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 layer_tail_size_0 + layer_tail_size_1 + layer_tail_size_other != layer_tail_verified or
                 layer_shape_attempts != layer_xdic_graph_has_tail or
                 layer_shape_verified + layer_shape_refused != layer_shape_attempts or
+                layer_shape_refused != (
+                    layer_shape_refused_precondition + layer_shape_refused_stream +
+                    layer_shape_refused_token_limit + layer_shape_refused_short_header +
+                    layer_shape_refused_header_read + layer_shape_refused_length +
+                    layer_shape_refused_length_overrun + layer_shape_refused_payload +
+                    layer_shape_refused_final + layer_shape_refused_other) or
                 layer_shape_verified > layer_tail_verified or
                 layer_shape_tokens < layer_shape_verified or
                 layer_shape_tokens > 64 * layer_shape_verified or
