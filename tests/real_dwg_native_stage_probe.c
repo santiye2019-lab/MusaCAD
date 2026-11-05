@@ -490,6 +490,29 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_xdic_refused_target_class;
     size_t sampled_layer_eed_xdic_refused_target_crc;
     size_t sampled_layer_eed_xdic_refused_other;
+    size_t sampled_layer_eed_first_h_attempts;
+    size_t sampled_layer_eed_first_h_verified;
+    size_t sampled_layer_eed_first_h_refused;
+    size_t sampled_layer_eed_first_h_code_0;
+    size_t sampled_layer_eed_first_h_code_1;
+    size_t sampled_layer_eed_first_h_code_2;
+    size_t sampled_layer_eed_first_h_code_3;
+    size_t sampled_layer_eed_first_h_code_4;
+    size_t sampled_layer_eed_first_h_code_5;
+    size_t sampled_layer_eed_first_h_code_6;
+    size_t sampled_layer_eed_first_h_code_7;
+    size_t sampled_layer_eed_first_h_code_8;
+    size_t sampled_layer_eed_first_h_code_9;
+    size_t sampled_layer_eed_first_h_code_10;
+    size_t sampled_layer_eed_first_h_code_11;
+    size_t sampled_layer_eed_first_h_code_12;
+    size_t sampled_layer_eed_first_h_code_13;
+    size_t sampled_layer_eed_first_h_code_14;
+    size_t sampled_layer_eed_first_h_code_15;
+    size_t sampled_layer_eed_first_h_size_0;
+    size_t sampled_layer_eed_first_h_size_1;
+    size_t sampled_layer_eed_first_h_size_2;
+    size_t sampled_layer_eed_first_h_size_other;
     size_t sampled_layer_eed_xdic_graph_has_tail;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
@@ -1043,6 +1066,46 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                    layer, insert coordinate or scene output. */
                                 const uint16_t type = recovered[k].raw_ot;
                                 if (type == 51u) {
+                                    ++hint.sampled_layer_eed_first_h_attempts;
+                                    MusaDwgAc1024LayerEedRawHandleHeader first_h = {0};
+                                    if (musa_dwg_ac1024_layer_eed_first_h_header_probe(
+                                            objects, nb, recovered, legacy_count,
+                                            recovered[k].embedded_absolute_handle,
+                                            &first_h) &&
+                                        first_h.layer_handle ==
+                                            recovered[k].embedded_absolute_handle &&
+                                        first_h.layer_record_offset ==
+                                            recovered[k].record_offset &&
+                                        first_h.record_crc_verified &&
+                                        first_h.display_accepted == 0u) {
+                                        ++hint.sampled_layer_eed_first_h_verified;
+                                        switch (first_h.first_h_code) {
+                                        case 0u: ++hint.sampled_layer_eed_first_h_code_0; break;
+                                        case 1u: ++hint.sampled_layer_eed_first_h_code_1; break;
+                                        case 2u: ++hint.sampled_layer_eed_first_h_code_2; break;
+                                        case 3u: ++hint.sampled_layer_eed_first_h_code_3; break;
+                                        case 4u: ++hint.sampled_layer_eed_first_h_code_4; break;
+                                        case 5u: ++hint.sampled_layer_eed_first_h_code_5; break;
+                                        case 6u: ++hint.sampled_layer_eed_first_h_code_6; break;
+                                        case 7u: ++hint.sampled_layer_eed_first_h_code_7; break;
+                                        case 8u: ++hint.sampled_layer_eed_first_h_code_8; break;
+                                        case 9u: ++hint.sampled_layer_eed_first_h_code_9; break;
+                                        case 10u: ++hint.sampled_layer_eed_first_h_code_10; break;
+                                        case 11u: ++hint.sampled_layer_eed_first_h_code_11; break;
+                                        case 12u: ++hint.sampled_layer_eed_first_h_code_12; break;
+                                        case 13u: ++hint.sampled_layer_eed_first_h_code_13; break;
+                                        case 14u: ++hint.sampled_layer_eed_first_h_code_14; break;
+                                        case 15u: ++hint.sampled_layer_eed_first_h_code_15; break;
+                                        default: break;
+                                        }
+                                        switch (first_h.first_h_size) {
+                                        case 0u: ++hint.sampled_layer_eed_first_h_size_0; break;
+                                        case 1u: ++hint.sampled_layer_eed_first_h_size_1; break;
+                                        case 2u: ++hint.sampled_layer_eed_first_h_size_2; break;
+                                        default: ++hint.sampled_layer_eed_first_h_size_other; break;
+                                        }
+                                    } else
+                                        ++hint.sampled_layer_eed_first_h_refused;
                                     ++hint.sampled_layer_eed_appid_attempts;
                                     MusaDwgAc1024EedAppidEvidence layer_appid = {0};
                                     if (musa_dwg_ac1024_layer_eed_appid_probe(
@@ -1994,6 +2057,29 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_xdic_refused_target_class\":%zu,"
                "\"sampled_layer_eed_xdic_refused_target_crc\":%zu,"
                "\"sampled_layer_eed_xdic_refused_other\":%zu,"
+               "\"sampled_layer_eed_first_h_attempts\":%zu,"
+               "\"sampled_layer_eed_first_h_verified\":%zu,"
+               "\"sampled_layer_eed_first_h_refused\":%zu,"
+               "\"sampled_layer_eed_first_h_code_0\":%zu,"
+               "\"sampled_layer_eed_first_h_code_1\":%zu,"
+               "\"sampled_layer_eed_first_h_code_2\":%zu,"
+               "\"sampled_layer_eed_first_h_code_3\":%zu,"
+               "\"sampled_layer_eed_first_h_code_4\":%zu,"
+               "\"sampled_layer_eed_first_h_code_5\":%zu,"
+               "\"sampled_layer_eed_first_h_code_6\":%zu,"
+               "\"sampled_layer_eed_first_h_code_7\":%zu,"
+               "\"sampled_layer_eed_first_h_code_8\":%zu,"
+               "\"sampled_layer_eed_first_h_code_9\":%zu,"
+               "\"sampled_layer_eed_first_h_code_10\":%zu,"
+               "\"sampled_layer_eed_first_h_code_11\":%zu,"
+               "\"sampled_layer_eed_first_h_code_12\":%zu,"
+               "\"sampled_layer_eed_first_h_code_13\":%zu,"
+               "\"sampled_layer_eed_first_h_code_14\":%zu,"
+               "\"sampled_layer_eed_first_h_code_15\":%zu,"
+               "\"sampled_layer_eed_first_h_size_0\":%zu,"
+               "\"sampled_layer_eed_first_h_size_1\":%zu,"
+               "\"sampled_layer_eed_first_h_size_2\":%zu,"
+               "\"sampled_layer_eed_first_h_size_other\":%zu,"
                "\"sampled_layer_eed_xdic_graph_has_tail\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
@@ -2255,6 +2341,29 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_xdic_refused_target_class,
                hint->sampled_layer_eed_xdic_refused_target_crc,
                hint->sampled_layer_eed_xdic_refused_other,
+               hint->sampled_layer_eed_first_h_attempts,
+               hint->sampled_layer_eed_first_h_verified,
+               hint->sampled_layer_eed_first_h_refused,
+               hint->sampled_layer_eed_first_h_code_0,
+               hint->sampled_layer_eed_first_h_code_1,
+               hint->sampled_layer_eed_first_h_code_2,
+               hint->sampled_layer_eed_first_h_code_3,
+               hint->sampled_layer_eed_first_h_code_4,
+               hint->sampled_layer_eed_first_h_code_5,
+               hint->sampled_layer_eed_first_h_code_6,
+               hint->sampled_layer_eed_first_h_code_7,
+               hint->sampled_layer_eed_first_h_code_8,
+               hint->sampled_layer_eed_first_h_code_9,
+               hint->sampled_layer_eed_first_h_code_10,
+               hint->sampled_layer_eed_first_h_code_11,
+               hint->sampled_layer_eed_first_h_code_12,
+               hint->sampled_layer_eed_first_h_code_13,
+               hint->sampled_layer_eed_first_h_code_14,
+               hint->sampled_layer_eed_first_h_code_15,
+               hint->sampled_layer_eed_first_h_size_0,
+               hint->sampled_layer_eed_first_h_size_1,
+               hint->sampled_layer_eed_first_h_size_2,
+               hint->sampled_layer_eed_first_h_size_other,
                hint->sampled_layer_eed_xdic_graph_has_tail,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
