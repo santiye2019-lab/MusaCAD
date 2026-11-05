@@ -473,6 +473,60 @@ static int test_survey(void){
         return 0;
     return 1;
 }
+/* This is only a size/position proof. It is deliberately not a TU
+ * decoder and never upgrades the source into a visual class. */
+static int test_r2010_string_span(int extra){
+    _Alignas(MusaDwgAc1024ClassesStringSpan) uint8_t section[96]={0};
+    const size_t len=r2010_bitcount_fixture(section,extra);
+    const size_t start=24u+(extra?4u:0u);
+    const size_t bit_count=96u-(extra?32u:0u);
+    const size_t marker=bit_count-1u;
+    /* Synthetic 8-bit non-TU payload followed by raw little-endian
+     * 16-bit length=8 and the final string-present bit. */
+    bit_set(section+start,marker-24u,8u,0x41u);
+    bit_set(section+start,marker-16u,8u,8u);
+    bit_set(section+start,marker-8u,8u,0u);
+    bit_set(section+start,marker,1u,1u);
+    uint8_t unchanged[96];
+    memcpy(unchanged,section,sizeof(section));
+    MusaDwgAc1024ClassesStringSpan span={0};
+    if(!musa_dwg_ac1024_classes_r2010_string_span_probe(
+          section,len,(uint8_t)extra,&span)||
+       !span.bounded||span.wide_size_word||
+       span.stream_begin_bit!=marker-24u||
+       span.stream_end_bit!=marker-16u||
+       span.stream_bits!=8u||
+       span.original_section_authenticated||span.class_name_resolved||
+       span.display_accepted||
+       memcmp(section,unchanged,sizeof(section)))
+        return 0;
+    const MusaDwgAc1024ClassesStringSpan saved=span;
+#define REJECT_SPAN() do{\
+    if(musa_dwg_ac1024_classes_r2010_string_span_probe(\
+       section,len,(uint8_t)extra,&span)||\
+       memcmp(&span,&saved,sizeof(saved)))return 0;\
+    }while(0)
+    bit_set(section+start,marker,1u,0u);REJECT_SPAN();
+    bit_set(section+start,marker,1u,1u);
+    bit_set(section+start,marker-16u,8u,0u);REJECT_SPAN();
+    bit_set(section+start,marker-16u,8u,8u);
+    bit_set(section+start,marker-8u,8u,0x7fu);REJECT_SPAN();
+    bit_set(section+start,marker-8u,8u,0u);
+    section[0]^=1u;REJECT_SPAN();section[0]^=1u;
+    if(musa_dwg_ac1024_classes_r2010_string_span_probe(
+         section,len,(uint8_t)extra,NULL)||
+       musa_dwg_ac1024_classes_r2010_string_span_probe(
+         section,len,(uint8_t)extra,
+         (MusaDwgAc1024ClassesStringSpan*)(void*)section)||
+       musa_dwg_ac1024_classes_r2010_string_span_probe(
+         section,len,(uint8_t)(1-extra),&span)||
+       memcmp(&saved,&span,sizeof(saved))||
+       memcmp(section,unchanged,sizeof(section)))
+        return 0;
+#undef REJECT_SPAN
+    return 1;
+}
+
 int main(void){
     if(!test_layout(0))return 11;
     if(!test_layout(1))return 12;
@@ -487,6 +541,8 @@ int main(void){
     if(!test_r2010_numeric(0,1))return 21;
     if(!test_r2010_numeric(1,0))return 22;
     if(!test_r2010_numeric(1,1))return 23;
+    if(!test_r2010_string_span(0))return 24;
+    if(!test_r2010_string_span(1))return 25;
     puts("AC1024 Classes numeric prefix only; no CRC, names or source acceptance");
     return 0;
 }
