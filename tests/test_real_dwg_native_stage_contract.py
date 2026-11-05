@@ -46,6 +46,9 @@ def ac1024_probe_record():
             "source_classes_r2010_max_class_with_extra": 0,
             "source_classes_r2010_tail8_with_extra": False,
             "source_classes_r2010_extent_exact_with_extra": False,
+            "source_classes_r2010_string_span_bounded": False,
+            "source_classes_r2010_string_bits": 0,
+            "source_classes_r2010_string_wide_length": False,
             "source_classes_r2010_numeric_verified": False,
             "source_classes_r2010_ot505_present": False,
             "source_classes_r2010_ot505_entity": False,
@@ -477,6 +480,44 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
         hint["source_classes_r2010_ot505_object"]=True
         self.assertEqual(validate_fake_result(valid),valid)
         hint["source_classes_r2010_ot505_entity"]=True
+        with self.assertRaises(ValueError):
+            validate_fake_result(valid)
+
+    def test_r2010_string_span_never_acts_as_named_class(self):
+        baseline=ac1024_probe_record()
+        self.assertEqual(validate_fake_result(baseline),baseline)
+        for key,value in (
+            ("source_classes_r2010_string_span_bounded", True),
+            ("source_classes_r2010_string_bits", 8),
+            ("source_classes_r2010_string_wide_length", True),
+        ):
+            invalid=deepcopy(baseline)
+            invalid["ac1024_compatibility_hypothesis"][key]=value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_fake_result(invalid)
+        valid=deepcopy(baseline)
+        h=valid["ac1024_compatibility_hypothesis"]
+        h["source_page_map_header"]=True
+        h["source_physical_page_map"]=True
+        h["source_physical_page_count"]=2
+        h["source_classes_section_verified"]=True
+        h["source_classes_extracted"]=True
+        h["source_classes_page_count"]=1
+        h["source_classes_logical_bytes"]=100
+        h["source_classes_r2010_bitcount_with_extra"]=True
+        h["source_classes_r2010_bits_with_extra"]=512
+        h["source_classes_r2010_max_class_with_extra"]=505
+        h["source_classes_r2010_extent_exact_with_extra"]=True
+        h["source_classes_r2010_string_span_bounded"]=True
+        h["source_classes_r2010_string_bits"]=8
+        self.assertEqual(validate_fake_result(valid),valid)
+        h["source_classes_r2010_string_bits"]=500
+        with self.assertRaises(ValueError):
+            validate_fake_result(valid)
+        h["source_classes_r2010_string_bits"]=8
+        h["source_classes_r2010_bitcount_with_extra"]=False
+        h["source_classes_r2010_bits_with_extra"]=0
+        h["source_classes_r2010_max_class_with_extra"]=0
         with self.assertRaises(ValueError):
             validate_fake_result(valid)
 
