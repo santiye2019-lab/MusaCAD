@@ -239,3 +239,68 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
     *out=next;
     return 1;
 }
+
+/* Do not conflate this diagnostics-only comparison with R2010
+ * Classes parsing or with a CRC-verified original source section.
+ * The caller independently authenticates the extracted section. */
+static int class_preamble_at(const uint8_t *buf,size_t len,
+                             size_t byte_offset){
+    if(!buf||byte_offset>=len||len-byte_offset<5u)return 0;
+    const uint8_t *area=buf+byte_offset;
+    const size_t size=len-byte_offset;
+    size_t at=0u;
+    uint16_t maxnum=0u;
+    uint32_t a=0u,b=0u,flag=0u;
+    return bit_short(area,size,&at,&maxnum)&&
+           bit_read(area,size,&at,8u,&a)&&
+           bit_read(area,size,&at,8u,&b)&&
+           bit_read(area,size,&at,1u,&flag)&&
+           maxnum>=500u&&maxnum<=5000u&&
+           a==0u&&b==0u&&flag==1u;
+}
+int musa_dwg_ac1024_classes_header_survey(
+    const uint8_t *section,size_t len,
+    MusaDwgAc1024ClassesHeaderSurvey *out){
+    if(!section||!out||len<64u||
+       len>MUSA_R2010_CLASSES_MAX||
+       overlaps(section,len,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1024ClassesHeaderSurvey next={0};
+    next.begin_at_zero=(uint8_t)(
+        memcmp(section,start_sentinel,sizeof(start_sentinel))==0);
+    next.end_at_eof=(uint8_t)(
+        memcmp(section+len-sizeof(end_sentinel),end_sentinel,
+               sizeof(end_sentinel))==0);
+    for(size_t at=0u;at<=64u-16u;++at)
+        if(!memcmp(section+at,start_sentinel,16u)){
+            next.begin_in_first64=1u;break;
+        }
+    for(size_t at=len-64u;at<=len-16u;++at)
+        if(!memcmp(section+at,end_sentinel,16u)){
+            next.end_in_last64=1u;break;
+        }
+    if(next.begin_at_zero){
+        const uint32_t size=read_le32(section+16u);
+        next.declared_byte_area_fits=(uint8_t)(
+            size>=5u && size<=len-38u);
+        if(next.declared_byte_area_fits){
+            next.area_exact_0extra=(uint8_t)(size==len-38u);
+            next.area_exact_1extra=(uint8_t)(size==len-42u);
+            next.area_exact_2extra=(uint8_t)(size==len-46u);
+        }
+        if(size>=5u&&size<=MUSA_R2010_CLASSES_MAX){
+            const uint64_t bits=(uint64_t)size*8u;
+            const uint32_t at20=read_le32(section+20u);
+            const uint32_t at24=read_le32(section+24u);
+            next.raw_bits20_in_range=(uint8_t)(
+                at20>=36u&&(uint64_t)at20<=bits);
+            next.raw_bits24_in_range=(uint8_t)(
+                at24>=36u&&(uint64_t)at24<=bits);
+        }
+        next.preamble_at20=(uint8_t)class_preamble_at(section,len,20u);
+        next.preamble_at24=(uint8_t)class_preamble_at(section,len,24u);
+        next.preamble_at28=(uint8_t)class_preamble_at(section,len,28u);
+    }
+    *out=next;
+    return 1;
+}

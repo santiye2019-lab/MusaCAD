@@ -249,6 +249,55 @@ static int test_r2010_bitcount(int extra){
 #undef REFUSE_R2010
     return 1;
 }
+
+static int test_survey(void){
+    _Alignas(MusaDwgAc1024ClassesHeaderSurvey) uint8_t section[96]={0};
+    MusaDwgAc1024ClassesHeaderSurvey observed={0};
+    size_t len=fixture(section,0);
+    if(!musa_dwg_ac1024_classes_header_survey(
+            section,len,&observed)||
+       !observed.begin_at_zero||!observed.end_at_eof||
+       !observed.begin_in_first64||!observed.end_in_last64||
+       !observed.declared_byte_area_fits||
+       !observed.area_exact_0extra||observed.area_exact_1extra||
+       observed.area_exact_2extra||!observed.preamble_at20||
+       observed.original_section_authenticated||
+       observed.class_name_resolved||observed.display_accepted)
+        return 0;
+    len=r2010_bitcount_fixture(section,0);
+    if(!musa_dwg_ac1024_classes_header_survey(
+            section,len,&observed)||
+       !observed.begin_at_zero||!observed.end_at_eof||
+       !observed.area_exact_1extra||
+       observed.area_exact_0extra||observed.area_exact_2extra||
+       !observed.raw_bits20_in_range||!observed.preamble_at24)
+        return 0;
+    len=r2010_bitcount_fixture(section,1);
+    if(!musa_dwg_ac1024_classes_header_survey(
+            section,len,&observed)||
+       !observed.area_exact_2extra||
+       observed.area_exact_0extra||observed.area_exact_1extra||
+       !observed.raw_bits24_in_range||!observed.preamble_at28)
+        return 0;
+    const MusaDwgAc1024ClassesHeaderSurvey saved=observed;
+    uint8_t untouched[96];
+    memcpy(untouched,section,sizeof(section));
+    if(musa_dwg_ac1024_classes_header_survey(
+          section,len,(MusaDwgAc1024ClassesHeaderSurvey*)(void *)section)||
+       musa_dwg_ac1024_classes_header_survey(
+          section,len,NULL)||
+       musa_dwg_ac1024_classes_header_survey(
+          section,15u,&observed)||
+       memcmp(&saved,&observed,sizeof(saved))||
+       memcmp(untouched,section,sizeof(section)))
+        return 0;
+    section[0]^=1u;
+    if(!musa_dwg_ac1024_classes_header_survey(section,len,&observed)||
+       observed.begin_at_zero||observed.preamble_at20||
+       observed.preamble_at24||observed.preamble_at28)
+        return 0;
+    return 1;
+}
 int main(void){
     if(!test_layout(0))return 11;
     if(!test_layout(1))return 12;
@@ -256,6 +305,7 @@ int main(void){
     if(!test_numeric(1))return 14;
     if(!test_r2010_bitcount(0))return 15;
     if(!test_r2010_bitcount(1))return 16;
+    if(!test_survey())return 17;
     puts("AC1024 Classes numeric prefix only; no CRC, names or source acceptance");
     return 0;
 }

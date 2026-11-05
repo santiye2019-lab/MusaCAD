@@ -64,6 +64,34 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
     uint8_t extra_rl_present,
     MusaDwgAc1024ClassesR2010BitcountPrefix *out);
 
+/* Pure read-only structural SURVEY of caller-supplied decompressed logical
+ * Classes bytes. This diagnoses layout mismatches WITHOUT interpreting
+ * individual class names or claiming source authentication. Even if all
+ * flags pass, OT505 class identity and CAD rendering remain unverified.
+ * Counts are not raw file bytes; all markers are shape observations.
+ * Output must not overlap the source and is atomic on failure. */
+typedef struct MusaDwgAc1024ClassesHeaderSurvey {
+    uint8_t begin_at_zero;
+    uint8_t end_at_eof;
+    uint8_t begin_in_first64;
+    uint8_t end_in_last64;
+    uint8_t declared_byte_area_fits;
+    uint8_t area_exact_0extra;
+    uint8_t area_exact_1extra;
+    uint8_t area_exact_2extra;
+    uint8_t raw_bits20_in_range;
+    uint8_t raw_bits24_in_range;
+    uint8_t preamble_at20;
+    uint8_t preamble_at24;
+    uint8_t preamble_at28;
+    uint8_t original_section_authenticated; /* ALWAYS zero */
+    uint8_t class_name_resolved;             /* ALWAYS zero */
+    uint8_t display_accepted;                /* ALWAYS zero */
+} MusaDwgAc1024ClassesHeaderSurvey;
+int musa_dwg_ac1024_classes_header_survey(
+    const uint8_t *logical_classes,size_t logical_bytes,
+    MusaDwgAc1024ClassesHeaderSurvey *out);
+
 /* R2010 class record numeric prefix, without external TU names, section
  * physical checksum, or class-body interpretation. Caller-supplied
  * decompressed logical section bytes are UNTRUSTED. */
