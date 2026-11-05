@@ -1290,7 +1290,7 @@ static int musa_layer_eed_tail_shape_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out,
-    uint8_t *stage) {
+    uint8_t *stage, MusaDwgAc1024LayerEedTerminalFragment *fragment) {
     if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_ARGUMENT;
     if (!objects || !object_bytes || !recovered_index || !record_count ||
         !canonical_layer_handle || !out ||
@@ -1356,7 +1356,28 @@ static int musa_layer_eed_tail_shape_impl(
         if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_TOKEN_LIMIT;
         if (count >= 64u) return 0;
         if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER;
-        if (bits.bit_end - bits.bit_pos < 8u) return 0;
+        if (bits.bit_end - bits.bit_pos < 8u) {
+            const size_t rem = bits.bit_end - bits.bit_pos;
+            if (fragment && rem > 0u && rem <= 7u && count > 0u) {
+                MusaDwgAc1015Bits view = bits;
+                uint32_t raw = 0u;
+                if (musa_dwg_ac1015_bits_read_u(
+                        &view, (uint32_t)rem, &raw) &&
+                    view.bit_pos == view.bit_end) {
+                    MusaDwgAc1024LayerEedTerminalFragment next = {0};
+                    next.layer_handle = canonical_layer_handle;
+                    next.layer_record_offset = graph.layer_record_offset;
+                    next.complete_h_token_count = count;
+                    next.complete_h5_zero_token_count = h5_zero;
+                    next.terminal_fragment_bit_count = rem;
+                    next.terminal_fragment_all_zero = (uint8_t)(raw == 0u);
+                    next.original_records_crc_verified = 1u;
+                    next.display_accepted = 0u;
+                    *fragment = next;
+                }
+            }
+            return 0;
+        }
         if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_HEADER_READ;
         if (!musa_dwg_ac1015_bits_read_u(&bits, 4u, &code) ||
             !musa_dwg_ac1015_bits_read_u(&bits, 4u, &length))
@@ -1420,7 +1441,7 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
     uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out) {
     return musa_layer_eed_tail_shape_impl(
         objects, object_bytes, recovered_index, record_count,
-        canonical_layer_handle, out, NULL);
+        canonical_layer_handle, out, NULL, NULL);
 }
 
 uint8_t musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
@@ -1431,8 +1452,38 @@ uint8_t musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
     uint8_t stage = MUSA_DWG_LAYER_TAIL_SHAPE_ARGUMENT;
     (void)musa_layer_eed_tail_shape_impl(
         objects, object_bytes, recovered_index, record_count,
-        canonical_layer_handle, &ignored, &stage);
+        canonical_layer_handle, &ignored, &stage, NULL);
     return stage;
+}
+
+int musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedTerminalFragment *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024LayerEedTailShape ignored = {0};
+    MusaDwgAc1024LayerEedTerminalFragment candidate = {0};
+    uint8_t stage = MUSA_DWG_LAYER_TAIL_SHAPE_ARGUMENT;
+    (void)musa_layer_eed_tail_shape_impl(
+        objects, object_bytes, recovered_index, record_count,
+        canonical_layer_handle, &ignored, &stage, &candidate);
+    if (stage != MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER ||
+        !candidate.original_records_crc_verified ||
+        !candidate.complete_h_token_count ||
+        candidate.terminal_fragment_bit_count < 1u ||
+        candidate.terminal_fragment_bit_count > 7u ||
+        candidate.display_accepted)
+        return 0;
+    *out = candidate;
+    return 1;
 }
 
 int musa_dwg_ac1024_recover_self_index(
