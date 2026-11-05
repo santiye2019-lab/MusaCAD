@@ -445,6 +445,13 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_raw_flags_attempts;
     size_t sampled_layer_raw_flags_verified;
     size_t sampled_layer_raw_flags_refused;
+    size_t sampled_layer_flags_refused_index;
+    size_t sampled_layer_flags_refused_eed;
+    size_t sampled_layer_flags_refused_record;
+    size_t sampled_layer_flags_refused_reactors;
+    size_t sampled_layer_flags_refused_xdic_bit;
+    size_t sampled_layer_flags_refused_numeric;
+    size_t sampled_layer_flags_refused_other;
     size_t sampled_layer_raw_flags_frozen_bit;
     size_t sampled_layer_raw_flags_on_bit;
     size_t sampled_layer_raw_flags_locked_bit;
@@ -1029,6 +1036,24 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             ++hint.sampled_layer_raw_flags_xdictionary_present;
                                     } else {
                                         ++hint.sampled_layer_raw_flags_refused;
+                                        switch (musa_dwg_ac1024_layer_raw_flags_failure_stage(
+                                                objects, nb, recovered, legacy_count,
+                                                recovered[k].embedded_absolute_handle)) {
+                                        case MUSA_DWG_LAYER_FLAGS_INDEX:
+                                            ++hint.sampled_layer_flags_refused_index; break;
+                                        case MUSA_DWG_LAYER_FLAGS_ZERO_EED:
+                                            ++hint.sampled_layer_flags_refused_eed; break;
+                                        case MUSA_DWG_LAYER_FLAGS_RECORD_BOUNDS:
+                                            ++hint.sampled_layer_flags_refused_record; break;
+                                        case MUSA_DWG_LAYER_FLAGS_REACTORS:
+                                            ++hint.sampled_layer_flags_refused_reactors; break;
+                                        case MUSA_DWG_LAYER_FLAGS_XDICTIONARY_BIT:
+                                            ++hint.sampled_layer_flags_refused_xdic_bit; break;
+                                        case MUSA_DWG_LAYER_FLAGS_NUMERIC:
+                                            ++hint.sampled_layer_flags_refused_numeric; break;
+                                        default:
+                                            ++hint.sampled_layer_flags_refused_other; break;
+                                        }
                                     }
                                 }
                                 int line_owner_layer_joinable = 0;
@@ -1799,6 +1824,13 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_raw_flags_attempts\":%zu,"
                "\"sampled_layer_raw_flags_verified\":%zu,"
                "\"sampled_layer_raw_flags_refused\":%zu,"
+               "\"sampled_layer_flags_refused_index\":%zu,"
+               "\"sampled_layer_flags_refused_eed\":%zu,"
+               "\"sampled_layer_flags_refused_record\":%zu,"
+               "\"sampled_layer_flags_refused_reactors\":%zu,"
+               "\"sampled_layer_flags_refused_xdic_bit\":%zu,"
+               "\"sampled_layer_flags_refused_numeric\":%zu,"
+               "\"sampled_layer_flags_refused_other\":%zu,"
                "\"sampled_layer_raw_flags_frozen_bit\":%zu,"
                "\"sampled_layer_raw_flags_on_bit\":%zu,"
                "\"sampled_layer_raw_flags_locked_bit\":%zu,"
@@ -2026,6 +2058,13 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_raw_flags_attempts,
                hint->sampled_layer_raw_flags_verified,
                hint->sampled_layer_raw_flags_refused,
+               hint->sampled_layer_flags_refused_index,
+               hint->sampled_layer_flags_refused_eed,
+               hint->sampled_layer_flags_refused_record,
+               hint->sampled_layer_flags_refused_reactors,
+               hint->sampled_layer_flags_refused_xdic_bit,
+               hint->sampled_layer_flags_refused_numeric,
+               hint->sampled_layer_flags_refused_other,
                hint->sampled_layer_raw_flags_frozen_bit,
                hint->sampled_layer_raw_flags_on_bit,
                hint->sampled_layer_raw_flags_locked_bit,
