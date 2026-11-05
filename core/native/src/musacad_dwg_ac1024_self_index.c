@@ -799,6 +799,96 @@ int musa_dwg_ac1024_line_eed_handle_graph_probe(
 }
 
 
+
+/* First-party, bounded original R2010 LAYER OT51 flag preflight.
+ * The output is the on-disk numeric evidence, not an interpreted layer
+ * visibility, CMC color, viewport state, H ownership or drawing gate. */
+int musa_dwg_ac1024_layer_raw_flags_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity identity = {0};
+    MusaDwgAc1024ZeroEedPrefix zero = {0};
+    MusaDwgAc1024SelfPrefix original = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, layer_handle, &identity) ||
+        identity.raw_ot != 51u || !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_zero_eed_prefix(
+            objects, object_bytes, identity.record_offset, &zero) ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, identity.record_offset, &original) ||
+        zero.raw_ot != 51u || original.raw_ot != 51u ||
+        zero.indexed_object_offset != identity.record_offset ||
+        original.indexed_object_offset != identity.record_offset ||
+        zero.embedded_absolute_handle != layer_handle ||
+        original.embedded_absolute_handle != layer_handle ||
+        !zero.frame_crc16_verified || !zero.zero_eed_verified ||
+        !original.frame_crc16_verified ||
+        !original.embedded_handle_code0_verified ||
+        zero.payload_start_byte >= object_bytes ||
+        zero.handle_stream_end_bit / 8u >
+            object_bytes - zero.payload_start_byte ||
+        zero.data_after_zero_eed_bit >= zero.handle_stream_start_bit)
+        return 0;
+
+    MusaDwgAc1015Bits bits = {0};
+    uint32_t reactors = UINT32_MAX, xdic = 2u;
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + zero.payload_start_byte,
+            zero.handle_stream_end_bit / 8u,
+            zero.data_after_zero_eed_bit, zero.handle_stream_start_bit) ||
+        !musa_dwg_ac1015_bits_read_bl(&bits, &reactors) ||
+        reactors != 0u ||
+        !musa_dwg_ac1015_bits_read_u(&bits, 1u, &xdic) ||
+        bits.bit_pos >= zero.handle_stream_start_bit)
+        return 0;
+
+    const size_t start = bits.bit_pos;
+    uint32_t flag64 = 0u, dependent = 0u;
+    uint16_t xref_plus_one = 0u, raw = 0u;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &flag64) ||
+        !musa_dwg_ac1015_bits_read_bs(&bits, &xref_plus_one) ||
+        !musa_dwg_ac1015_bits_read_u(&bits, 1u, &dependent) ||
+        !musa_dwg_ac1015_bits_read_bs(&bits, &raw) ||
+        bits.bit_pos >= zero.handle_stream_start_bit)
+        return 0;
+
+    MusaDwgAc1024LayerRawFlagsEvidence next = {0};
+    next.layer_handle = layer_handle;
+    next.layer_record_offset = identity.record_offset;
+    next.raw_flags_start_bit = start;
+    next.raw_flags_end_bit = bits.bit_pos;
+    next.xref_index_plus_one = xref_plus_one;
+    next.raw_values_70_290_370 = raw;
+    next.unmapped_bits = (uint16_t)(raw & (uint16_t)~UINT16_C(0x03ff));
+    next.entry_64_flag = (uint8_t)flag64;
+    next.xref_dependent = (uint8_t)dependent;
+    next.xdictionary_missing = (uint8_t)xdic;
+    next.frozen_bit = (uint8_t)((raw >> 0u) & 1u);
+    next.on_bit = (uint8_t)((raw >> 1u) & 1u);
+    next.frozen_new_viewports_bit = (uint8_t)((raw >> 2u) & 1u);
+    next.locked_bit = (uint8_t)((raw >> 3u) & 1u);
+    next.plotting_bit = (uint8_t)((raw >> 4u) & 1u);
+    next.lineweight_field = (uint8_t)((raw >> 5u) & 31u);
+    next.original_record_crc_verified = 1u;
+    next.display_accepted = 0u;
+    *out = next;
+    return 1;
+}
+
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
