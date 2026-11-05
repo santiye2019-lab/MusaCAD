@@ -20,6 +20,11 @@ def sample(*, numeric=True, has505=True, obj=True):
             "source_classes_r2010_string_span_bounded": False,
             "source_classes_r2010_string_bits": 0,
             "source_classes_r2010_string_wide_length": False,
+            "source_classes_r2010_tu_verified": False,
+            "source_classes_r2010_tu_fields": 0,
+            "source_classes_r2010_tu_units": 0,
+            "source_classes_r2010_tu_505_three_nonempty": False,
+            "source_classes_r2010_tu_505_ascii_only": False,
             "source_classes_r2010_numeric_count": 59 if numeric else 0,
             "source_classes_r2010_max_class_with_extra": 558,
             "source_classes_r2010_ot505_present": has505,
@@ -107,6 +112,34 @@ class NumericClassCensusTest(unittest.TestCase):
             b[field] = value
             with self.subTest(field=field), self.assertRaises(InvalidEvidence):
                 summarize(report(b))
+
+    def test_verified_utf16_tu_never_becomes_a_class_semantic_claim(self):
+        x=sample()
+        h=x["ac1024_compatibility_hypothesis"]
+        h["source_classes_r2010_string_span_bounded"]=True
+        h["source_classes_r2010_string_bits"]=1024
+        h["source_classes_r2010_tu_verified"]=True
+        h["source_classes_r2010_tu_fields"]=177
+        h["source_classes_r2010_tu_units"]=120
+        h["source_classes_r2010_tu_505_three_nonempty"]=True
+        h["source_classes_r2010_tu_505_ascii_only"]=True
+        outcome=summarize(report(x))
+        self.assertEqual(outcome["complete_utf16_tu_class_files"],1)
+        self.assertEqual(outcome["verified_utf16_tu_fields"],177)
+        self.assertFalse(outcome["original_class_names_decoded"])
+        self.assertFalse(outcome["cross_file_class_identity_claim"])
+        for field,value in (
+            ("source_classes_r2010_tu_fields",176),
+            ("source_classes_r2010_tu_verified",False),
+            ("source_classes_r2010_numeric_verified",False),
+            ("source_classes_r2010_string_span_bounded",False),
+        ):
+            bad=sample()
+            t=bad["ac1024_compatibility_hypothesis"]
+            t.update(h)
+            t[field]=value
+            with self.subTest(field=field),self.assertRaises(InvalidEvidence):
+                summarize(report(bad))
 
     def test_reject_missing_fields_and_bad_count(self):
         x = sample()
