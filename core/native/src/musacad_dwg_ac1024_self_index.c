@@ -978,7 +978,7 @@ uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
 
 
 /* Only first two documented original OT51 reference roles are admitted.
- * LAYER_CONTROL is a soft-pointer H2 to OT50, then XDictionary is a
+ * LAYER_CONTROL is a soft-pointer H4 to OT50, then XDictionary is a
  * hard-owner H3 to OT42. Later references remain deliberately unparsed. */
 /* This is NOT a second H decoder: it reads only the first eight
  * unmodified H-header bits after independently proven original EED,
@@ -1127,7 +1127,7 @@ static int musa_layer_eed_xdictionary_impl(
     uint64_t control_h = 0u, xdic_h = 0u;
     uint8_t control_code = 0u, xdic_code = 0u;
     if (stage) *stage = MUSA_DWG_LAYER_XDIC_GRAPH_CONTROL_H;
-    if (!r2010_link_h(&tail, canonical_layer_handle, 2u,
+    if (!r2010_link_h(&tail, canonical_layer_handle, 4u,
                       &control_h, &control_code))
         return 0;
     if (stage) *stage = MUSA_DWG_LAYER_XDIC_GRAPH_DICTIONARY_H;
