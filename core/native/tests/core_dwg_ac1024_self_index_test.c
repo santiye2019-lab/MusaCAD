@@ -1133,6 +1133,136 @@ static int test_layer_eed_appid_original_target(void) {
     return 1;
 }
 
+/* H-stream roles are source-order-specific: OT50 LAYER_CONTROL H2
+ * then OT42 DICTIONARY H3; no subsequent LTYPE, material, plotstyle or
+ * display state is inferred. All original target CRCs must remain valid. */
+static int test_layer_eed_xdictionary_original_graph(void) {
+    uint8_t bytes[68] = {0};
+    const uint64_t offsets[4] = {0u, 13u, 26u, 39u};
+    const uint16_t types[3] = {67u, 50u, 42u};
+    const uint32_t handles[3] = {40u, 41u, 43u};
+    uint16_t crc = 0u;
+    for (size_t k = 0u; k < 3u; ++k) {
+        uint8_t *const rec = bytes + 13u * k;
+        if (!make_record(rec, handles[k]))
+            return 0;
+        set_bits(rec + 3u, 2u, 8u, types[k]);
+        if (!musa_core_crc16_arc(0xc0c1u, rec, 11u, &crc))
+            return 0;
+        rec[11] = (uint8_t)crc;
+        rec[12] = (uint8_t)(crc >> 8u);
+    }
+    uint8_t *const layer = bytes + 39u;
+    uint8_t *const p = layer + 3u;
+    layer[0] = 24u; /* 24-byte payload, record CRC at 27 */
+    layer[2] = 32u; /* two role-specific Hrefs at bits160..191 */
+    set_bits(p, 2u, 8u, 51u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 45u);
+    set_bits(p, 26u, 2u, 1u); /* EED BS length 1 */
+    set_bits(p, 28u, 8u, 1u);
+    set_bits(p, 36u, 4u, 5u); /* original APPID H5 -> OT67/H40 */
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 40u);
+    set_bits(p, 52u, 8u, 0x70u); /* opaque application data */
+    set_bits(p, 60u, 2u, 2u); /* terminating BS=0 */
+    set_bits(p, 62u, 2u, 2u); /* BL=0 reactors */
+    set_bits(p, 64u, 1u, 0u); /* XDictionary PRESENT */
+    set_bits(p, 66u, 2u, 2u); /* zero xrefindex+1 */
+    set_bits(p, 69u, 2u, 1u); /* raw layer flags BS byte */
+    set_bits(p, 71u, 8u, 0xabu);
+    set_bits(p, 160u, 4u, 2u); /* soft pointer H2 to layer CTRL */
+    set_bits(p, 164u, 4u, 1u);
+    set_bits(p, 168u, 8u, 41u);
+    set_bits(p, 176u, 4u, 3u); /* hard owner H3 to dictionary */
+    set_bits(p, 180u, 4u, 1u);
+    set_bits(p, 184u, 8u, 43u);
+    if (!musa_core_crc16_arc(0xc0c1u, layer, 27u, &crc))
+        return 0;
+    layer[27] = (uint8_t)crc;
+    layer[28] = (uint8_t)(crc >> 8u);
+
+    MusaDwgAc1024SelfIdentity index[4] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            bytes, sizeof(bytes), offsets, 4u, index, 4u))
+        return 0;
+    uint8_t unchanged[sizeof(bytes)];
+    memcpy(unchanged, bytes, sizeof(unchanged));
+    MusaDwgAc1024LayerEedXDictionaryGraph result = {0};
+    if (!musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &result) ||
+        result.layer_handle != 45u ||
+        result.layer_record_offset != 39u ||
+        result.layer_control_handle != 41u ||
+        result.layer_control_record_offset != 13u ||
+        result.xdictionary_handle != 43u ||
+        result.xdictionary_record_offset != 26u ||
+        result.remaining_handle_tail_bits != 0u ||
+        result.eed_appid_reference_count != 1u ||
+        result.layer_control_raw_h_code != 2u ||
+        result.xdictionary_raw_h_code != 3u ||
+        !result.original_records_crc_verified || result.display_accepted ||
+        memcmp(unchanged, bytes, sizeof(bytes)))
+        return 0;
+    const MusaDwgAc1024LayerEedXDictionaryGraph preserved = result;
+
+    /* A valid layer CRC does not authenticate a broken DICTIONARY CRC. */
+    bytes[38] ^= 1u;
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &result) ||
+        memcmp(&preserved, &result, sizeof(result)))
+        return 0;
+    memcpy(bytes, unchanged, sizeof(bytes));
+
+    /* The source-indexed LAYER_CONTROL cannot masquerade as OT42. */
+    index[1].raw_ot = 42u;
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &result) ||
+        memcmp(&preserved, &result, sizeof(result)))
+        return 0;
+    index[1].raw_ot = 50u;
+
+    /* Re-sealed, dangling dictionary H3 is still refused. */
+    set_bits(p, 184u, 8u, 44u);
+    if (!musa_core_crc16_arc(0xc0c1u, layer, 27u, &crc))
+        return 0;
+    layer[27] = (uint8_t)crc;
+    layer[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &result) ||
+        memcmp(&preserved, &result, sizeof(result)))
+        return 0;
+    memcpy(bytes, unchanged, sizeof(bytes));
+
+    /* Wrong role H4, even pointing at the same original dictionary. */
+    set_bits(p, 176u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, layer, 27u, &crc))
+        return 0;
+    layer[27] = (uint8_t)crc;
+    layer[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &result) ||
+        memcmp(&preserved, &result, sizeof(result)))
+        return 0;
+    memcpy(bytes, unchanged, sizeof(bytes));
+
+    /* No aliasing, NULL, forged handle or source mutation. */
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 44u, &result) ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, NULL) ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u,
+            (MusaDwgAc1024LayerEedXDictionaryGraph *)(void *)bytes) ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u,
+            (MusaDwgAc1024LayerEedXDictionaryGraph *)(void *)index) ||
+        memcmp(&preserved, &result, sizeof(result)) ||
+        memcmp(unchanged, bytes, sizeof(bytes)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_owner_layer_bridge()) return 11;
     if (!test_relative_owner_layer_codes()) return 12;
@@ -1143,6 +1273,7 @@ int main(void) {
     if (!test_layer_raw_flags_preflight()) return 14;
     if (!test_layer_nonzero_eed_raw_flags()) return 15;
     if (!test_layer_eed_appid_original_target()) return 16;
+    if (!test_layer_eed_xdictionary_original_graph()) return 17;
     if (!test_no_proxy_subset()) return 8;
     if (!test_entity_meta_subset()) return 9;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
