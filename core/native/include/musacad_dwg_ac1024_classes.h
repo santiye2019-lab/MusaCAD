@@ -213,6 +213,17 @@ int musa_dwg_ac1024_classes_r2010_tu_audit(
     uint8_t extra_rl_present,uint16_t target_class_number,
     MusaDwgAc1024ClassesTuAudit *out);
 
+/* Optional explicit lookup of ONE validated target class DXF identifier.
+ * Never exports layer names, text entities, object handles, raw TU bytes or
+ * other class names. Requires the FULL separate TU audit above and accepts
+ * only 1..96 ASCII identifier characters [A-Za-z0-9_:.-] from the third TU
+ * field. Fails atomically; raw source remains untouched. Not permission to
+ * render, write, assign layer roles or infer class semantics. */
+int musa_dwg_ac1024_classes_r2010_dxf_identifier(
+    const uint8_t *logical_classes,size_t logical_bytes,
+    uint8_t extra_rl_present,uint16_t target_class_number,
+    char *output,size_t capacity,size_t *out_length);
+
 #ifdef __cplusplus
 }
 #endif
