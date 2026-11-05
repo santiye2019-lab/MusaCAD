@@ -385,7 +385,7 @@ int musa_dwg_ac1024_layer_eed_raw_flags_probe(
 
 /* Original R2010 LAYER OT51 H stream, EED-bearing and XDictionary
  * present ONLY. A CRC-backed layer and its OT67 APPID targets are
- * mandatory. The first H2 is an OT50 LAYER_CONTROL soft-pointer; the
+ * mandatory. The first H4 is an OT50 LAYER_CONTROL soft-pointer; the
  * next H3 is an OT42 DICTIONARY hard-owner reference. Relative H6/H8/
  * HA/HC codes are admitted only after exact target OT/CRC/self-H proof.
  * Later linetype, plotstyle, material and XREF H refs are UNPARSED.
