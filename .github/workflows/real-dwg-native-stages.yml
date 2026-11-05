@@ -13,6 +13,8 @@ on:
       - 'tests/real_dwg_rejected_map_triage.py'
       - 'tests/test_real_dwg_rejected_map_diagnostic.py'
       - 'tests/real_dwg_native_stage_matrix.py'
+      - 'tests/real_dwg_classes_corpus_evidence.py'
+      - 'tests/test_real_dwg_classes_corpus_evidence.py'
       - 'tests/test_real_dwg_native_stage_probe.py'
       - 'tests/real_dwg_lfs_corpus_audit.py'
       - '.github/workflows/real-dwg-native-stages.yml'
@@ -28,6 +30,8 @@ on:
       - 'tests/real_dwg_rejected_map_triage.py'
       - 'tests/test_real_dwg_rejected_map_diagnostic.py'
       - 'tests/real_dwg_native_stage_matrix.py'
+      - 'tests/real_dwg_classes_corpus_evidence.py'
+      - 'tests/test_real_dwg_classes_corpus_evidence.py'
       - 'tests/test_real_dwg_native_stage_probe.py'
       - 'tests/real_dwg_lfs_corpus_audit.py'
       - '.github/workflows/real-dwg-native-stages.yml'
@@ -108,6 +112,14 @@ jobs:
             --repository . --probe /tmp/musacad-real-stage-probe \
             --timeout-seconds 45 \
             --report /tmp/musacad-real-native-stages.json
+      - name: Verify class 505 claims stay numeric and drawing-local
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_classes_corpus_evidence.py' -v
+          python3 tests/real_dwg_classes_corpus_evidence.py \
+            --stage-report /tmp/musacad-real-native-stages.json \
+            --report /tmp/musacad-real-classes-numeric-census.json
       - name: Compile read-only rejected map diagnostics
         run: |
           set -euo pipefail
@@ -135,6 +147,7 @@ jobs:
           name: musacad-real-dwg-native-stage-diagnostic
           path: |
             /tmp/musacad-real-native-stages.json
+            /tmp/musacad-real-classes-numeric-census.json
             /tmp/musacad-real-rejected-map-triage.json
           if-no-files-found: ignore
           retention-days: 14
