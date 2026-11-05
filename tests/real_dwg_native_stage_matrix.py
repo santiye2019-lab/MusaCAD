@@ -611,6 +611,17 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_xdic_graph_attempts",
             "sampled_layer_eed_xdic_graph_verified",
             "sampled_layer_eed_xdic_graph_refused",
+            "sampled_layer_eed_xdic_refused_identity",
+            "sampled_layer_eed_xdic_refused_eed",
+            "sampled_layer_eed_xdic_refused_flags",
+            "sampled_layer_eed_xdic_refused_appid",
+            "sampled_layer_eed_xdic_refused_tail",
+            "sampled_layer_eed_xdic_refused_control_h",
+            "sampled_layer_eed_xdic_refused_dictionary_h",
+            "sampled_layer_eed_xdic_refused_target_index",
+            "sampled_layer_eed_xdic_refused_target_class",
+            "sampled_layer_eed_xdic_refused_target_crc",
+            "sampled_layer_eed_xdic_refused_other",
             "sampled_layer_eed_xdic_graph_has_tail",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
@@ -670,7 +681,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_appid_attempts, layer_appid_ok, layer_appid_bad,
          layer_appid_refs,
          layer_xdic_graph_attempts, layer_xdic_graph_ok,
-         layer_xdic_graph_bad, layer_xdic_graph_has_tail,
+         layer_xdic_graph_bad,
+         layer_xdic_refused_identity, layer_xdic_refused_eed, layer_xdic_refused_flags, layer_xdic_refused_appid,
+         layer_xdic_refused_tail, layer_xdic_refused_control_h, layer_xdic_refused_dictionary_h, layer_xdic_refused_target_index,
+         layer_xdic_refused_target_class, layer_xdic_refused_target_crc, layer_xdic_refused_other,
+         layer_xdic_graph_has_tail,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -747,6 +762,17 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 layer_xdic_graph_attempts != layer_appid_ok or
                 layer_xdic_graph_ok + layer_xdic_graph_bad !=
                     layer_xdic_graph_attempts or
+                layer_xdic_graph_bad != (
+                    layer_xdic_refused_identity +
+                    layer_xdic_refused_eed +
+                    layer_xdic_refused_flags +
+                    layer_xdic_refused_appid +
+                    layer_xdic_refused_tail +
+                    layer_xdic_refused_control_h +
+                    layer_xdic_refused_dictionary_h +
+                    layer_xdic_refused_target_index +
+                    layer_xdic_refused_target_class +
+                    layer_xdic_refused_target_crc + layer_xdic_refused_other) or
                 layer_xdic_graph_has_tail > layer_xdic_graph_ok or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
