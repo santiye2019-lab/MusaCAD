@@ -710,6 +710,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_terminal_candidate_ot49",
             "sampled_layer_eed_terminal_candidate_ot51",
             "sampled_layer_eed_terminal_candidate_ot_other",
+            "sampled_layer_eed_terminal_candidate_ot80_placeholder",
+            "sampled_layer_eed_terminal_candidate_ot57_ltype",
+            "sampled_layer_eed_terminal_candidate_dynamic_class_unresolved",
+            "sampled_layer_eed_terminal_candidate_other_raw_ot",
             "sampled_layer_eed_terminal_candidate_ordinal_1_matched",
             "sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus",
             "sampled_layer_eed_terminal_candidate_ordinal_2_matched",
@@ -810,6 +814,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          fragment_ordinal_3_code5, fragment_ordinal_4_code5,
          candidate_attempts, candidate_verified, candidate_refused, candidate_prefix_tokens, candidate_absolute,
          candidate_matched, candidate_unmatched, candidate_other, candidate_ot49, candidate_ot51, candidate_ot_other,
+         candidate_ot80_placeholder, candidate_ot57_ltype,
+         candidate_dynamic_class_unresolved, candidate_other_raw_ot,
          candidate_ordinal_1_matched,
          candidate_ordinal_1_raw_ot_consensus,
          candidate_ordinal_2_matched,
@@ -948,6 +954,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 candidate_absolute + candidate_other != candidate_prefix_tokens or
                 candidate_matched + candidate_unmatched != candidate_absolute or
                 candidate_ot49 + candidate_ot51 + candidate_ot_other !=
+                    candidate_matched or
+                candidate_ot80_placeholder + candidate_ot57_ltype +
+                    candidate_dynamic_class_unresolved + candidate_other_raw_ot !=
                     candidate_matched or
                 (candidate_ordinal_1_matched + candidate_ordinal_2_matched +
                  candidate_ordinal_3_matched + candidate_ordinal_4_matched) !=

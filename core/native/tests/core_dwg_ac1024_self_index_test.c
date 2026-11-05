@@ -1562,6 +1562,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         candidates.verified_ot49 != 0u ||
         candidates.verified_ot51 != 0u ||
         candidates.verified_other_ot != 0u ||
+        candidates.verified_placeholder_ot80 != 0u ||
+        candidates.verified_ltype_ot57 != 0u ||
+        candidates.unresolved_dynamic_class_ot_ge500 != 0u ||
+        candidates.verified_other_raw_ot != 0u ||
         candidates.matched_ordinal_mask != 0u ||
         candidates.verified_raw_ot_by_ordinal[0] != 0u ||
         candidates.verified_raw_ot_by_ordinal[1] != 0u ||
@@ -1589,6 +1593,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         candidates.verified_ot49 != 0u ||
         candidates.verified_ot51 != 0u ||
         candidates.verified_other_ot != 1u ||
+        candidates.verified_placeholder_ot80 != 0u ||
+        candidates.verified_ltype_ot57 != 0u ||
+        candidates.unresolved_dynamic_class_ot_ge500 != 0u ||
+        candidates.verified_other_raw_ot != 1u ||
         candidates.matched_ordinal_mask != 1u ||
         candidates.verified_raw_ot_by_ordinal[0] != 42u ||
         candidates.verified_raw_ot_by_ordinal[1] != 0u ||
@@ -1625,6 +1633,85 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
             with_fragment, sizeof(with_fragment), fragment_index, 4u, 45u,
             NULL))
+        return 0;
+
+    /* Three additional authentic source records, outside the verified
+     * layer/APPID/XDictionary chain: fixed 80 PLACEHOLDER, dynamically
+     * declared 505, fixed 57 LTYPE. No class-name or property role is
+     * assigned by these numeric-only checks. */
+    uint8_t with_known_targets[111] = {0};
+    memcpy(with_known_targets, with_fragment, sizeof(with_fragment));
+    const uint64_t known_offsets[7] = {0u,13u,26u,39u,72u,85u,98u};
+    const uint16_t expected_raw[3] = {80u,505u,57u};
+    for (size_t k = 0u; k < 3u; ++k) {
+        uint8_t *const rec = with_known_targets + known_offsets[4u + k];
+        if (!make_record(rec, (uint32_t)(46u + k))) return 0;
+        if (k == 1u) {
+            /* R2010 selector 1 encodes raw OT 496 + 9 = 505, NOT
+             * a resolved material/class name. Self-H remains at bit 10. */
+            set_bits(rec + 3u, 0u, 2u, 1u);
+            set_bits(rec + 3u, 2u, 8u, 9u);
+        } else {
+            set_bits(rec + 3u, 2u, 8u, expected_raw[k]);
+        }
+        if (!musa_core_crc16_arc(0xc0c1u, rec, 11u, &crc))
+            return 0;
+        rec[11] = (uint8_t)crc;
+        rec[12] = (uint8_t)(crc >> 8u);
+        MusaDwgAc1024SelfPrefix prefix = {0};
+        if (!musa_dwg_ac1024_record_self_prefix(
+                with_known_targets, sizeof(with_known_targets),
+                known_offsets[4u + k], &prefix) ||
+            prefix.raw_ot != expected_raw[k] ||
+            prefix.embedded_absolute_handle != (uint64_t)(46u + k) ||
+            !prefix.frame_crc16_verified)
+            return 0;
+    }
+    MusaDwgAc1024SelfIdentity known_index[7] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            with_known_targets, sizeof(with_known_targets),
+            known_offsets, 7u, known_index, 7u))
+        return 0;
+    for (size_t k = 0u; k < 3u; ++k) {
+        /* The one complete numeric H5 token starts at bit 205 of
+         * this otherwise unchanged CRC-backed fragment witness. */
+        set_bits(with_known_targets + 42u, 205u, 8u, (uint32_t)(46u + k));
+        if (!musa_core_crc16_arc(
+                0xc0c1u, with_known_targets + 39u, 31u, &crc))
+            return 0;
+        with_known_targets[70] = (uint8_t)crc;
+        with_known_targets[71] = (uint8_t)(crc >> 8u);
+        if (!musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+                with_known_targets, sizeof(with_known_targets),
+                known_index, 7u, 45u, &candidates) ||
+            candidates.verified_index_matches != 1u ||
+            candidates.unmatched_or_unverified != 0u ||
+            candidates.verified_other_ot != 1u ||
+            candidates.verified_placeholder_ot80 != (size_t)(k == 0u) ||
+            candidates.unresolved_dynamic_class_ot_ge500 !=
+                (size_t)(k == 1u) ||
+            candidates.verified_ltype_ot57 != (size_t)(k == 2u) ||
+            candidates.verified_other_raw_ot != 0u ||
+            candidates.verified_raw_ot_by_ordinal[0] != expected_raw[k] ||
+            candidates.matched_ordinal_mask != 1u ||
+            candidates.display_accepted)
+            return 0;
+    }
+    /* Even an indexed dynamic OT must lose its match when its source
+     * CRC is damaged. Remaining source relationships stay non-renderable. */
+    with_known_targets[97] ^= 1u; /* OT505 record CRC */
+    set_bits(with_known_targets + 42u, 205u, 8u, 47u);
+    if (!musa_core_crc16_arc(0xc0c1u, with_known_targets + 39u, 31u, &crc))
+        return 0;
+    with_known_targets[70] = (uint8_t)crc;
+    with_known_targets[71] = (uint8_t)(crc >> 8u);
+    if (!musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            with_known_targets, sizeof(with_known_targets),
+            known_index, 7u, 45u, &candidates) ||
+        candidates.verified_index_matches != 0u ||
+        candidates.unmatched_or_unverified != 1u ||
+        candidates.unresolved_dynamic_class_ot_ge500 != 0u ||
+        candidates.display_accepted)
         return 0;
     /* A damaged original layer CRC or aliased output is always refused. */
     extended_layer[31] ^= 1u;

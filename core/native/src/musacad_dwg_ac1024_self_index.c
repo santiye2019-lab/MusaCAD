@@ -1606,6 +1606,16 @@ int musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
             if (original.raw_ot == 49u) ++next.verified_ot49;
             else if (original.raw_ot == 51u) ++next.verified_ot51;
             else ++next.verified_other_ot;
+            /* Raw identity categories only: a dynamic OT is never
+             * promoted to a resolved MATERIAL/class/scene object. */
+            if (original.raw_ot == 80u)
+                ++next.verified_placeholder_ot80;
+            else if (original.raw_ot == 57u)
+                ++next.verified_ltype_ot57;
+            else if (original.raw_ot >= 500u)
+                ++next.unresolved_dynamic_class_ot_ge500;
+            else
+                ++next.verified_other_raw_ot;
         } else {
             ++next.unmatched_or_unverified;
         }
@@ -1626,7 +1636,10 @@ int musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
         next.verified_index_matches + next.unmatched_or_unverified !=
             next.absolute_candidates ||
         next.verified_ot49 + next.verified_ot51 + next.verified_other_ot !=
-            next.verified_index_matches)
+            next.verified_index_matches ||
+        next.verified_placeholder_ot80 + next.verified_ltype_ot57 +
+            next.unresolved_dynamic_class_ot_ge500 +
+            next.verified_other_raw_ot != next.verified_index_matches)
         return 0;
     next.original_records_crc_verified = 1u;
     next.display_accepted = 0u;

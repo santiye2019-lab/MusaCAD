@@ -504,6 +504,15 @@ typedef struct MusaDwgAc1024LayerTailCandidateCensus {
     size_t verified_ot49;
     size_t verified_ot51;
     size_t verified_other_ot;
+    /* Disjoint source-verified RAW type categories. DWG object type 0x50
+     * = PLACEHOLDER and 0x39 = LTYPE are fixed type identities only;
+     * OT >= 500 is a drawing-local dynamic class number. It stays
+     * unresolved until the original R2010 Classes section is decoded.
+     * None of these counters establishes which LAYER property links it. */
+    size_t verified_placeholder_ot80;
+    size_t verified_ltype_ot57;
+    size_t unresolved_dynamic_class_ot_ge500;
+    size_t verified_other_raw_ot;
     /* Index-verified numeric OT at each of first four complete raw H
      * slots, never a CAD role. Mask bit n means slot n CRC-matched. */
     uint16_t verified_raw_ot_by_ordinal[4];

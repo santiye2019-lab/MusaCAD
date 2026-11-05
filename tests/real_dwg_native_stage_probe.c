@@ -582,6 +582,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_candidate_ot49;
     size_t sampled_layer_eed_terminal_candidate_ot51;
     size_t sampled_layer_eed_terminal_candidate_ot_other;
+    size_t sampled_layer_eed_terminal_candidate_ot80_placeholder;
+    size_t sampled_layer_eed_terminal_candidate_ot57_ltype;
+    size_t sampled_layer_eed_terminal_candidate_dynamic_class_unresolved;
+    size_t sampled_layer_eed_terminal_candidate_other_raw_ot;
     size_t sampled_layer_eed_terminal_candidate_ordinal_1_matched;
     size_t sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus;
     size_t sampled_layer_eed_terminal_candidate_ordinal_2_matched;
@@ -1369,6 +1373,11 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                 candidates.verified_ot49 +
                                                                     candidates.verified_ot51 +
                                                                     candidates.verified_other_ot ==
+                                                                    candidates.verified_index_matches &&
+                                                                candidates.verified_placeholder_ot80 +
+                                                                    candidates.verified_ltype_ot57 +
+                                                                    candidates.unresolved_dynamic_class_ot_ge500 +
+                                                                    candidates.verified_other_raw_ot ==
                                                                     candidates.verified_index_matches) {
                                                                 ++hint.sampled_layer_eed_terminal_candidate_verified;
                                                                 hint.sampled_layer_eed_terminal_candidate_prefix_tokens +=
@@ -1385,6 +1394,14 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                 hint.sampled_layer_eed_terminal_candidate_ot51 += candidates.verified_ot51;
                                                                 hint.sampled_layer_eed_terminal_candidate_ot_other +=
                                                                     candidates.verified_other_ot;
+                                                                hint.sampled_layer_eed_terminal_candidate_ot80_placeholder +=
+                                                                    candidates.verified_placeholder_ot80;
+                                                                hint.sampled_layer_eed_terminal_candidate_ot57_ltype +=
+                                                                    candidates.verified_ltype_ot57;
+                                                                hint.sampled_layer_eed_terminal_candidate_dynamic_class_unresolved +=
+                                                                    candidates.unresolved_dynamic_class_ot_ge500;
+                                                                hint.sampled_layer_eed_terminal_candidate_other_raw_ot +=
+                                                                    candidates.verified_other_raw_ot;
                                                                 /* A consensus is a numeric OT, not proof
                                                                  * of linetype/material/plotstyle role. */
                                                                 for (size_t ordinal = 0u; ordinal < 4u; ++ordinal) {
@@ -2453,6 +2470,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_candidate_ot49\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ot51\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ot_other\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ot80_placeholder\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ot57_ltype\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_dynamic_class_unresolved\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_other_raw_ot\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ordinal_1_matched\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ordinal_2_matched\":%zu,"
@@ -2809,6 +2830,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_candidate_ot49,
                hint->sampled_layer_eed_terminal_candidate_ot51,
                hint->sampled_layer_eed_terminal_candidate_ot_other,
+               hint->sampled_layer_eed_terminal_candidate_ot80_placeholder,
+               hint->sampled_layer_eed_terminal_candidate_ot57_ltype,
+               hint->sampled_layer_eed_terminal_candidate_dynamic_class_unresolved,
+               hint->sampled_layer_eed_terminal_candidate_other_raw_ot,
                hint->sampled_layer_eed_terminal_candidate_ordinal_1_matched,
                hint->sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus,
                hint->sampled_layer_eed_terminal_candidate_ordinal_2_matched,
