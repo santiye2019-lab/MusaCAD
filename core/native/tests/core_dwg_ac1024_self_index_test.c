@@ -923,6 +923,113 @@ static int test_layer_raw_flags_preflight(void) {
     return 1;
 }
 
+/* Original CRC-backed OT51 with NONZERO EED: the application H5/opaque
+ * frame must be terminated before the reactor and source flags. Test is
+ * DATA-only; no viewport display status or APPID semantics are inferred. */
+static int test_layer_nonzero_eed_raw_flags(void) {
+    _Alignas(MusaDwgAc1024LayerRawFlagsEvidence)
+    uint8_t source[29] = {0};
+    source[0] = 24u; /* 24-byte source body, CRC at 27..28 */
+    source[2] = 16u; /* H tail 16 bits at payload bit176 */
+    uint8_t *const p = source + 3u;
+    set_bits(p, 2u, 8u, 51u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 42u); /* original LAYER self H42 */
+    set_bits(p, 26u, 2u, 1u); /* BS EED len1 */
+    set_bits(p, 28u, 8u, 1u);
+    set_bits(p, 36u, 4u, 5u); /* APPID H5, not yet target-resolved */
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 40u);
+    set_bits(p, 52u, 8u, 0x70u); /* opaque application content */
+    set_bits(p, 60u, 2u, 2u); /* EED terminator BS zero */
+    set_bits(p, 62u, 2u, 2u); /* BL zero reactors */
+    set_bits(p, 64u, 1u, 1u); /* XDictionary absent */
+    set_bits(p, 65u, 1u, 0u); /* source 64-bit flag */
+    set_bits(p, 66u, 2u, 2u); /* BS xref index+1 = 0 */
+    set_bits(p, 68u, 1u, 0u); /* source xref-dependent */
+    set_bits(p, 69u, 2u, 1u); /* BS raw layer flags as 8bit */
+    set_bits(p, 71u, 8u, 0xabu);
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    const uint64_t offsets[1] = {0u};
+    MusaDwgAc1024SelfIdentity index[1] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            source, sizeof(source), offsets, 1u, index, 1u))
+        return 0;
+    uint8_t pristine[sizeof(source)];
+    memcpy(pristine, source, sizeof(source));
+    MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
+    if (!musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, &flags) ||
+        flags.layer_handle != 42u || flags.layer_record_offset != 0u ||
+        flags.raw_flags_start_bit != 65u ||
+        flags.raw_flags_end_bit != 79u ||
+        flags.raw_values_70_290_370 != 0xabu ||
+        !flags.original_record_crc_verified ||
+        flags.display_accepted != 0u ||
+        flags.frozen_bit != 1u || flags.locked_bit != 1u ||
+        flags.lineweight_field != 5u ||
+        musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, &flags) ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    const MusaDwgAc1024LayerRawFlagsEvidence saved = flags;
+
+    /* Corrupted application H code is still refused with correct CRC. */
+    set_bits(p, 36u, 4u, 4u);
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Unsupported reactor count must never be silently skipped. */
+    set_bits(p, 62u, 2u, 1u); /* BL byte follows */
+    set_bits(p, 64u, 8u, 1u);
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* No CRC or canonical source index bypass. */
+    source[28] ^= 1u;
+    if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+    index[0].raw_ot = 19u;
+    if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, &flags) ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    index[0].raw_ot = 51u;
+    if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u, NULL) ||
+        musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u,
+            (MusaDwgAc1024LayerRawFlagsEvidence *)(void *)source) ||
+        musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            source, sizeof(source), index, 1u, 42u,
+            (MusaDwgAc1024LayerRawFlagsEvidence *)(void *)index) ||
+        memcmp(&flags, &saved, sizeof(saved)) ||
+        memcmp(pristine, source, sizeof(source)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_owner_layer_bridge()) return 11;
     if (!test_relative_owner_layer_codes()) return 12;
@@ -931,6 +1038,7 @@ int main(void) {
     if (!test_zero_eed_subset()) return 7;
     if (!test_eed_chain_bounded()) return 13;
     if (!test_layer_raw_flags_preflight()) return 14;
+    if (!test_layer_nonzero_eed_raw_flags()) return 15;
     if (!test_no_proxy_subset()) return 8;
     if (!test_entity_meta_subset()) return 9;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
