@@ -69,6 +69,22 @@ enum {
 uint8_t musa_dwg_ac1024_line_common_failure_stage(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset);
 
+/* Read-only classification of the ORIGINAL CRC-backed LINE LTSCALE BD
+ * when strict common decoding refuses at the scale stage. Never fills
+ * in a default value, alters source, or admits nonpositive scales to
+ * a scene. Codes 2..5 are mutually exclusive; 0 means the refusal
+ * (if any) happened at a different stage. */
+enum {
+    MUSA_DWG_LINE_LTSCALE_NOT_REJECTED_HERE = 0,
+    MUSA_DWG_LINE_LTSCALE_ZERO = 2,
+    MUSA_DWG_LINE_LTSCALE_NEGATIVE = 3,
+    MUSA_DWG_LINE_LTSCALE_NONFINITE = 4,
+    MUSA_DWG_LINE_LTSCALE_PARSE_REFUSED = 5
+};
+uint8_t musa_dwg_ac1024_line_ltscale_refusal_kind(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset);
+
+
 
 typedef struct MusaDwgAc1024LineFields {
     uint64_t indexed_handle;
