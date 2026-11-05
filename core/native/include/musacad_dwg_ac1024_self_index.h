@@ -383,6 +383,35 @@ int musa_dwg_ac1024_layer_eed_raw_flags_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out);
 
+/* Original R2010 LAYER OT51 H stream, EED-bearing and XDictionary
+ * present ONLY. A CRC-backed layer and its OT67 APPID targets are
+ * mandatory. The first H2 is an OT50 LAYER_CONTROL soft-pointer; the
+ * next H3 is an OT42 DICTIONARY hard-owner reference. Relative H6/H8/
+ * HA/HC codes are admitted only after exact target OT/CRC/self-H proof.
+ * Later linetype, plotstyle, material and XREF H refs are UNPARSED.
+ * This does not resolve CMC, VP visibility, draw/paint or block context.
+ * Outputs are atomic and never authorize scene rendering. */
+typedef struct MusaDwgAc1024LayerEedXDictionaryGraph {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    uint64_t layer_control_handle;
+    uint64_t layer_control_record_offset;
+    uint64_t xdictionary_handle;
+    uint64_t xdictionary_record_offset;
+    size_t remaining_handle_tail_bits;
+    size_t eed_appid_reference_count;
+    uint8_t layer_control_raw_h_code;
+    uint8_t xdictionary_raw_h_code;
+    uint8_t original_records_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerEedXDictionaryGraph;
+
+int musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedXDictionaryGraph *out);
+
 /* Diagnostics use the EXACT strict OT51 proof; no alternative parsing,
  * fallback flags, or scene/display acceptance. */
 enum {
