@@ -219,18 +219,27 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
     const uint32_t declared=read_le32(section+16u);
     const uint32_t maintenance=extra?read_le32(section+20u):0u;
     const uint32_t declared_bits=read_le32(section+20u+(extra?4u:0u));
-    if(declared<5u||declared>MUSA_R2010_CLASSES_MAX||
-       declared>len-offset-18u-tail||
+    /* In the source-backed extra-RL R2010 layout the declared area
+     * starts at +24 and INCLUDES its four-byte raw bit-count RL.
+     * The class BS/RC/RC/B stream starts at +28. Never grant an
+     * additional four bytes from CRC or the closing sentinel. */
+    const size_t preceding_rl_bytes=extra?4u:0u;
+    if(declared<5u+preceding_rl_bytes||
+       declared>MUSA_R2010_CLASSES_MAX||
+       len<24u+18u+tail||
+       (size_t)declared!=len-24u-18u-tail||
        declared_bits<36u||
-       (uint64_t)declared_bits>(uint64_t)declared*8u)
+       (uint64_t)declared_bits>
+           (uint64_t)(declared-preceding_rl_bytes)*8u)
         return 0;
+    const size_t data_bytes=(size_t)declared-preceding_rl_bytes;
     size_t pos=0u;
     uint16_t maximum=0u;
     uint32_t zero1=0u,zero2=0u,flag=0u;
-    if(!bit_short(section+offset,declared,&pos,&maximum)||
-       !bit_read(section+offset,declared,&pos,8u,&zero1)||
-       !bit_read(section+offset,declared,&pos,8u,&zero2)||
-       !bit_read(section+offset,declared,&pos,1u,&flag)||
+    if(!bit_short(section+offset,data_bytes,&pos,&maximum)||
+       !bit_read(section+offset,data_bytes,&pos,8u,&zero1)||
+       !bit_read(section+offset,data_bytes,&pos,8u,&zero2)||
+       !bit_read(section+offset,data_bytes,&pos,1u,&flag)||
        maximum<500u||maximum>5000u||
        zero1||zero2||flag!=1u||pos>=declared_bits)
         return 0;
@@ -243,8 +252,7 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
     next.numeric_records_start_bit=pos;
     next.extra_rl_present=extra;
     next.end_sentinel_followed_by_eight_bytes=(uint8_t)(tail==8u);
-    next.byte_area_extent_exact=(uint8_t)(
-        (size_t)declared==len-offset-18u-tail);
+    next.byte_area_extent_exact=1u; /* mandatory exact CRC-bounded extent */
     next.structural_prefix_verified=1u;
     *out=next;
     return 1;

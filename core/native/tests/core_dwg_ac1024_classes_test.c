@@ -181,8 +181,10 @@ static size_t r2010_bitcount_fixture(uint8_t *bytes,int extra){
     const size_t size=start+16u+18u;
     memset(bytes,0,96u);
     memcpy(bytes,opening,sizeof(opening));
-    bytes[16]=16u; /* class data byte area */
-    if(extra)bytes[20]=7u; /* opaque maintenance word */
+    bytes[16]=(uint8_t)(extra?20u:16u);
+    /* Extra-RL form's 20-byte declared area includes 4-byte bit count
+     * and 16 bytes of class data. Opaque high word remains unclassified. */
+    if(extra)bytes[20]=7u;
     bytes[20u+(extra?4u:0u)]=96u; /* mandatory bit count */
     /* BS(505), 2 RC zero, B true */
     bit_set(bytes+start,0u,2u,0u);
@@ -202,7 +204,7 @@ static int test_r2010_bitcount(int extra){
     MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
     if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
             bytes,len,(uint8_t)extra,&prefix)||
-       prefix.declared_data_area_bytes!=16u||
+       prefix.declared_data_area_bytes!=(uint32_t)(extra?20u:16u)||
        prefix.declared_data_bits!=96u||
        prefix.maintenance_word!=(extra?7u:0u)||
        prefix.maximum_class_number!=505u||
@@ -223,7 +225,8 @@ static int test_r2010_bitcount(int extra){
     }while(0)
     bytes[0]^=1u;REFUSE_R2010();bytes[0]^=1u;
     bytes[len-1u]^=1u;REFUSE_R2010();bytes[len-1u]^=1u;
-    bytes[16]=0u;REFUSE_R2010();bytes[16]=16u;
+    bytes[16]=0u;REFUSE_R2010();
+    bytes[16]=(uint8_t)(extra?20u:16u);
     bytes[20u+(extra?4u:0u)]=0u;REFUSE_R2010();
     bytes[20u+(extra?4u:0u)]=96u;
     bytes[20u+(extra?4u:0u)]=129u;REFUSE_R2010();
@@ -316,8 +319,8 @@ static int test_survey(void){
     len=r2010_bitcount_fixture(section,1);
     if(!musa_dwg_ac1024_classes_header_survey(
             section,len,&observed)||
-       !observed.area_exact_2extra||
-       observed.area_exact_0extra||observed.area_exact_1extra||
+       !observed.area_exact_1extra||
+       observed.area_exact_0extra||observed.area_exact_2extra||
        !observed.raw_bits24_in_range||!observed.preamble_at28)
         return 0;
     /* The verified short synthetic extra-RL form places the closing
