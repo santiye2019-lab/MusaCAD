@@ -412,6 +412,28 @@ int musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerEedXDictionaryGraph *out);
 
+/* Exact same reader, with its first refusal stage. This is a read-only
+ * diagnosis and never a fallback into render/scene acceptance. */
+enum {
+    MUSA_DWG_LAYER_XDIC_GRAPH_OK = 0,
+    MUSA_DWG_LAYER_XDIC_GRAPH_ARGUMENT = 1,
+    MUSA_DWG_LAYER_XDIC_GRAPH_IDENTITY = 2,
+    MUSA_DWG_LAYER_XDIC_GRAPH_EED = 3,
+    MUSA_DWG_LAYER_XDIC_GRAPH_FLAGS = 4,
+    MUSA_DWG_LAYER_XDIC_GRAPH_APPID = 5,
+    MUSA_DWG_LAYER_XDIC_GRAPH_TAIL = 6,
+    MUSA_DWG_LAYER_XDIC_GRAPH_CONTROL_H = 7,
+    MUSA_DWG_LAYER_XDIC_GRAPH_DICTIONARY_H = 8,
+    MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_INDEX = 9,
+    MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CLASS = 10,
+    MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CRC = 11
+};
+uint8_t musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle);
+
+
 /* Diagnostics use the EXACT strict OT51 proof; no alternative parsing,
  * fallback flags, or scene/display acceptance. */
 enum {
