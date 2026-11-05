@@ -1030,6 +1030,109 @@ static int test_layer_nonzero_eed_raw_flags(void) {
     return 1;
 }
 
+/* CRC-valid LAYER OT51 with a nonempty EED application H5 -> APPID
+ * OT67 source record, and 0 application semantics/scene permission. */
+static int test_layer_eed_appid_original_target(void) {
+    _Alignas(MusaDwgAc1024EedAppidEvidence)
+    uint8_t records[42] = {0};
+    uint8_t *const appid = records;
+    uint8_t *const layer = records + 13u;
+    appid[0] = 8u;
+    appid[2] = 16u;
+    set_bits(appid + 3u, 2u, 8u, 67u);
+    set_bits(appid + 3u, 14u, 4u, 1u);
+    set_bits(appid + 3u, 18u, 8u, 40u);
+    uint16_t crc = 0u;
+    if (!musa_core_crc16_arc(0xc0c1u, appid, 11u, &crc))
+        return 0;
+    appid[11] = (uint8_t)crc; appid[12] = (uint8_t)(crc >> 8u);
+    layer[0] = 24u; layer[2] = 16u;
+    uint8_t *const p = layer + 3u;
+    set_bits(p, 2u, 8u, 51u);
+    set_bits(p, 14u, 4u, 1u);
+    set_bits(p, 18u, 8u, 42u);
+    set_bits(p, 26u, 2u, 1u);
+    set_bits(p, 28u, 8u, 1u);
+    set_bits(p, 36u, 4u, 5u);
+    set_bits(p, 40u, 4u, 1u);
+    set_bits(p, 44u, 8u, 40u);
+    set_bits(p, 52u, 8u, 0x70u);
+    set_bits(p, 60u, 2u, 2u);
+    set_bits(p, 62u, 2u, 2u);
+    set_bits(p, 64u, 1u, 1u);
+    set_bits(p, 66u, 2u, 2u);
+    set_bits(p, 69u, 2u, 1u);
+    set_bits(p, 71u, 8u, 0xabu);
+    if (!musa_core_crc16_arc(0xc0c1u, layer, 27u, &crc))
+        return 0;
+    layer[27] = (uint8_t)crc; layer[28] = (uint8_t)(crc >> 8u);
+    const uint64_t offsets[2] = {0u, 13u};
+    MusaDwgAc1024SelfIdentity index[2] = {{0}};
+    if (!musa_dwg_ac1024_recover_self_index(
+            records, sizeof(records), offsets, 2u, index, 2u))
+        return 0;
+    uint8_t pristine[sizeof(records)];
+    memcpy(pristine, records, sizeof(records));
+    MusaDwgAc1024EedAppidEvidence evidence = {0};
+    if (!musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u, &evidence) ||
+        evidence.chain.raw_ot != 51u ||
+        evidence.chain.indexed_object_offset != 13u ||
+        evidence.chain.embedded_absolute_handle != 42u ||
+        evidence.chain.application_count != 1u ||
+        evidence.appid_reference_count != 1u ||
+        evidence.distinct_appid_count != 1u ||
+        evidence.first_appid_handle != 40u ||
+        evidence.first_appid_record_offset != 0u ||
+        !evidence.original_appid_records_crc_verified ||
+        musa_dwg_ac1024_line_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u, &evidence) ||
+        memcmp(records, pristine, sizeof(records)))
+        return 0;
+    const MusaDwgAc1024EedAppidEvidence saved = evidence;
+
+    /* The original APPID target's CRC must match even when LAYER CRC
+     * and the EED application bytes themselves are valid. */
+    appid[12] ^= 1u;
+    if (musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u, &evidence) ||
+        memcmp(&evidence, &saved, sizeof(saved)))
+        return 0;
+    memcpy(records, pristine, sizeof(records));
+
+    index[0].raw_ot = 51u;
+    if (musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u, &evidence) ||
+        memcmp(&evidence, &saved, sizeof(saved)))
+        return 0;
+    index[0].raw_ot = 67u;
+
+    set_bits(p, 44u, 8u, 41u); /* dangling APPID H5 */
+    if (!musa_core_crc16_arc(0xc0c1u, layer, 27u, &crc))
+        return 0;
+    layer[27] = (uint8_t)crc; layer[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u, &evidence) ||
+        memcmp(&evidence, &saved, sizeof(saved)))
+        return 0;
+    memcpy(records, pristine, sizeof(records));
+
+    if (musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 0u, &evidence) ||
+        musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u, NULL) ||
+        musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u,
+            (MusaDwgAc1024EedAppidEvidence *)(void *)records) ||
+        musa_dwg_ac1024_layer_eed_appid_probe(
+            records, sizeof(records), index, 2u, 42u,
+            (MusaDwgAc1024EedAppidEvidence *)(void *)index) ||
+        memcmp(&evidence, &saved, sizeof(saved)) ||
+        memcmp(records, pristine, sizeof(records)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
     if (!test_owner_layer_bridge()) return 11;
     if (!test_relative_owner_layer_codes()) return 12;
@@ -1039,6 +1142,7 @@ int main(void) {
     if (!test_eed_chain_bounded()) return 13;
     if (!test_layer_raw_flags_preflight()) return 14;
     if (!test_layer_nonzero_eed_raw_flags()) return 15;
+    if (!test_layer_eed_appid_original_target()) return 16;
     if (!test_no_proxy_subset()) return 8;
     if (!test_entity_meta_subset()) return 9;
     _Alignas(MusaDwgAc1024SelfIdentity) uint8_t objects[26] = {0};
