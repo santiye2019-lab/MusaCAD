@@ -117,6 +117,15 @@ int musa_dwg_ac1024_line_eed_appid_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_line_handle, MusaDwgAc1024EedAppidEvidence *out);
 
+/* A distinct OT51 LAYER EED H5 APPID target witness, using the exact
+ * first-party CRC/OT67/self-H checks already required for OT19 LINE.
+ * The APPID target's bytes are not interpreted, and neither visibility
+ * nor layer CMC/colour follows from this evidence. */
+int musa_dwg_ac1024_layer_eed_appid_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024EedAppidEvidence *out);
+
 /* After CRC-verified self H and zero-length EED, the published common
  * format has a single graphic-present flag. This narrow witness ONLY
  * accepts flag=0 and returns the next exact DATA bit position. A flag=1
