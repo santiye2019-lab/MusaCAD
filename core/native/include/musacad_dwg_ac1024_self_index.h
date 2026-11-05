@@ -365,6 +365,15 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out);
 
+/* Separate NONZERO-EED original OT51 numerical preflight; verified H5
+ * application chain is bounded and CRC backed, but individual APPID
+ * target records/application bytes are not semantically interpreted.
+ * Output cannot be used to hide, recolor, or promote CAD geometry. */
+int musa_dwg_ac1024_layer_eed_raw_flags_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out);
+
 /* Diagnostics use the EXACT strict OT51 proof; no alternative parsing,
  * fallback flags, or scene/display acceptance. */
 enum {
