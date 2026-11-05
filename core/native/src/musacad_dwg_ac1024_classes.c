@@ -439,3 +439,73 @@ int musa_dwg_ac1024_classes_r2010_numeric_records(
     free(tmp);
     return ok;
 }
+
+/* R2010 detached string stream envelope only. The final bit is a
+ * presence flag; the preceding raw little-endian 16-bit word describes
+ * the length in bits, optionally extended with another 16-bit word.
+ * No TU character, object identity or original section CRC is checked. */
+int musa_dwg_ac1024_classes_r2010_string_span_probe(
+    const uint8_t *section,size_t len,uint8_t extra,
+    MusaDwgAc1024ClassesStringSpan *out){
+    if(!section||!out||extra>1u||
+       overlaps(section,len,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+            section,len,extra,&prefix)||!prefix.structural_prefix_verified)
+        return 0;
+    const size_t data_bytes=prefix.declared_data_area_bytes-
+                            (extra?4u:0u);
+    const size_t bits=(size_t)prefix.declared_data_bits-
+                      (extra?32u:0u);
+    if(prefix.bitstream_start_byte>len||
+       data_bytes>len-prefix.bitstream_start_byte||
+       data_bytes>SIZE_MAX/8u||bits>data_bytes*8u||
+       bits<=prefix.numeric_records_start_bit+24u)
+        return 0;
+    const uint8_t *data=section+prefix.bitstream_start_byte;
+    const size_t marker=bits-1u;
+    size_t at=marker;
+    uint32_t present=0u;
+    if(!bit_read(data,data_bytes,&at,1u,&present)||present!=1u||
+       marker<16u)
+        return 0;
+    /* The raw size words are bit-addressable, not necessarily byte aligned. */
+    uint32_t lo0=0u,lo1=0u;
+    at=marker-16u;
+    if(!bit_read(data,data_bytes,&at,8u,&lo0)||
+       !bit_read(data,data_bytes,&at,8u,&lo1)||
+       at!=marker)
+        return 0;
+    const uint32_t lower=lo0|(lo1<<8u);
+    uint32_t upper=0u;
+    size_t stream_end=marker-16u;
+    uint8_t extended=0u;
+    if(lower&0x8000u){
+        if(stream_end<16u)return 0;
+        at=stream_end-16u;
+        uint32_t hi0=0u,hi1=0u;
+        if(!bit_read(data,data_bytes,&at,8u,&hi0)||
+           !bit_read(data,data_bytes,&at,8u,&hi1)||
+           at!=stream_end)
+            return 0;
+        upper=hi0|(hi1<<8u);
+        stream_end-=16u;
+        extended=1u;
+    }
+    const uint64_t string_bits=
+        ((uint64_t)upper<<15u)|(uint64_t)(lower&0x7fffu);
+    if(!string_bits||string_bits>stream_end||
+       string_bits>UINT32_MAX||
+       stream_end-(size_t)string_bits<prefix.numeric_records_start_bit)
+        return 0;
+    MusaDwgAc1024ClassesStringSpan next={0};
+    next.stream_begin_bit=stream_end-(size_t)string_bits;
+    next.stream_end_bit=stream_end;
+    next.stream_bits=(uint32_t)string_bits;
+    next.wide_size_word=extended;
+    next.bounded=1u;
+    /* Source CRC, TU names and rendering MUST remain unproven. */
+    *out=next;
+    return 1;
+}
