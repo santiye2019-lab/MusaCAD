@@ -25,6 +25,9 @@ def sample(*, numeric=True, has505=True, obj=True):
             "source_classes_r2010_tu_units": 0,
             "source_classes_r2010_tu_505_three_nonempty": False,
             "source_classes_r2010_tu_505_ascii_only": False,
+            "source_classes_r2010_505_dxf_identifier_verified": False,
+            "source_classes_r2010_505_dxf_identifier_length": 0,
+            "source_classes_r2010_505_dxf_identifier": "",
             "source_classes_r2010_numeric_count": 59 if numeric else 0,
             "source_classes_r2010_max_class_with_extra": 558,
             "source_classes_r2010_ot505_present": has505,
@@ -123,9 +126,14 @@ class NumericClassCensusTest(unittest.TestCase):
         h["source_classes_r2010_tu_units"]=45
         h["source_classes_r2010_tu_505_three_nonempty"]=True
         h["source_classes_r2010_tu_505_ascii_only"]=True
+        h["source_classes_r2010_505_dxf_identifier_verified"]=True
+        h["source_classes_r2010_505_dxf_identifier_length"]=4
+        h["source_classes_r2010_505_dxf_identifier"]="TEST"
         outcome=summarize(report(x))
         self.assertEqual(outcome["complete_utf16_tu_class_files"],1)
         self.assertEqual(outcome["verified_utf16_tu_fields"],177)
+        self.assertEqual(outcome["class505_dxf_identifier_counts"],{"TEST":1})
+        self.assertFalse(outcome["class_semantics_accepted"])
         self.assertFalse(outcome["original_class_names_decoded"])
         self.assertFalse(outcome["cross_file_class_identity_claim"])
         for field,value in (
