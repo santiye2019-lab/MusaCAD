@@ -584,6 +584,13 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_raw_flags_attempts",
             "sampled_layer_raw_flags_verified",
             "sampled_layer_raw_flags_refused",
+            "sampled_layer_flags_refused_index",
+            "sampled_layer_flags_refused_eed",
+            "sampled_layer_flags_refused_record",
+            "sampled_layer_flags_refused_reactors",
+            "sampled_layer_flags_refused_xdic_bit",
+            "sampled_layer_flags_refused_numeric",
+            "sampled_layer_flags_refused_other",
             "sampled_layer_raw_flags_frozen_bit",
             "sampled_layer_raw_flags_on_bit",
             "sampled_layer_raw_flags_locked_bit",
@@ -637,6 +644,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          eed_appid_attempts, eed_appid_ok, eed_appid_bad,
          eed_appid_refs, eed_appid_distinct,
          layer_flags_attempts, layer_flags_ok, layer_flags_bad,
+         layer_refused_index, layer_refused_eed, layer_refused_record,
+         layer_refused_reactors, layer_refused_xdic, layer_refused_numeric,
+         layer_refused_other,
          layer_frozen, layer_on, layer_locked, layer_unmapped, layer_xdic,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
@@ -695,6 +705,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 eed_appid_distinct < eed_appid_ok or
                 eed_appid_distinct > eed_appid_refs or
                 layer_flags_attempts != layer_flags_ok + layer_flags_bad or
+                layer_flags_bad != (
+                    layer_refused_index + layer_refused_eed +
+                    layer_refused_record + layer_refused_reactors +
+                    layer_refused_xdic + layer_refused_numeric +
+                    layer_refused_other) or
                 max(layer_frozen, layer_on, layer_locked, layer_unmapped,
                     layer_xdic) > layer_flags_ok or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
