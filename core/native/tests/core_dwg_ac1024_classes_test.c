@@ -573,6 +573,26 @@ static int test_r2010_tu(int extra){
        out.class_semantics_accepted||out.display_accepted||
        memcmp(b,original,sizeof(b)))
         return 0;
+    char dxf[97];
+    memset(dxf,0x5a,sizeof(dxf));
+    size_t dxf_size=37u;
+    if(!musa_dwg_ac1024_classes_r2010_dxf_identifier(
+          b,n,(uint8_t)extra,505u,dxf,sizeof(dxf),&dxf_size)||
+       dxf_size!=1u||dxf[0]!='C'||dxf[1]!='\0'||dxf[2]!=0x5a)
+        return 0;
+    char dxf_original[97];
+    memcpy(dxf_original,dxf,sizeof(dxf));
+    const size_t saved_size=dxf_size;
+    if(musa_dwg_ac1024_classes_r2010_dxf_identifier(
+          b,n,(uint8_t)extra,505u,dxf,1u,&dxf_size)||
+       musa_dwg_ac1024_classes_r2010_dxf_identifier(
+          b,n,(uint8_t)extra,504u,dxf,sizeof(dxf),&dxf_size)||
+       musa_dwg_ac1024_classes_r2010_dxf_identifier(
+          b,n,(uint8_t)extra,505u,(char*)(void*)b,sizeof(dxf),&dxf_size)||
+       musa_dwg_ac1024_classes_r2010_dxf_identifier(
+          b,n,(uint8_t)extra,505u,dxf,sizeof(dxf),(size_t*)(void*)b)||
+       dxf_size!=saved_size||memcmp(dxf,dxf_original,sizeof(dxf)))
+        return 0;
     const MusaDwgAc1024ClassesTuAudit saved=out;
     const size_t start=24u+(extra?4u:0u);
 #define REFUSE_TU() do{\
