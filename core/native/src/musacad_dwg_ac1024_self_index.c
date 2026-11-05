@@ -1601,6 +1601,8 @@ int musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
             original.embedded_absolute_handle == value &&
             original.raw_ot == candidate.raw_ot) {
             ++next.verified_index_matches;
+            next.verified_raw_ot_by_ordinal[n] = original.raw_ot;
+            next.matched_ordinal_mask |= (uint8_t)(1u << n);
             if (original.raw_ot == 49u) ++next.verified_ot49;
             else if (original.raw_ot == 51u) ++next.verified_ot51;
             else ++next.verified_other_ot;
@@ -1609,7 +1611,17 @@ int musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
         }
     }
     next.complete_prefix_h_tokens = fragment.prefix_h_token_count;
-    if (next.absolute_candidates + next.nonabsolute_or_empty_tokens !=
+    size_t matched_mask_count = 0u;
+    for (size_t n = 0u; n < 4u; ++n) {
+        const uint8_t bit = (uint8_t)(1u << n);
+        if ((next.matched_ordinal_mask & bit) != 0u)
+            ++matched_mask_count;
+        else if (next.verified_raw_ot_by_ordinal[n] != 0u)
+            return 0;
+    }
+    if (matched_mask_count != next.verified_index_matches ||
+        (next.matched_ordinal_mask >> next.complete_prefix_h_tokens) != 0u ||
+        next.absolute_candidates + next.nonabsolute_or_empty_tokens !=
             next.complete_prefix_h_tokens ||
         next.verified_index_matches + next.unmatched_or_unverified !=
             next.absolute_candidates ||

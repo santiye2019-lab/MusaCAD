@@ -1562,6 +1562,9 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         candidates.verified_ot49 != 0u ||
         candidates.verified_ot51 != 0u ||
         candidates.verified_other_ot != 0u ||
+        candidates.matched_ordinal_mask != 0u ||
+        candidates.verified_raw_ot_by_ordinal[0] != 0u ||
+        candidates.verified_raw_ot_by_ordinal[1] != 0u ||
         !candidates.original_records_crc_verified ||
         candidates.display_accepted)
         return 0;
@@ -1586,6 +1589,11 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         candidates.verified_ot49 != 0u ||
         candidates.verified_ot51 != 0u ||
         candidates.verified_other_ot != 1u ||
+        candidates.matched_ordinal_mask != 1u ||
+        candidates.verified_raw_ot_by_ordinal[0] != 42u ||
+        candidates.verified_raw_ot_by_ordinal[1] != 0u ||
+        candidates.verified_raw_ot_by_ordinal[2] != 0u ||
+        candidates.verified_raw_ot_by_ordinal[3] != 0u ||
         candidates.display_accepted)
         return 0;
     const MusaDwgAc1024LayerTailCandidateCensus matched_candidates = candidates;

@@ -710,6 +710,14 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_terminal_candidate_ot49",
             "sampled_layer_eed_terminal_candidate_ot51",
             "sampled_layer_eed_terminal_candidate_ot_other",
+            "sampled_layer_eed_terminal_candidate_ordinal_1_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus",
+            "sampled_layer_eed_terminal_candidate_ordinal_2_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus",
+            "sampled_layer_eed_terminal_candidate_ordinal_3_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus",
+            "sampled_layer_eed_terminal_candidate_ordinal_4_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -802,6 +810,14 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          fragment_ordinal_3_code5, fragment_ordinal_4_code5,
          candidate_attempts, candidate_verified, candidate_refused, candidate_prefix_tokens, candidate_absolute,
          candidate_matched, candidate_unmatched, candidate_other, candidate_ot49, candidate_ot51, candidate_ot_other,
+         candidate_ordinal_1_matched,
+         candidate_ordinal_1_raw_ot_consensus,
+         candidate_ordinal_2_matched,
+         candidate_ordinal_2_raw_ot_consensus,
+         candidate_ordinal_3_matched,
+         candidate_ordinal_3_raw_ot_consensus,
+         candidate_ordinal_4_matched,
+         candidate_ordinal_4_raw_ot_consensus,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -933,6 +949,18 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 candidate_matched + candidate_unmatched != candidate_absolute or
                 candidate_ot49 + candidate_ot51 + candidate_ot_other !=
                     candidate_matched or
+                (candidate_ordinal_1_matched + candidate_ordinal_2_matched +
+                 candidate_ordinal_3_matched + candidate_ordinal_4_matched) !=
+                    candidate_matched or
+                any(
+                    (count > candidate_verified or
+                     (count == 0 and consensus != 0) or
+                     (count > 0 and (consensus == 0 or consensus > 65535)))
+                    for count, consensus in (
+                        (candidate_ordinal_1_matched, candidate_ordinal_1_raw_ot_consensus),
+                        (candidate_ordinal_2_matched, candidate_ordinal_2_raw_ot_consensus),
+                        (candidate_ordinal_3_matched, candidate_ordinal_3_raw_ot_consensus),
+                        (candidate_ordinal_4_matched, candidate_ordinal_4_raw_ot_consensus))) or
                 layer_shape_verified > layer_tail_verified or
                 layer_shape_tokens < layer_shape_verified or
                 layer_shape_tokens > 64 * layer_shape_verified or

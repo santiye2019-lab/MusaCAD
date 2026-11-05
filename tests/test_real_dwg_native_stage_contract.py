@@ -337,6 +337,14 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_candidate_ot49": 0,
             "sampled_layer_eed_terminal_candidate_ot51": 0,
             "sampled_layer_eed_terminal_candidate_ot_other": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_1_matched": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_2_matched": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_3_matched": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_4_matched": 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
             "sampled_line_common_mode_unsupported": 0,
@@ -419,7 +427,15 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_layer_eed_terminal_candidate_other",
             "sampled_layer_eed_terminal_candidate_ot49",
             "sampled_layer_eed_terminal_candidate_ot51",
-            "sampled_layer_eed_terminal_candidate_ot_other"):
+            "sampled_layer_eed_terminal_candidate_ot_other",
+            "sampled_layer_eed_terminal_candidate_ordinal_1_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus",
+            "sampled_layer_eed_terminal_candidate_ordinal_2_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus",
+            "sampled_layer_eed_terminal_candidate_ordinal_3_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus",
+            "sampled_layer_eed_terminal_candidate_ordinal_4_matched",
+            "sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus"):
             invalid = deepcopy(record)
             invalid["ac1024_compatibility_hypothesis"][field] = 1
             with self.subTest(field=field), self.assertRaises(ValueError):

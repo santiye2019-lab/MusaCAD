@@ -504,6 +504,10 @@ typedef struct MusaDwgAc1024LayerTailCandidateCensus {
     size_t verified_ot49;
     size_t verified_ot51;
     size_t verified_other_ot;
+    /* Index-verified numeric OT at each of first four complete raw H
+     * slots, never a CAD role. Mask bit n means slot n CRC-matched. */
+    uint16_t verified_raw_ot_by_ordinal[4];
+    uint8_t matched_ordinal_mask;
     uint8_t original_records_crc_verified;
     uint8_t display_accepted;
 } MusaDwgAc1024LayerTailCandidateCensus;

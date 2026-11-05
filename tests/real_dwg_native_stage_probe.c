@@ -582,6 +582,14 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_candidate_ot49;
     size_t sampled_layer_eed_terminal_candidate_ot51;
     size_t sampled_layer_eed_terminal_candidate_ot_other;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_1_matched;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_2_matched;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_3_matched;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_4_matched;
+    size_t sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1377,6 +1385,41 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                 hint.sampled_layer_eed_terminal_candidate_ot51 += candidates.verified_ot51;
                                                                 hint.sampled_layer_eed_terminal_candidate_ot_other +=
                                                                     candidates.verified_other_ot;
+                                                                /* A consensus is a numeric OT, not proof
+                                                                 * of linetype/material/plotstyle role. */
+                                                                for (size_t ordinal = 0u; ordinal < 4u; ++ordinal) {
+                                                                    if (!(candidates.matched_ordinal_mask &
+                                                                          (uint8_t)(1u << ordinal)))
+                                                                        continue;
+                                                                    const size_t type_plus_one =
+                                                                        (size_t)candidates.verified_raw_ot_by_ordinal[ordinal] + 1u;
+                                                                    size_t *matched = NULL, *consensus = NULL;
+                                                                    switch (ordinal) {
+                                                                    case 0u:
+                                                                        matched = &hint.sampled_layer_eed_terminal_candidate_ordinal_1_matched;
+                                                                        consensus = &hint.sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus;
+                                                                        break;
+                                                                    case 1u:
+                                                                        matched = &hint.sampled_layer_eed_terminal_candidate_ordinal_2_matched;
+                                                                        consensus = &hint.sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus;
+                                                                        break;
+                                                                    case 2u:
+                                                                        matched = &hint.sampled_layer_eed_terminal_candidate_ordinal_3_matched;
+                                                                        consensus = &hint.sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus;
+                                                                        break;
+                                                                    case 3u:
+                                                                        matched = &hint.sampled_layer_eed_terminal_candidate_ordinal_4_matched;
+                                                                        consensus = &hint.sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus;
+                                                                        break;
+                                                                    default: break;
+                                                                    }
+                                                                    if (!matched || !consensus) continue;
+                                                                    if (*matched == 0u)
+                                                                        *consensus = type_plus_one;
+                                                                    else if (*consensus != type_plus_one)
+                                                                        *consensus = 65535u; /* mixed OT */
+                                                                    ++*matched;
+                                                                }
                                                             } else {
                                                                 ++hint.sampled_layer_eed_terminal_candidate_refused;
                                                             }
@@ -2410,6 +2453,14 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_candidate_ot49\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ot51\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_ot_other\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_1_matched\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_2_matched\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_3_matched\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_4_matched\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2758,6 +2809,14 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_candidate_ot49,
                hint->sampled_layer_eed_terminal_candidate_ot51,
                hint->sampled_layer_eed_terminal_candidate_ot_other,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_1_matched,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_1_raw_ot_consensus,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_2_matched,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_3_matched,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_4_matched,
+               hint->sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
