@@ -1286,10 +1286,12 @@ int musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
 /* Source-preserving H-token SHAPE census after strictly authenticated
  * OT50/H4 + OT42/H3 original targets. No target identity, semantic
  * handle role or appearance is inferred from this stream. */
-int musa_dwg_ac1024_layer_eed_tail_shape_probe(
+static int musa_layer_eed_tail_shape_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
-    uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out) {
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out,
+    uint8_t *stage) {
+    if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_ARGUMENT;
     if (!objects || !object_bytes || !recovered_index || !record_count ||
         !canonical_layer_handle || !out ||
         record_count > MUSA_AC1024_SELF_INDEX_MAX ||
@@ -1301,6 +1303,7 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
                  out, sizeof(*out)))
         return 0;
 
+    if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_PRECONDITION;
     MusaDwgAc1024LayerEedXDictionaryGraph graph = {0};
     MusaDwgAc1024LayerEedTailRawHeader first = {0};
     MusaDwgAc1024EedChainEvidence chain = {0};
@@ -1323,12 +1326,14 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
             object_bytes - chain.payload_start_byte)
         return 0;
 
+    if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_STREAM;
     MusaDwgAc1015Bits bits = {0};
     if (!musa_dwg_ac1015_bits_init(
             &bits, objects + chain.payload_start_byte,
             chain.handle_stream_end_bit / 8u,
             chain.handle_stream_start_bit, chain.handle_stream_end_bit))
         return 0;
+    if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_PREFIX;
     uint64_t control_h = 0u, dictionary_h = 0u;
     uint8_t control_code = 0u, dictionary_code = 0u;
     if (!r2010_link_h(&bits, canonical_layer_handle, 4u,
@@ -1348,12 +1353,19 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
     size_t h5_payload = 0u, other_zero = 0u, other_payload = 0u;
     while (bits.bit_pos < bits.bit_end) {
         uint32_t code = 0u, length = 0u, value = 0u;
-        if (count >= 64u || bits.bit_end - bits.bit_pos < 8u ||
-            !musa_dwg_ac1015_bits_read_u(&bits, 4u, &code) ||
-            !musa_dwg_ac1015_bits_read_u(&bits, 4u, &length) ||
-            length > 8u ||
-            length > (bits.bit_end - bits.bit_pos) / 8u)
+        if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_TOKEN_LIMIT;
+        if (count >= 64u) return 0;
+        if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_SHORT_HEADER;
+        if (bits.bit_end - bits.bit_pos < 8u) return 0;
+        if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_HEADER_READ;
+        if (!musa_dwg_ac1015_bits_read_u(&bits, 4u, &code) ||
+            !musa_dwg_ac1015_bits_read_u(&bits, 4u, &length))
             return 0;
+        if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH;
+        if (length > 8u) return 0;
+        if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_LENGTH_OVERRUN;
+        if (length > (bits.bit_end - bits.bit_pos) / 8u) return 0;
+        if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_PAYLOAD;
         for (uint32_t i = 0u; i < length; ++i) {
             if (!musa_dwg_ac1015_bits_read_u(&bits, 8u, &value))
                 return 0;
@@ -1372,6 +1384,7 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
                 ++other_payload;
         }
     }
+    if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_FINAL;
     if (!count || bits.bit_pos != bits.bit_end ||
         start != first.original_tail_start_bit ||
         bits.bit_pos - start != graph.remaining_handle_tail_bits ||
@@ -1397,7 +1410,29 @@ int musa_dwg_ac1024_layer_eed_tail_shape_probe(
     next.original_records_crc_verified = 1u;
     next.display_accepted = 0u;
     *out = next;
+    if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_OK;
     return 1;
+}
+
+int musa_dwg_ac1024_layer_eed_tail_shape_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerEedTailShape *out) {
+    return musa_layer_eed_tail_shape_impl(
+        objects, object_bytes, recovered_index, record_count,
+        canonical_layer_handle, out, NULL);
+}
+
+uint8_t musa_dwg_ac1024_layer_eed_tail_shape_failure_stage(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle) {
+    MusaDwgAc1024LayerEedTailShape ignored = {0};
+    uint8_t stage = MUSA_DWG_LAYER_TAIL_SHAPE_ARGUMENT;
+    (void)musa_layer_eed_tail_shape_impl(
+        objects, object_bytes, recovered_index, record_count,
+        canonical_layer_handle, &ignored, &stage);
+    return stage;
 }
 
 int musa_dwg_ac1024_recover_self_index(
