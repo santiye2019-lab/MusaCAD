@@ -1351,6 +1351,8 @@ static int musa_layer_eed_tail_shape_impl(
     const size_t start = bits.bit_pos;
     size_t count = 0u, h5_zero = 0u, other = 0u, octets = 0u;
     size_t h5_payload = 0u, other_zero = 0u, other_payload = 0u;
+    uint8_t prefix_codes[4] = {0};
+    uint8_t prefix_sizes[4] = {0};
     while (bits.bit_pos < bits.bit_end) {
         uint32_t code = 0u, length = 0u, value = 0u;
         if (stage) *stage = MUSA_DWG_LAYER_TAIL_SHAPE_TOKEN_LIMIT;
@@ -1370,6 +1372,9 @@ static int musa_layer_eed_tail_shape_impl(
                     next.complete_h_token_count = count;
                     next.complete_h5_zero_token_count = h5_zero;
                     next.terminal_fragment_bit_count = rem;
+                    next.prefix_h_token_count = (uint8_t)(count < 4u ? count : 4u);
+                    memcpy(next.prefix_h_code, prefix_codes, sizeof(prefix_codes));
+                    memcpy(next.prefix_h_size, prefix_sizes, sizeof(prefix_sizes));
                     next.terminal_fragment_all_zero = (uint8_t)(raw == 0u);
                     next.original_records_crc_verified = 1u;
                     next.display_accepted = 0u;
@@ -1390,6 +1395,10 @@ static int musa_layer_eed_tail_shape_impl(
         for (uint32_t i = 0u; i < length; ++i) {
             if (!musa_dwg_ac1015_bits_read_u(&bits, 8u, &value))
                 return 0;
+        }
+        if (count < 4u) {
+            prefix_codes[count] = (uint8_t)code;
+            prefix_sizes[count] = (uint8_t)length;
         }
         ++count;
         octets += length;
