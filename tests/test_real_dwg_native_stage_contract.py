@@ -49,6 +49,11 @@ def ac1024_probe_record():
             "source_classes_r2010_string_span_bounded": False,
             "source_classes_r2010_string_bits": 0,
             "source_classes_r2010_string_wide_length": False,
+            "source_classes_r2010_tu_verified": False,
+            "source_classes_r2010_tu_fields": 0,
+            "source_classes_r2010_tu_units": 0,
+            "source_classes_r2010_tu_505_three_nonempty": False,
+            "source_classes_r2010_tu_505_ascii_only": False,
             "source_classes_r2010_numeric_verified": False,
             "source_classes_r2010_ot505_present": False,
             "source_classes_r2010_ot505_entity": False,
@@ -518,6 +523,54 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
         h["source_classes_r2010_bitcount_with_extra"]=False
         h["source_classes_r2010_bits_with_extra"]=0
         h["source_classes_r2010_max_class_with_extra"]=0
+        with self.assertRaises(ValueError):
+            validate_fake_result(valid)
+
+    def test_r2010_tu_three_fields_need_original_numeric_and_span(self):
+        baseline=ac1024_probe_record()
+        self.assertEqual(validate_fake_result(baseline),baseline)
+        for field,value in (
+            ("source_classes_r2010_tu_verified",True),
+            ("source_classes_r2010_tu_fields",3),
+            ("source_classes_r2010_tu_units",6),
+            ("source_classes_r2010_tu_505_three_nonempty",True),
+            ("source_classes_r2010_tu_505_ascii_only",True),
+        ):
+            invalid=deepcopy(baseline)
+            invalid["ac1024_compatibility_hypothesis"][field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                validate_fake_result(invalid)
+        valid=deepcopy(baseline)
+        h=valid["ac1024_compatibility_hypothesis"]
+        h["source_page_map_header"]=True
+        h["source_physical_page_map"]=True
+        h["source_physical_page_count"]=2
+        h["source_classes_section_verified"]=True
+        h["source_classes_extracted"]=True
+        h["source_classes_page_count"]=1
+        h["source_classes_logical_bytes"]=100
+        h["source_classes_r2010_bitcount_with_extra"]=True
+        h["source_classes_r2010_bits_with_extra"]=512
+        h["source_classes_r2010_max_class_with_extra"]=505
+        h["source_classes_r2010_extent_exact_with_extra"]=True
+        h["source_classes_r2010_numeric_verified"]=True
+        h["source_classes_r2010_numeric_count"]=1
+        h["source_classes_r2010_ot505_present"]=True
+        h["source_classes_r2010_ot505_object"]=True
+        h["source_classes_r2010_string_span_bounded"]=True
+        h["source_classes_r2010_string_bits"]=128
+        h["source_classes_r2010_tu_verified"]=True
+        h["source_classes_r2010_tu_fields"]=3
+        h["source_classes_r2010_tu_units"]=3
+        h["source_classes_r2010_tu_505_three_nonempty"]=True
+        h["source_classes_r2010_tu_505_ascii_only"]=True
+        self.assertEqual(validate_fake_result(valid),valid)
+        h["source_classes_r2010_tu_fields"]=2
+        with self.assertRaises(ValueError):
+            validate_fake_result(valid)
+        h["source_classes_r2010_tu_fields"]=3
+        h["source_classes_r2010_numeric_verified"]=False
+        h["source_classes_r2010_numeric_count"]=0
         with self.assertRaises(ValueError):
             validate_fake_result(valid)
 
