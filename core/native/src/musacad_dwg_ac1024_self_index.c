@@ -980,6 +980,81 @@ uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
 /* Only first two documented original OT51 reference roles are admitted.
  * LAYER_CONTROL is a soft-pointer H2 to OT50, then XDictionary is a
  * hard-owner H3 to OT42. Later references remain deliberately unparsed. */
+/* This is NOT a second H decoder: it reads only the first eight
+ * unmodified H-header bits after independently proven original EED,
+ * OT67 APPID and OT51 raw-flags source boundaries. A raw H prefix is
+ * never a substitute for authenticated OT50/OT42 target records. */
+int musa_dwg_ac1024_layer_eed_first_h_header_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedRawHandleHeader *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity layer = {0};
+    MusaDwgAc1024EedChainEvidence chain = {0};
+    MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
+    MusaDwgAc1024EedAppidEvidence appid = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_layer_handle, &layer) ||
+        layer.raw_ot != 51u || !layer.frame_crc16_verified ||
+        !layer.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, layer.record_offset, &chain) ||
+        chain.raw_ot != 51u ||
+        chain.embedded_absolute_handle != canonical_layer_handle ||
+        chain.indexed_object_offset != layer.record_offset ||
+        !chain.original_crc16_verified || !chain.eed_boundaries_verified ||
+        !chain.application_count ||
+        !musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &flags) ||
+        flags.layer_record_offset != layer.record_offset ||
+        flags.layer_handle != canonical_layer_handle ||
+        flags.xdictionary_missing != 0u ||
+        !flags.original_record_crc_verified || flags.display_accepted ||
+        !musa_dwg_ac1024_layer_eed_appid_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &appid) ||
+        appid.appid_reference_count != chain.application_count ||
+        !appid.original_appid_records_crc_verified ||
+        chain.payload_start_byte >= object_bytes ||
+        chain.handle_stream_end_bit / 8u >
+            object_bytes - chain.payload_start_byte ||
+        chain.handle_stream_start_bit >= chain.handle_stream_end_bit)
+        return 0;
+    MusaDwgAc1015Bits tail = {0};
+    uint32_t code = 0u, size = 0u;
+    if (!musa_dwg_ac1015_bits_init(
+            &tail, objects + chain.payload_start_byte,
+            chain.handle_stream_end_bit / 8u,
+            chain.handle_stream_start_bit, chain.handle_stream_end_bit) ||
+        !musa_dwg_ac1015_bits_read_u(&tail, 4u, &code) ||
+        !musa_dwg_ac1015_bits_read_u(&tail, 4u, &size) ||
+        code > 15u || size > 15u)
+        return 0;
+    MusaDwgAc1024LayerEedRawHandleHeader next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = layer.record_offset;
+    next.original_handle_start_bit = chain.handle_stream_start_bit;
+    next.handle_tail_bits = chain.handle_stream_end_bit -
+                            chain.handle_stream_start_bit;
+    next.first_h_code = (uint8_t)code;
+    next.first_h_size = (uint8_t)size;
+    next.record_crc_verified = 1u;
+    next.display_accepted = 0u;
+    *out = next;
+    return 1;
+}
+
 static int musa_layer_eed_xdictionary_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
