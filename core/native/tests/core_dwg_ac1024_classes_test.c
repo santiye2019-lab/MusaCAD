@@ -527,6 +527,83 @@ static int test_r2010_string_span(int extra){
     return 1;
 }
 
+/* Synthetic detached R2010 TU stream: exactly three one-unit names.
+ * No physical DWG, class semantics or rendering evidence is asserted. */
+static size_t tu_fixture(uint8_t *b,int extra){
+    uint8_t old[96]={0};
+    (void)r2010_numeric_fixture(old,extra,0);
+    const size_t start=24u+(extra?4u:0u);
+    const size_t len=start+32u+18u;
+    memset(b,0,128u);
+    memcpy(b,old,start+16u);
+    b[16]=(uint8_t)(extra?36u:32u);
+    b[20u+(extra?4u:0u)]=(uint8_t)(extra?219u:187u);
+    size_t pos=92u;
+    for(uint8_t ch='A';ch<='C';ch++){
+        bit_set(b+start,pos,2u,1u);pos+=2u; /* BS char count: 1 */
+        bit_set(b+start,pos,8u,1u);pos+=8u;
+        bit_set(b+start,pos,8u,ch);pos+=8u; /* UTF-16LE */
+        bit_set(b+start,pos,8u,0u);pos+=8u;
+    }
+    if(pos!=170u)return 0u;
+    bit_set(b+start,170u,8u,78u);
+    bit_set(b+start,178u,8u,0u);
+    bit_set(b+start,186u,1u,1u);
+    memcpy(b+len-16u,closing,sizeof(closing));
+    return len;
+}
+static int test_r2010_tu(int extra){
+    _Alignas(MusaDwgAc1024ClassesTuAudit) uint8_t b[128]={0};
+    const size_t n=tu_fixture(b,extra);
+    if(!n)return 0;
+    uint8_t original[128];
+    memcpy(original,b,sizeof(b));
+    MusaDwgAc1024ClassesTuAudit out={0};
+    if(!musa_dwg_ac1024_classes_r2010_tu_audit(
+        b,n,(uint8_t)extra,505u,&out)||
+       out.classes_verified!=1u||out.tu_fields_verified!=3u||
+       out.utf16_code_units_verified!=3u||
+       out.trailing_padding_bits||!out.complete_bounded_stream||
+       !out.target_found||!out.target_three_nonempty||
+       !out.target_ascii_only||!out.target_triplet_fingerprint||
+       out.target_name_code_units[0]!=1u||
+       out.target_name_code_units[1]!=1u||
+       out.target_name_code_units[2]!=1u||
+       out.original_section_authenticated||
+       out.class_semantics_accepted||out.display_accepted||
+       memcmp(b,original,sizeof(b)))
+        return 0;
+    const MusaDwgAc1024ClassesTuAudit saved=out;
+    const size_t start=24u+(extra?4u:0u);
+#define REFUSE_TU() do{\
+    if(musa_dwg_ac1024_classes_r2010_tu_audit(\
+       b,n,(uint8_t)extra,505u,&out)||\
+       memcmp(&out,&saved,sizeof(out)))return 0;\
+    }while(0)
+    bit_set(b+start,186u,1u,0u);REFUSE_TU();
+    bit_set(b+start,186u,1u,1u);
+    bit_set(b+start,94u,8u,17u);REFUSE_TU();
+    bit_set(b+start,94u,8u,1u);
+    bit_set(b+start,110u,8u,0xd8u);REFUSE_TU();
+    bit_set(b+start,110u,8u,0u);
+    bit_set(b+start,102u,8u,0u);REFUSE_TU();
+    bit_set(b+start,102u,8u,'A');
+    if(musa_dwg_ac1024_classes_r2010_tu_audit(
+            b,n,(uint8_t)extra,504u,&out)||
+       musa_dwg_ac1024_classes_r2010_tu_audit(
+            b,n,(uint8_t)extra,505u,NULL)||
+       musa_dwg_ac1024_classes_r2010_tu_audit(
+            b,n,(uint8_t)extra,505u,
+            (MusaDwgAc1024ClassesTuAudit*)(void*)b)||
+       musa_dwg_ac1024_classes_r2010_tu_audit(
+            b,n,(uint8_t)(1-extra),505u,&out)||
+       memcmp(&out,&saved,sizeof(out))||
+       memcmp(b,original,sizeof(b)))
+        return 0;
+#undef REFUSE_TU
+    return 1;
+}
+
 int main(void){
     if(!test_layout(0))return 11;
     if(!test_layout(1))return 12;
@@ -543,6 +620,8 @@ int main(void){
     if(!test_r2010_numeric(1,1))return 23;
     if(!test_r2010_string_span(0))return 24;
     if(!test_r2010_string_span(1))return 25;
+    if(!test_r2010_tu(0))return 26;
+    if(!test_r2010_tu(1))return 27;
     puts("AC1024 Classes numeric prefix only; no CRC, names or source acceptance");
     return 0;
 }
