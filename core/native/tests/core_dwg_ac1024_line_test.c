@@ -1000,7 +1000,9 @@ int main(void) {
     if (musa_dwg_ac1024_line_common_failure_stage(
             record, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_OK ||
         musa_dwg_ac1024_line_common_failure_stage(
-            NULL, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_ARGUMENT)
+            NULL, sizeof(saved), 0u) != MUSA_DWG_LINE_COMMON_ARGUMENT ||
+        musa_dwg_ac1024_line_ltscale_refusal_kind(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_LTSCALE_NOT_REJECTED_HERE)
         return 27;
     set_bits(record + 3u, 34u, 2u, 0u); /* BS raw16 color */
     set_bits(record + 3u, 36u, 16u, 257u); /* unsupported ACI */
@@ -1017,10 +1019,35 @@ int main(void) {
         musa_dwg_ac1024_line_common_failure_stage(
             record, sizeof(saved), 0u) !=
                 MUSA_DWG_LINE_COMMON_LTYPE_SCALE ||
+        musa_dwg_ac1024_line_ltscale_refusal_kind(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_LTSCALE_ZERO ||
         musa_dwg_ac1024_line_common_probe(
             record, sizeof(saved), 0u, &common) ||
         memcmp(&old_common, &common, sizeof(common)))
         return 29;
+    memcpy(record, saved, sizeof(saved));
+    /* A legitimate raw BD negative -1 remains invalid and distinguishable
+     * from the compact zero double. Never accept it into common output. */
+    set_bits(record + 3u, 44u, 2u, 0u); /* BD raw binary64 */
+    set_bits(record + 3u, 46u + 6u*8u, 8u, 0xf0u);
+    set_bits(record + 3u, 46u + 7u*8u, 8u, 0xbfu);
+    if (!seal(record) ||
+        musa_dwg_ac1024_line_ltscale_refusal_kind(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_LTSCALE_NEGATIVE ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        memcmp(&old_common, &common, sizeof(common)))
+        return 35;
+    memcpy(record, saved, sizeof(saved));
+    /* Reserved BD selector is a parse refusal, not a zero-scale default. */
+    set_bits(record + 3u, 44u, 2u, 3u);
+    if (!seal(record) ||
+        musa_dwg_ac1024_line_ltscale_refusal_kind(
+            record, sizeof(saved), 0u) != MUSA_DWG_LINE_LTSCALE_PARSE_REFUSED ||
+        musa_dwg_ac1024_line_common_probe(
+            record, sizeof(saved), 0u, &common) ||
+        memcmp(&old_common, &common, sizeof(common)))
+        return 36;
     memcpy(record, saved, sizeof(saved));
     set_bits(record + 3u, 29u, 2u, 3u); /* reserved mode */
     if (!seal(record) ||
