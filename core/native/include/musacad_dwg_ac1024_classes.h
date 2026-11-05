@@ -39,6 +39,33 @@ int musa_dwg_ac1024_classes_prefix_shape_probe(
     const uint8_t *logical_classes, size_t logical_bytes,
     uint8_t extra_rl_present, MusaDwgAc1024ClassesPrefix *out);
 
+
+/* R2010 class record numeric prefix, without external TU names, section
+ * physical checksum, or class-body interpretation. Caller-supplied
+ * decompressed logical section bytes are UNTRUSTED. */
+typedef struct MusaDwgAc1024ClassNumeric {
+    uint16_t class_number;
+    uint16_t proxy_flags;
+    uint16_t item_class_id; /* 0x1f2 entity; 0x1f3 object */
+    uint16_t dwg_version;
+    uint16_t maintenance_version;
+    uint32_t object_instance_count;
+    uint32_t unknown1;
+    uint32_t unknown2;
+    uint8_t was_proxy;
+    uint8_t original_section_authenticated; /* ALWAYS zero */
+    uint8_t class_name_resolved;             /* ALWAYS zero */
+    uint8_t display_accepted;                /* ALWAYS zero */
+} MusaDwgAc1024ClassNumeric;
+
+/* Query count with records=NULL,capacity=0. All-or-nothing outputs, no
+ * partial class records on failure. Unsorted/duplicate/missing IDs or
+ * invalid object-vs-entity declarations are refused. This cannot establish
+ * that OT505 is a material or allow it to paint/enter a scene. */
+int musa_dwg_ac1024_classes_numeric_records(
+    const uint8_t *logical_classes,size_t logical_bytes,
+    uint8_t extra_rl_present,
+    MusaDwgAc1024ClassNumeric *records,size_t capacity,size_t *out_count);
 #ifdef __cplusplus
 }
 #endif

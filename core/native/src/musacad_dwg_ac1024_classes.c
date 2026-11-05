@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "musacad_dwg_ac1024_classes.h"
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MUSA_R2010_CLASSES_MAX (8u * 1024u * 1024u)
@@ -100,4 +101,93 @@ int musa_dwg_ac1024_classes_prefix_shape_probe(
      * or display_accepted in a shape-only diagnostic. */
     *out=next;
     return 1;
+}
+
+static int bit_long(const uint8_t *p,size_t bytes,
+                    size_t *cursor,uint32_t *out) {
+    size_t at=*cursor;
+    uint32_t mode=0u,v=0u,byte=0u;
+    if(!bit_read(p,bytes,&at,2u,&mode))return 0;
+    if(mode==0u){
+        for(unsigned n=0u;n<4u;n++){
+            if(!bit_read(p,bytes,&at,8u,&byte))return 0;
+            v|=byte<<(n*8u);
+        }
+    } else if(mode==1u) {
+        if(!bit_read(p,bytes,&at,8u,&v))return 0;
+    } else if(mode!=2u) {
+        return 0; /* BL 11 is reserved */
+    }
+    *cursor=at;
+    *out=v;
+    return 1;
+}
+
+int musa_dwg_ac1024_classes_numeric_records(
+    const uint8_t *section,size_t len,uint8_t extra,
+    MusaDwgAc1024ClassNumeric *records,size_t capacity,size_t *out_count) {
+    if(!section||!out_count||(!records&&capacity)||
+       (records&&capacity>SIZE_MAX/sizeof(*records))||
+       overlaps(section,len,out_count,sizeof(*out_count))||
+       (records&&(
+          overlaps(section,len,records,capacity*sizeof(*records))||
+          overlaps(records,capacity*sizeof(*records),
+                   out_count,sizeof(*out_count)))))
+        return 0;
+    MusaDwgAc1024ClassesPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_prefix_shape_probe(
+            section,len,extra,&prefix)||
+       prefix.original_section_authenticated||
+       prefix.class_name_resolved||prefix.display_accepted||
+       prefix.maximum_class_number<500u)
+        return 0;
+    const size_t limit=(size_t)prefix.maximum_class_number-499u;
+    if(!limit||limit>4096u)return 0;
+    MusaDwgAc1024ClassNumeric *tmp=
+        (MusaDwgAc1024ClassNumeric *)calloc(limit,sizeof(*tmp));
+    if(!tmp)return 0;
+    const uint8_t *data=section+prefix.data_start_byte;
+    const size_t bytes=prefix.declared_data_area_bytes;
+    size_t at=prefix.records_start_bit,count=0u;
+    uint16_t previous=499u;
+    int ok=1;
+    while(previous<prefix.maximum_class_number&&count<limit){
+        uint16_t classnum=0u,proxy=0u,item=0u,dwg=0u,maint=0u;
+        uint32_t zombie=0u,instances=0u,unk1=0u,unk2=0u;
+        if(!bit_short(data,bytes,&at,&classnum)||
+           !bit_short(data,bytes,&at,&proxy)||
+           !bit_read(data,bytes,&at,1u,&zombie)||
+           !bit_short(data,bytes,&at,&item)||
+           !bit_long(data,bytes,&at,&instances)||
+           !bit_short(data,bytes,&at,&dwg)||
+           !bit_short(data,bytes,&at,&maint)||
+           !bit_long(data,bytes,&at,&unk1)||
+           !bit_long(data,bytes,&at,&unk2)||
+           classnum<=previous||classnum>prefix.maximum_class_number||
+           (item!=0x1f2u&&item!=0x1f3u)){
+            ok=0;break;
+        }
+        MusaDwgAc1024ClassNumeric rec={0};
+        rec.class_number=classnum;
+        rec.proxy_flags=proxy;
+        rec.item_class_id=item;
+        rec.dwg_version=dwg;
+        rec.maintenance_version=maint;
+        rec.object_instance_count=instances;
+        rec.unknown1=unk1;
+        rec.unknown2=unk2;
+        rec.was_proxy=(uint8_t)zombie;
+        /* No original Classes CRC or TU string has been validated. */
+        tmp[count++]=rec;
+        previous=classnum;
+    }
+    if(previous!=prefix.maximum_class_number||!count||
+       (records&&capacity<count))
+        ok=0;
+    if(ok){
+        if(records)memcpy(records,tmp,count*sizeof(*tmp));
+        *out_count=count;
+    }
+    free(tmp);
+    return ok;
 }
