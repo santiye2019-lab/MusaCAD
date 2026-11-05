@@ -479,6 +479,17 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_xdic_graph_attempts;
     size_t sampled_layer_eed_xdic_graph_verified;
     size_t sampled_layer_eed_xdic_graph_refused;
+    size_t sampled_layer_eed_xdic_refused_identity;
+    size_t sampled_layer_eed_xdic_refused_eed;
+    size_t sampled_layer_eed_xdic_refused_flags;
+    size_t sampled_layer_eed_xdic_refused_appid;
+    size_t sampled_layer_eed_xdic_refused_tail;
+    size_t sampled_layer_eed_xdic_refused_control_h;
+    size_t sampled_layer_eed_xdic_refused_dictionary_h;
+    size_t sampled_layer_eed_xdic_refused_target_index;
+    size_t sampled_layer_eed_xdic_refused_target_class;
+    size_t sampled_layer_eed_xdic_refused_target_crc;
+    size_t sampled_layer_eed_xdic_refused_other;
     size_t sampled_layer_eed_xdic_graph_has_tail;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
@@ -1071,8 +1082,35 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             ++hint.sampled_layer_eed_xdic_graph_verified;
                                             if (layer_graph.remaining_handle_tail_bits)
                                                 ++hint.sampled_layer_eed_xdic_graph_has_tail;
-                                        } else
+                                        } else {
                                             ++hint.sampled_layer_eed_xdic_graph_refused;
+                                            switch (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+                                                    objects, nb, recovered, legacy_count,
+                                                    recovered[k].embedded_absolute_handle)) {
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_IDENTITY:
+                                                ++hint.sampled_layer_eed_xdic_refused_identity; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_EED:
+                                                ++hint.sampled_layer_eed_xdic_refused_eed; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_FLAGS:
+                                                ++hint.sampled_layer_eed_xdic_refused_flags; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_APPID:
+                                                ++hint.sampled_layer_eed_xdic_refused_appid; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_TAIL:
+                                                ++hint.sampled_layer_eed_xdic_refused_tail; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_CONTROL_H:
+                                                ++hint.sampled_layer_eed_xdic_refused_control_h; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_DICTIONARY_H:
+                                                ++hint.sampled_layer_eed_xdic_refused_dictionary_h; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_INDEX:
+                                                ++hint.sampled_layer_eed_xdic_refused_target_index; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CLASS:
+                                                ++hint.sampled_layer_eed_xdic_refused_target_class; break;
+                                            case MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CRC:
+                                                ++hint.sampled_layer_eed_xdic_refused_target_crc; break;
+                                            default:
+                                                ++hint.sampled_layer_eed_xdic_refused_other; break;
+                                            }
+                                        }
                                     } else
                                         ++hint.sampled_layer_eed_appid_refused;
                                     ++hint.sampled_layer_eed_flags_attempts;
@@ -1945,6 +1983,17 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_xdic_graph_attempts\":%zu,"
                "\"sampled_layer_eed_xdic_graph_verified\":%zu,"
                "\"sampled_layer_eed_xdic_graph_refused\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_identity\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_eed\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_flags\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_appid\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_tail\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_control_h\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_dictionary_h\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_target_index\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_target_class\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_target_crc\":%zu,"
+               "\"sampled_layer_eed_xdic_refused_other\":%zu,"
                "\"sampled_layer_eed_xdic_graph_has_tail\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
@@ -2195,6 +2244,17 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_xdic_graph_attempts,
                hint->sampled_layer_eed_xdic_graph_verified,
                hint->sampled_layer_eed_xdic_graph_refused,
+               hint->sampled_layer_eed_xdic_refused_identity,
+               hint->sampled_layer_eed_xdic_refused_eed,
+               hint->sampled_layer_eed_xdic_refused_flags,
+               hint->sampled_layer_eed_xdic_refused_appid,
+               hint->sampled_layer_eed_xdic_refused_tail,
+               hint->sampled_layer_eed_xdic_refused_control_h,
+               hint->sampled_layer_eed_xdic_refused_dictionary_h,
+               hint->sampled_layer_eed_xdic_refused_target_index,
+               hint->sampled_layer_eed_xdic_refused_target_class,
+               hint->sampled_layer_eed_xdic_refused_target_crc,
+               hint->sampled_layer_eed_xdic_refused_other,
                hint->sampled_layer_eed_xdic_graph_has_tail,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
