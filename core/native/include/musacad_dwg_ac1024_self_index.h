@@ -412,6 +412,29 @@ int musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerEedXDictionaryGraph *out);
 
+
+/* Diagnostic ONLY: inspect the next raw H header after independently
+ * authenticated OT50 and OT42 references of an EED-bearing OT51.
+ * This bounds the declared H payload but does NOT resolve its target,
+ * assume linetype/plotstyle/material/XREF roles, or enable rendering.
+ * A missing/malformed header is refused; output is fail-atomic. */
+typedef struct MusaDwgAc1024LayerEedTailRawHeader {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t original_tail_start_bit;
+    size_t remaining_handle_tail_bits;
+    uint8_t raw_h_code;
+    uint8_t raw_h_size;
+    uint8_t original_records_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerEedTailRawHeader;
+
+int musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedTailRawHeader *out);
+
 /* Read-only original OT51 EED first H header, for source-format
  * diagnosis only. Returns the exact 4-bit H code/size without resolving
  * target roles. The record, EED APPIDs and XDictionary-present flag
