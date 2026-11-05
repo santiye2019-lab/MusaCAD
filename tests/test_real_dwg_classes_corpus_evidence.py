@@ -117,7 +117,7 @@ class NumericClassCensusTest(unittest.TestCase):
         x=sample()
         h=x["ac1024_compatibility_hypothesis"]
         h["source_classes_r2010_string_span_bounded"]=True
-        h["source_classes_r2010_string_bits"]=1024
+        h["source_classes_r2010_string_bits"]=960
         h["source_classes_r2010_tu_verified"]=True
         h["source_classes_r2010_tu_fields"]=177
         h["source_classes_r2010_tu_units"]=45
