@@ -149,6 +149,25 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             if hint[tail_field] and not hint["source_classes_r2010_bitcount_with_extra"]:
                 raise ValueError("unverified_ac1024_class_tail_evidence")
 
+        span_ok = hint.get("source_classes_r2010_string_span_bounded")
+        span_bits = hint.get("source_classes_r2010_string_bits")
+        span_wide = hint.get("source_classes_r2010_string_wide_length")
+        if type(span_ok) is not bool or type(span_wide) is not bool or \
+                type(span_bits) is not int:
+            raise ValueError("invalid_ac1024_string_span_type")
+        if span_ok:
+            if (not hint["source_classes_section_verified"]
+                    or not hint["source_classes_extracted"]
+                    or not hint["source_classes_r2010_bitcount_with_extra"]
+                    or not hint["source_classes_r2010_extent_exact_with_extra"]
+                    or not 0 < span_bits <
+                    hint["source_classes_r2010_bits_with_extra"] - 32):
+                raise ValueError("unproven_ac1024_string_span")
+        elif span_bits or span_wide:
+            raise ValueError("unverified_ac1024_string_span_values")
+        # A string bit-window does not prove valid TU strings, any class
+        # name, or a shared class identity across two different drawings.
+
         numeric_flags = (
             "source_classes_r2010_numeric_verified",
             "source_classes_r2010_ot505_present",
