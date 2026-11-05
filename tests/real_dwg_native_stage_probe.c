@@ -571,6 +571,17 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_fragment_ordinal_2_code5;
     size_t sampled_layer_eed_terminal_fragment_ordinal_3_code5;
     size_t sampled_layer_eed_terminal_fragment_ordinal_4_code5;
+    size_t sampled_layer_eed_terminal_candidate_attempts;
+    size_t sampled_layer_eed_terminal_candidate_verified;
+    size_t sampled_layer_eed_terminal_candidate_refused;
+    size_t sampled_layer_eed_terminal_candidate_prefix_tokens;
+    size_t sampled_layer_eed_terminal_candidate_absolute;
+    size_t sampled_layer_eed_terminal_candidate_matched;
+    size_t sampled_layer_eed_terminal_candidate_unmatched;
+    size_t sampled_layer_eed_terminal_candidate_other;
+    size_t sampled_layer_eed_terminal_candidate_ot49;
+    size_t sampled_layer_eed_terminal_candidate_ot51;
+    size_t sampled_layer_eed_terminal_candidate_ot_other;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1327,6 +1338,47 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                     ++hint.sampled_layer_eed_terminal_fragment_prefix_size_zero;
                                                                 else
                                                                     ++hint.sampled_layer_eed_terminal_fragment_prefix_size_nonzero;
+                                                            }
+                                                            /* Source-internal numeric H candidates only.
+                                                             * Never infer layer styling or visibility. */
+                                                            ++hint.sampled_layer_eed_terminal_candidate_attempts;
+                                                            MusaDwgAc1024LayerTailCandidateCensus candidates = {0};
+                                                            if (musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+                                                                    objects, nb, recovered, legacy_count,
+                                                                    recovered[k].embedded_absolute_handle,
+                                                                    &candidates) &&
+                                                                candidates.original_records_crc_verified &&
+                                                                !candidates.display_accepted &&
+                                                                candidates.complete_prefix_h_tokens ==
+                                                                    fragment.prefix_h_token_count &&
+                                                                candidates.complete_prefix_h_tokens <= 4u &&
+                                                                candidates.absolute_candidates +
+                                                                    candidates.nonabsolute_or_empty_tokens ==
+                                                                    candidates.complete_prefix_h_tokens &&
+                                                                candidates.verified_index_matches +
+                                                                    candidates.unmatched_or_unverified ==
+                                                                    candidates.absolute_candidates &&
+                                                                candidates.verified_ot49 +
+                                                                    candidates.verified_ot51 +
+                                                                    candidates.verified_other_ot ==
+                                                                    candidates.verified_index_matches) {
+                                                                ++hint.sampled_layer_eed_terminal_candidate_verified;
+                                                                hint.sampled_layer_eed_terminal_candidate_prefix_tokens +=
+                                                                    candidates.complete_prefix_h_tokens;
+                                                                hint.sampled_layer_eed_terminal_candidate_absolute +=
+                                                                    candidates.absolute_candidates;
+                                                                hint.sampled_layer_eed_terminal_candidate_matched +=
+                                                                    candidates.verified_index_matches;
+                                                                hint.sampled_layer_eed_terminal_candidate_unmatched +=
+                                                                    candidates.unmatched_or_unverified;
+                                                                hint.sampled_layer_eed_terminal_candidate_other +=
+                                                                    candidates.nonabsolute_or_empty_tokens;
+                                                                hint.sampled_layer_eed_terminal_candidate_ot49 += candidates.verified_ot49;
+                                                                hint.sampled_layer_eed_terminal_candidate_ot51 += candidates.verified_ot51;
+                                                                hint.sampled_layer_eed_terminal_candidate_ot_other +=
+                                                                    candidates.verified_other_ot;
+                                                            } else {
+                                                                ++hint.sampled_layer_eed_terminal_candidate_refused;
                                                             }
                                                             switch (fragment.terminal_fragment_bit_count) {
                                                             case 1u: ++hint.sampled_layer_eed_terminal_fragment_bits_1; break;
@@ -2347,6 +2399,17 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_fragment_ordinal_2_code5\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_ordinal_3_code5\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_ordinal_4_code5\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_attempts\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_verified\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_refused\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_prefix_tokens\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_absolute\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_matched\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_unmatched\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_other\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ot49\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ot51\":%zu,"
+               "\"sampled_layer_eed_terminal_candidate_ot_other\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2684,6 +2747,17 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_fragment_ordinal_2_code5,
                hint->sampled_layer_eed_terminal_fragment_ordinal_3_code5,
                hint->sampled_layer_eed_terminal_fragment_ordinal_4_code5,
+               hint->sampled_layer_eed_terminal_candidate_attempts,
+               hint->sampled_layer_eed_terminal_candidate_verified,
+               hint->sampled_layer_eed_terminal_candidate_refused,
+               hint->sampled_layer_eed_terminal_candidate_prefix_tokens,
+               hint->sampled_layer_eed_terminal_candidate_absolute,
+               hint->sampled_layer_eed_terminal_candidate_matched,
+               hint->sampled_layer_eed_terminal_candidate_unmatched,
+               hint->sampled_layer_eed_terminal_candidate_other,
+               hint->sampled_layer_eed_terminal_candidate_ot49,
+               hint->sampled_layer_eed_terminal_candidate_ot51,
+               hint->sampled_layer_eed_terminal_candidate_ot_other,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,

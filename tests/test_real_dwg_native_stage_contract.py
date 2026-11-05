@@ -326,6 +326,17 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_fragment_ordinal_2_code5": 0,
             "sampled_layer_eed_terminal_fragment_ordinal_3_code5": 0,
             "sampled_layer_eed_terminal_fragment_ordinal_4_code5": 0,
+            "sampled_layer_eed_terminal_candidate_attempts": 0,
+            "sampled_layer_eed_terminal_candidate_verified": 0,
+            "sampled_layer_eed_terminal_candidate_refused": 0,
+            "sampled_layer_eed_terminal_candidate_prefix_tokens": 0,
+            "sampled_layer_eed_terminal_candidate_absolute": 0,
+            "sampled_layer_eed_terminal_candidate_matched": 0,
+            "sampled_layer_eed_terminal_candidate_unmatched": 0,
+            "sampled_layer_eed_terminal_candidate_other": 0,
+            "sampled_layer_eed_terminal_candidate_ot49": 0,
+            "sampled_layer_eed_terminal_candidate_ot51": 0,
+            "sampled_layer_eed_terminal_candidate_ot_other": 0,
             "sampled_line_common_after_meta_refused": 0,
             "sampled_line_xyz_after_common_refused": 0,
             "sampled_line_common_mode_unsupported": 0,
@@ -397,7 +408,18 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_layer_eed_terminal_fragment_prefix_code_5",
             "sampled_layer_eed_terminal_fragment_prefix_size_zero",
             "sampled_layer_eed_terminal_fragment_prefix_four_tokens",
-            "sampled_layer_eed_terminal_fragment_ordinal_4_code5"):
+            "sampled_layer_eed_terminal_fragment_ordinal_4_code5",
+            "sampled_layer_eed_terminal_candidate_attempts",
+            "sampled_layer_eed_terminal_candidate_verified",
+            "sampled_layer_eed_terminal_candidate_refused",
+            "sampled_layer_eed_terminal_candidate_prefix_tokens",
+            "sampled_layer_eed_terminal_candidate_absolute",
+            "sampled_layer_eed_terminal_candidate_matched",
+            "sampled_layer_eed_terminal_candidate_unmatched",
+            "sampled_layer_eed_terminal_candidate_other",
+            "sampled_layer_eed_terminal_candidate_ot49",
+            "sampled_layer_eed_terminal_candidate_ot51",
+            "sampled_layer_eed_terminal_candidate_ot_other"):
             invalid = deepcopy(record)
             invalid["ac1024_compatibility_hypothesis"][field] = 1
             with self.subTest(field=field), self.assertRaises(ValueError):
