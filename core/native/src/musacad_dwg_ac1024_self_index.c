@@ -834,7 +834,7 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
         original.indexed_object_offset != identity.record_offset ||
         zero.embedded_absolute_handle != layer_handle ||
         original.embedded_absolute_handle != layer_handle ||
-        !zero.frame_crc16_verified || !zero.zero_eed_verified ||
+        !zero.record_crc16_verified || !zero.zero_eed_verified ||
         !original.frame_crc16_verified ||
         !original.embedded_handle_code0_verified ||
         zero.payload_start_byte >= object_bytes ||
