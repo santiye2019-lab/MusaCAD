@@ -44,6 +44,8 @@ def summarize(stage: dict) -> dict:
     objects505 = 0
     numerical_classes = 0
     unsupported = 0
+    string_spans = 0
+    extended_lengths = 0
     for record in files:
         if not isinstance(record, dict):
             raise InvalidEvidence("invalid_file_record")
@@ -84,6 +86,23 @@ def summarize(stage: dict) -> dict:
             unsupported += 1
             if count:
                 raise InvalidEvidence("count_without_numeric_proof")
+        span_ok = boolean(hint.get("source_classes_r2010_string_span_bounded"),
+                          "string_span_bounded")
+        span_bits = bounded_integer(hint.get("source_classes_r2010_string_bits"),
+                                    "string_span_bits", 8 * 1024 * 1024)
+        span_wide = boolean(hint.get("source_classes_r2010_string_wide_length"),
+                            "string_span_wide")
+        if span_ok:
+            raw_bits = bounded_integer(
+                hint.get("source_classes_r2010_bits_with_extra"),
+                "section_bit_count", 8 * 1024 * 1024 * 8)
+            if (not authenticated or not extracted or not bitcount
+                    or not 0 < span_bits < raw_bits - 32):
+                raise InvalidEvidence("span_without_source_provenance")
+            string_spans += 1
+            extended_lengths += int(span_wide)
+        elif span_bits or span_wide:
+            raise InvalidEvidence("span_values_without_proof")
         if has505:
             if not numeric_ok or (entity505 == object505):
                 raise InvalidEvidence("505_without_unique_kind")
@@ -100,6 +119,8 @@ def summarize(stage: dict) -> dict:
         "ac1024_numeric_class_files_verified": numeric,
         "ac1024_numeric_class_files_unsupported": unsupported,
         "verified_numeric_class_record_total": numerical_classes,
+        "bounded_class_string_span_files": string_spans,
+        "extended_string_length_word_files": extended_lengths,
         "class505_number_present_files": observed505,
         "class505_object_kind_files": objects505,
         "class505_entity_kind_files": entities505,
