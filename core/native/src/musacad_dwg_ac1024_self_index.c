@@ -803,10 +803,12 @@ int musa_dwg_ac1024_line_eed_handle_graph_probe(
 /* First-party, bounded original R2010 LAYER OT51 flag preflight.
  * The output is the on-disk numeric evidence, not an interpreted layer
  * visibility, CMC color, viewport state, H ownership or drawing gate. */
-int musa_dwg_ac1024_layer_raw_flags_probe(
+static int musa_layer_raw_flags_impl(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
-    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out) {
+    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out,
+    uint8_t *stage) {
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_ARGUMENT;
     if (!objects || !object_bytes || !recovered_index || !record_count ||
         !layer_handle || !out ||
         record_count > MUSA_AC1024_SELF_INDEX_MAX ||
@@ -821,13 +823,18 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
     MusaDwgAc1024SelfIdentity identity = {0};
     MusaDwgAc1024ZeroEedPrefix zero = {0};
     MusaDwgAc1024SelfPrefix original = {0};
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_INDEX;
     if (!musa_dwg_ac1024_self_index_find(
             recovered_index, record_count, layer_handle, &identity) ||
         identity.raw_ot != 51u || !identity.frame_crc16_verified ||
-        !identity.embedded_handle_code0_verified ||
-        !musa_dwg_ac1024_record_zero_eed_prefix(
-            objects, object_bytes, identity.record_offset, &zero) ||
-        !musa_dwg_ac1024_record_self_prefix(
+        !identity.embedded_handle_code0_verified)
+        return 0;
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_ZERO_EED;
+    if (!musa_dwg_ac1024_record_zero_eed_prefix(
+            objects, object_bytes, identity.record_offset, &zero))
+        return 0;
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_RECORD_BOUNDS;
+    if (!musa_dwg_ac1024_record_self_prefix(
             objects, object_bytes, identity.record_offset, &original) ||
         zero.raw_ot != 51u || original.raw_ot != 51u ||
         zero.indexed_object_offset != identity.record_offset ||
@@ -843,6 +850,7 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
         zero.data_after_zero_eed_bit >= zero.handle_stream_start_bit)
         return 0;
 
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_REACTORS;
     MusaDwgAc1015Bits bits = {0};
     uint32_t reactors = UINT32_MAX, xdic = 2u;
     if (!musa_dwg_ac1015_bits_init(
@@ -850,11 +858,14 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
             zero.handle_stream_end_bit / 8u,
             zero.data_after_zero_eed_bit, zero.handle_stream_start_bit) ||
         !musa_dwg_ac1015_bits_read_bl(&bits, &reactors) ||
-        reactors != 0u ||
-        !musa_dwg_ac1015_bits_read_u(&bits, 1u, &xdic) ||
+        reactors != 0u)
+        return 0;
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_XDICTIONARY_BIT;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 1u, &xdic) ||
         bits.bit_pos >= zero.handle_stream_start_bit)
         return 0;
 
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_NUMERIC;
     const size_t start = bits.bit_pos;
     uint32_t flag64 = 0u, dependent = 0u;
     uint16_t xref_plus_one = 0u, raw = 0u;
@@ -885,7 +896,28 @@ int musa_dwg_ac1024_layer_raw_flags_probe(
     next.original_record_crc_verified = 1u;
     next.display_accepted = 0u;
     *out = next;
+    if (stage) *stage = MUSA_DWG_LAYER_FLAGS_OK;
     return 1;
+}
+
+int musa_dwg_ac1024_layer_raw_flags_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out) {
+    return musa_layer_raw_flags_impl(
+        objects, object_bytes, recovered_index, record_count,
+        layer_handle, out, NULL);
+}
+uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle) {
+    MusaDwgAc1024LayerRawFlagsEvidence ignored = {0};
+    uint8_t stage = MUSA_DWG_LAYER_FLAGS_ARGUMENT;
+    (void)musa_layer_raw_flags_impl(
+        objects, object_bytes, recovered_index, record_count,
+        layer_handle, &ignored, &stage);
+    return stage;
 }
 
 
