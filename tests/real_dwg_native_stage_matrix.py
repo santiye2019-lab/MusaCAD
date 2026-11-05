@@ -622,6 +622,29 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_xdic_refused_target_class",
             "sampled_layer_eed_xdic_refused_target_crc",
             "sampled_layer_eed_xdic_refused_other",
+            "sampled_layer_eed_first_h_attempts",
+            "sampled_layer_eed_first_h_verified",
+            "sampled_layer_eed_first_h_refused",
+            "sampled_layer_eed_first_h_code_0",
+            "sampled_layer_eed_first_h_code_1",
+            "sampled_layer_eed_first_h_code_2",
+            "sampled_layer_eed_first_h_code_3",
+            "sampled_layer_eed_first_h_code_4",
+            "sampled_layer_eed_first_h_code_5",
+            "sampled_layer_eed_first_h_code_6",
+            "sampled_layer_eed_first_h_code_7",
+            "sampled_layer_eed_first_h_code_8",
+            "sampled_layer_eed_first_h_code_9",
+            "sampled_layer_eed_first_h_code_10",
+            "sampled_layer_eed_first_h_code_11",
+            "sampled_layer_eed_first_h_code_12",
+            "sampled_layer_eed_first_h_code_13",
+            "sampled_layer_eed_first_h_code_14",
+            "sampled_layer_eed_first_h_code_15",
+            "sampled_layer_eed_first_h_size_0",
+            "sampled_layer_eed_first_h_size_1",
+            "sampled_layer_eed_first_h_size_2",
+            "sampled_layer_eed_first_h_size_other",
             "sampled_layer_eed_xdic_graph_has_tail",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
@@ -685,6 +708,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_xdic_refused_identity, layer_xdic_refused_eed, layer_xdic_refused_flags, layer_xdic_refused_appid,
          layer_xdic_refused_tail, layer_xdic_refused_control_h, layer_xdic_refused_dictionary_h, layer_xdic_refused_target_index,
          layer_xdic_refused_target_class, layer_xdic_refused_target_crc, layer_xdic_refused_other,
+         layer_first_h_attempts, layer_first_h_verified, layer_first_h_refused, layer_first_h_code_0, layer_first_h_code_1,
+         layer_first_h_code_2, layer_first_h_code_3, layer_first_h_code_4, layer_first_h_code_5, layer_first_h_code_6,
+         layer_first_h_code_7, layer_first_h_code_8, layer_first_h_code_9, layer_first_h_code_10, layer_first_h_code_11,
+         layer_first_h_code_12, layer_first_h_code_13, layer_first_h_code_14, layer_first_h_code_15, layer_first_h_size_0,
+         layer_first_h_size_1, layer_first_h_size_2, layer_first_h_size_other,
          layer_xdic_graph_has_tail,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
@@ -774,6 +802,31 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                     layer_xdic_refused_target_class +
                     layer_xdic_refused_target_crc + layer_xdic_refused_other) or
                 layer_xdic_graph_has_tail > layer_xdic_graph_ok or
+                layer_first_h_attempts !=
+                    layer_first_h_verified + layer_first_h_refused or
+                layer_first_h_attempts != layer_eed_attempts or
+                layer_first_h_verified != (
+                    layer_first_h_code_0 +
+                    layer_first_h_code_1 +
+                    layer_first_h_code_2 +
+                    layer_first_h_code_3 +
+                    layer_first_h_code_4 +
+                    layer_first_h_code_5 +
+                    layer_first_h_code_6 +
+                    layer_first_h_code_7 +
+                    layer_first_h_code_8 +
+                    layer_first_h_code_9 +
+                    layer_first_h_code_10 +
+                    layer_first_h_code_11 +
+                    layer_first_h_code_12 +
+                    layer_first_h_code_13 +
+                    layer_first_h_code_14 +
+                    layer_first_h_code_15) or
+                layer_first_h_verified != (
+                    layer_first_h_size_0 +
+                    layer_first_h_size_1 +
+                    layer_first_h_size_2 +
+                    layer_first_h_size_other) or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
