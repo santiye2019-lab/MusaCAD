@@ -1205,10 +1205,17 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         memcmp(unchanged, bytes, sizeof(bytes)))
         return 0;
     const MusaDwgAc1024LayerEedXDictionaryGraph preserved = result;
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+            bytes, sizeof(bytes), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_XDIC_GRAPH_OK)
+        return 0;
 
     /* A valid layer CRC does not authenticate a broken DICTIONARY CRC. */
     bytes[38] ^= 1u;
-    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+            bytes, sizeof(bytes), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CRC ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             bytes, sizeof(bytes), index, 4u, 45u, &result) ||
         memcmp(&preserved, &result, sizeof(result)))
         return 0;
@@ -1216,7 +1223,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
 
     /* The source-indexed LAYER_CONTROL cannot masquerade as OT42. */
     index[1].raw_ot = 42u;
-    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+            bytes, sizeof(bytes), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_CLASS ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             bytes, sizeof(bytes), index, 4u, 45u, &result) ||
         memcmp(&preserved, &result, sizeof(result)))
         return 0;
@@ -1228,7 +1238,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         return 0;
     layer[27] = (uint8_t)crc;
     layer[28] = (uint8_t)(crc >> 8u);
-    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+            bytes, sizeof(bytes), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_XDIC_GRAPH_TARGET_INDEX ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             bytes, sizeof(bytes), index, 4u, 45u, &result) ||
         memcmp(&preserved, &result, sizeof(result)))
         return 0;
@@ -1240,7 +1253,10 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         return 0;
     layer[27] = (uint8_t)crc;
     layer[28] = (uint8_t)(crc >> 8u);
-    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+            bytes, sizeof(bytes), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_XDIC_GRAPH_DICTIONARY_H ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             bytes, sizeof(bytes), index, 4u, 45u, &result) ||
         memcmp(&preserved, &result, sizeof(result)))
         return 0;
