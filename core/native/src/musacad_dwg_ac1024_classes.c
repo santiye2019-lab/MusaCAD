@@ -261,7 +261,7 @@ static int class_preamble_at(const uint8_t *buf,size_t len,
 int musa_dwg_ac1024_classes_header_survey(
     const uint8_t *section,size_t len,
     MusaDwgAc1024ClassesHeaderSurvey *out){
-    if(!section||!out||len<64u||
+    if(!section||!out||len<38u||
        len>MUSA_R2010_CLASSES_MAX||
        overlaps(section,len,out,sizeof(*out)))
         return 0;
@@ -271,11 +271,14 @@ int musa_dwg_ac1024_classes_header_survey(
     next.end_at_eof=(uint8_t)(
         memcmp(section+len-sizeof(end_sentinel),end_sentinel,
                sizeof(end_sentinel))==0);
-    for(size_t at=0u;at<=64u-16u;++at)
+    /* A section under 64 bytes still has fully defined survey windows. */
+    const size_t first_end=len<64u?len:64u;
+    const size_t last_begin=len>64u?len-64u:0u;
+    for(size_t at=0u;at<=first_end-16u;++at)
         if(!memcmp(section+at,start_sentinel,16u)){
             next.begin_in_first64=1u;break;
         }
-    for(size_t at=len-64u;at<=len-16u;++at)
+    for(size_t at=last_begin;at<=len-16u;++at)
         if(!memcmp(section+at,end_sentinel,16u)){
             next.end_in_last64=1u;break;
         }
