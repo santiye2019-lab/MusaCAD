@@ -165,6 +165,26 @@ int musa_dwg_ac1024_extract_classes_section(
     const uint8_t *file,size_t file_bytes,uint8_t *output,
     size_t capacity,size_t *out_bytes);
 
+/* Shape-only locator of the detached R2010 Unicode string bitstream.
+ * Uses the final string-present bit of the declared class data and the
+ * preceding 16/32-bit little-endian length fields. Does NOT read TU names,
+ * check section CRC, link class numbers or authorize rendering.
+ * All returned bit offsets are relative to bitstream_start_byte from the
+ * R2010 prefix. On failure output is unchanged. */
+typedef struct MusaDwgAc1024ClassesStringSpan {
+    size_t stream_begin_bit;
+    size_t stream_end_bit; /* exclusive; before trailing length words */
+    uint32_t stream_bits;
+    uint8_t wide_size_word;
+    uint8_t bounded;
+    uint8_t original_section_authenticated; /* ALWAYS zero */
+    uint8_t class_name_resolved; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024ClassesStringSpan;
+int musa_dwg_ac1024_classes_r2010_string_span_probe(
+    const uint8_t *logical_classes,size_t logical_bytes,
+    uint8_t extra_rl_present,MusaDwgAc1024ClassesStringSpan *out);
+
 #ifdef __cplusplus
 }
 #endif
