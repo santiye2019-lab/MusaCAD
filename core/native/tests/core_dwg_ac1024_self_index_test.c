@@ -821,6 +821,12 @@ static int test_layer_raw_flags_preflight(void) {
         memcmp(source, pristine, sizeof(source)))
         return 0;
     const MusaDwgAc1024LayerRawFlagsEvidence saved = flags;
+    if (musa_dwg_ac1024_layer_raw_flags_failure_stage(
+            source, sizeof(source), idx, 1u, 42u) != MUSA_DWG_LAYER_FLAGS_OK ||
+        musa_dwg_ac1024_layer_raw_flags_failure_stage(
+            NULL, sizeof(source), idx, 1u, 42u) !=
+                MUSA_DWG_LAYER_FLAGS_ARGUMENT)
+        return 0;
 
     /* Unknown upper numeric bits are exposed, never ignored or rendered. */
     set_bits(p, 35u, 2u, 0u); /* BS raw16 */
@@ -863,6 +869,24 @@ static int test_layer_raw_flags_preflight(void) {
     source[20] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_layer_raw_flags_probe(
             source, sizeof(source), idx, 1u, 42u, &flags) ||
+        musa_dwg_ac1024_layer_raw_flags_failure_stage(
+            source, sizeof(source), idx, 1u, 42u) !=
+                MUSA_DWG_LAYER_FLAGS_REACTORS ||
+        memcmp(&flags, &saved, sizeof(saved)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    /* Unsupported BS flag selector is a numeric-stage refusal. */
+    set_bits(p, 35u, 2u, 3u);
+    if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
+        return 0;
+    source[19] = (uint8_t)crc;
+    source[20] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_raw_flags_probe(
+            source, sizeof(source), idx, 1u, 42u, &flags) ||
+        musa_dwg_ac1024_layer_raw_flags_failure_stage(
+            source, sizeof(source), idx, 1u, 42u) !=
+                MUSA_DWG_LAYER_FLAGS_NUMERIC ||
         memcmp(&flags, &saved, sizeof(saved)))
         return 0;
     memcpy(source, pristine, sizeof(source));
