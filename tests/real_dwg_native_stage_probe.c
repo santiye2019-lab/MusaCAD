@@ -467,6 +467,12 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_flags_locked_bit;
     size_t sampled_layer_eed_flags_unmapped_bits;
     size_t sampled_layer_eed_flags_xdictionary_present;
+    /* Original nonzero-EED OT51 APPID H5 -> CRC-backed OT67 targets,
+     * independent from layer numeric flags, CMC and drawing readiness. */
+    size_t sampled_layer_eed_appid_attempts;
+    size_t sampled_layer_eed_appid_verified;
+    size_t sampled_layer_eed_appid_refused;
+    size_t sampled_layer_eed_appid_refs_verified;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1019,6 +1025,26 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                    layer, insert coordinate or scene output. */
                                 const uint16_t type = recovered[k].raw_ot;
                                 if (type == 51u) {
+                                    ++hint.sampled_layer_eed_appid_attempts;
+                                    MusaDwgAc1024EedAppidEvidence layer_appid = {0};
+                                    if (musa_dwg_ac1024_layer_eed_appid_probe(
+                                            objects, nb, recovered, legacy_count,
+                                            recovered[k].embedded_absolute_handle,
+                                            &layer_appid) &&
+                                        layer_appid.chain.raw_ot == 51u &&
+                                        layer_appid.chain.indexed_object_offset ==
+                                            recovered[k].record_offset &&
+                                        layer_appid.chain.embedded_absolute_handle ==
+                                            recovered[k].embedded_absolute_handle &&
+                                        layer_appid.appid_reference_count ==
+                                            layer_appid.chain.application_count &&
+                                        layer_appid.appid_reference_count >= 1u &&
+                                        layer_appid.original_appid_records_crc_verified) {
+                                        ++hint.sampled_layer_eed_appid_verified;
+                                        hint.sampled_layer_eed_appid_refs_verified +=
+                                            layer_appid.appid_reference_count;
+                                    } else
+                                        ++hint.sampled_layer_eed_appid_refused;
                                     ++hint.sampled_layer_eed_flags_attempts;
                                     MusaDwgAc1024LayerRawFlagsEvidence eed_layer = {0};
                                     if (musa_dwg_ac1024_layer_eed_raw_flags_probe(
@@ -1882,6 +1908,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_flags_locked_bit\":%zu,"
                "\"sampled_layer_eed_flags_unmapped_bits\":%zu,"
                "\"sampled_layer_eed_flags_xdictionary_present\":%zu,"
+               "\"sampled_layer_eed_appid_attempts\":%zu,"
+               "\"sampled_layer_eed_appid_verified\":%zu,"
+               "\"sampled_layer_eed_appid_refused\":%zu,"
+               "\"sampled_layer_eed_appid_refs_verified\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2124,6 +2154,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_flags_locked_bit,
                hint->sampled_layer_eed_flags_unmapped_bits,
                hint->sampled_layer_eed_flags_xdictionary_present,
+               hint->sampled_layer_eed_appid_attempts,
+               hint->sampled_layer_eed_appid_verified,
+               hint->sampled_layer_eed_appid_refused,
+               hint->sampled_layer_eed_appid_refs_verified,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
