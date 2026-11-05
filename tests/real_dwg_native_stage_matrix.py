@@ -581,6 +581,14 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_eed_appid_refused",
             "sampled_line_eed_appid_references_verified",
             "sampled_line_eed_appid_distinct_references_verified",
+            "sampled_layer_raw_flags_attempts",
+            "sampled_layer_raw_flags_verified",
+            "sampled_layer_raw_flags_refused",
+            "sampled_layer_raw_flags_frozen_bit",
+            "sampled_layer_raw_flags_on_bit",
+            "sampled_layer_raw_flags_locked_bit",
+            "sampled_layer_raw_flags_unmapped_bits",
+            "sampled_layer_raw_flags_xdictionary_present",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -628,6 +636,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          eed_join_explicit_owner, eed_join_implicit_layer, eed_join_xdic,
          eed_appid_attempts, eed_appid_ok, eed_appid_bad,
          eed_appid_refs, eed_appid_distinct,
+         layer_flags_attempts, layer_flags_ok, layer_flags_bad,
+         layer_frozen, layer_on, layer_locked, layer_unmapped, layer_xdic,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -684,6 +694,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 eed_appid_refs > 64 * eed_appid_ok or
                 eed_appid_distinct < eed_appid_ok or
                 eed_appid_distinct > eed_appid_refs or
+                layer_flags_attempts != layer_flags_ok + layer_flags_bad or
+                max(layer_frozen, layer_on, layer_locked, layer_unmapped,
+                    layer_xdic) > layer_flags_ok or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
