@@ -191,3 +191,51 @@ int musa_dwg_ac1024_classes_numeric_records(
     free(tmp);
     return ok;
 }
+
+/* Source-agnostic R2010 RL bit-count diagnostic. It does NOT use the
+ * CRC of the section, the physical page provenance, or TU names.
+ * Unlike the older shape hypothesis, a mandatory RL bitcount is
+ * consumed before the class BS prefix. Outputs remain fail-atomic. */
+int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+    const uint8_t *section,size_t len,uint8_t extra,
+    MusaDwgAc1024ClassesR2010BitcountPrefix *out){
+    if(!section||!out||extra>1u||
+       len<16u+4u+4u+5u+18u||
+       len>MUSA_R2010_CLASSES_MAX||
+       overlaps(section,len,out,sizeof(*out))||
+       memcmp(section,start_sentinel,sizeof(start_sentinel))!=0||
+       memcmp(section+len-sizeof(end_sentinel),end_sentinel,
+              sizeof(end_sentinel))!=0)
+        return 0;
+    const size_t offset=24u+(extra?4u:0u);
+    if(len<offset+5u+18u)return 0;
+    const uint32_t declared=read_le32(section+16u);
+    const uint32_t maintenance=extra?read_le32(section+20u):0u;
+    const uint32_t declared_bits=read_le32(section+20u+(extra?4u:0u));
+    if(declared<5u||declared>MUSA_R2010_CLASSES_MAX||
+       declared>len-offset-18u||
+       declared_bits<36u||
+       (uint64_t)declared_bits>(uint64_t)declared*8u)
+        return 0;
+    size_t pos=0u;
+    uint16_t maximum=0u;
+    uint32_t zero1=0u,zero2=0u,flag=0u;
+    if(!bit_short(section+offset,declared,&pos,&maximum)||
+       !bit_read(section+offset,declared,&pos,8u,&zero1)||
+       !bit_read(section+offset,declared,&pos,8u,&zero2)||
+       !bit_read(section+offset,declared,&pos,1u,&flag)||
+       maximum<500u||maximum>5000u||
+       zero1||zero2||flag!=1u||pos>=declared_bits)
+        return 0;
+    MusaDwgAc1024ClassesR2010BitcountPrefix next={0};
+    next.declared_data_area_bytes=declared;
+    next.declared_data_bits=declared_bits;
+    next.maintenance_word=maintenance;
+    next.maximum_class_number=maximum;
+    next.bitstream_start_byte=offset;
+    next.numeric_records_start_bit=pos;
+    next.extra_rl_present=extra;
+    next.structural_prefix_verified=1u;
+    *out=next;
+    return 1;
+}

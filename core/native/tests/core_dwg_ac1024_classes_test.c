@@ -172,11 +172,90 @@ static int test_numeric(int extra) {
 #undef REJECT
     return 1;
 }
+
+/* The missing mandatory R2010 RL bitsize is tested independently
+ * from the previous shape hypothesis. The 96-bit declared stream
+ * does not imply valid Unicode, class names or real-file CRC. */
+static size_t r2010_bitcount_fixture(uint8_t *bytes,int extra){
+    const size_t start=24u+(extra?4u:0u);
+    const size_t size=start+16u+18u;
+    memset(bytes,0,96u);
+    memcpy(bytes,opening,sizeof(opening));
+    bytes[16]=16u; /* class data byte area */
+    if(extra)bytes[20]=7u; /* opaque maintenance word */
+    bytes[20u+(extra?4u:0u)]=96u; /* mandatory bit count */
+    /* BS(505), 2 RC zero, B true */
+    bit_set(bytes+start,0u,2u,0u);
+    bit_set(bytes+start,2u,8u,0xf9u);
+    bit_set(bytes+start,10u,8u,1u);
+    bit_set(bytes+start,34u,1u,1u);
+    /* Subsequent 61 bits intentionally opaque. */
+    memcpy(bytes+size-16u,closing,sizeof(closing));
+    return size;
+}
+static int test_r2010_bitcount(int extra){
+    _Alignas(MusaDwgAc1024ClassesR2010BitcountPrefix)
+       uint8_t bytes[96]={0};
+    const size_t len=r2010_bitcount_fixture(bytes,extra);
+    uint8_t original[96];
+    memcpy(original,bytes,sizeof(original));
+    MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+            bytes,len,(uint8_t)extra,&prefix)||
+       prefix.declared_data_area_bytes!=16u||
+       prefix.declared_data_bits!=96u||
+       prefix.maintenance_word!=(extra?7u:0u)||
+       prefix.maximum_class_number!=505u||
+       prefix.bitstream_start_byte!=24u+(extra?4u:0u)||
+       prefix.numeric_records_start_bit!=35u||
+       prefix.extra_rl_present!=(uint8_t)extra||
+       prefix.structural_prefix_verified!=1u||
+       prefix.original_section_authenticated||
+       prefix.class_name_resolved||prefix.display_accepted||
+       memcmp(bytes,original,sizeof(original)))
+        return 0;
+    const MusaDwgAc1024ClassesR2010BitcountPrefix saved=prefix;
+    const size_t start=24u+(extra?4u:0u);
+#define REFUSE_R2010() do{\
+    if(musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(\
+       bytes,len,(uint8_t)extra,&prefix)||\
+       memcmp(&saved,&prefix,sizeof(saved)))return 0;\
+    }while(0)
+    bytes[0]^=1u;REFUSE_R2010();bytes[0]^=1u;
+    bytes[len-1u]^=1u;REFUSE_R2010();bytes[len-1u]^=1u;
+    bytes[16]=0u;REFUSE_R2010();bytes[16]=16u;
+    bytes[20u+(extra?4u:0u)]=0u;REFUSE_R2010();
+    bytes[20u+(extra?4u:0u)]=96u;
+    bytes[20u+(extra?4u:0u)]=129u;REFUSE_R2010();
+    bytes[20u+(extra?4u:0u)]=96u;
+    bit_set(bytes+start,34u,1u,0u);REFUSE_R2010();
+    bit_set(bytes+start,34u,1u,1u);
+    bit_set(bytes+start,18u,8u,1u);REFUSE_R2010();
+    bit_set(bytes+start,18u,8u,0u);
+    bit_set(bytes+start,2u,8u,0xf3u);REFUSE_R2010();
+    bit_set(bytes+start,2u,8u,0xf9u);
+    if(musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           bytes,len,(uint8_t)(1-extra),&prefix)||
+       musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           bytes,len-1u,(uint8_t)extra,&prefix)||
+       musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           bytes,len,(uint8_t)extra,
+           (MusaDwgAc1024ClassesR2010BitcountPrefix *)(void *)bytes)||
+       musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           bytes,len,2u,&prefix)||
+       memcmp(&saved,&prefix,sizeof(saved))||
+       memcmp(original,bytes,sizeof(original)))
+        return 0;
+#undef REFUSE_R2010
+    return 1;
+}
 int main(void){
     if(!test_layout(0))return 11;
     if(!test_layout(1))return 12;
     if(!test_numeric(0))return 13;
     if(!test_numeric(1))return 14;
+    if(!test_r2010_bitcount(0))return 15;
+    if(!test_r2010_bitcount(1))return 16;
     puts("AC1024 Classes numeric prefix only; no CRC, names or source acceptance");
     return 0;
 }

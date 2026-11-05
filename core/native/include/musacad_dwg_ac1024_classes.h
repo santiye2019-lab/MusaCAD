@@ -40,6 +40,30 @@ int musa_dwg_ac1024_classes_prefix_shape_probe(
     uint8_t extra_rl_present, MusaDwgAc1024ClassesPrefix *out);
 
 
+/* Alternative R2010 R18+ documented header: RL data area, optional RL
+ * maintenance word, MANDATORY RL bit count, then BS max class, RC0,
+ * RC0, B1. This deliberately coexists with the older hypothesis and
+ * does not promote any source bytes to a verified class/name/scene.
+ * The supplied logical section is NOT independently authenticated here.
+ * Explicit layout choice avoids silently guessing maintenance rules. */
+typedef struct MusaDwgAc1024ClassesR2010BitcountPrefix {
+    uint32_t declared_data_area_bytes;
+    uint32_t declared_data_bits;
+    uint32_t maintenance_word; /* opaque, not a semantic assertion */
+    uint16_t maximum_class_number;
+    size_t bitstream_start_byte;
+    size_t numeric_records_start_bit;
+    uint8_t extra_rl_present;
+    uint8_t structural_prefix_verified;
+    uint8_t original_section_authenticated; /* ALWAYS zero */
+    uint8_t class_name_resolved; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024ClassesR2010BitcountPrefix;
+int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+    const uint8_t *logical_classes, size_t logical_bytes,
+    uint8_t extra_rl_present,
+    MusaDwgAc1024ClassesR2010BitcountPrefix *out);
+
 /* R2010 class record numeric prefix, without external TU names, section
  * physical checksum, or class-body interpretation. Caller-supplied
  * decompressed logical section bytes are UNTRUSTED. */
