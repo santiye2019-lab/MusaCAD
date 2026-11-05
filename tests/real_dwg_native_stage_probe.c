@@ -346,6 +346,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t source_classes_r2010_tu_units;
     int source_classes_r2010_tu_505_three_nonempty;
     int source_classes_r2010_tu_505_ascii_only;
+    int source_classes_r2010_505_dxf_identifier_verified;
+    size_t source_classes_r2010_505_dxf_identifier_length;
+    char source_classes_r2010_505_dxf_identifier[97];
     /* The original CRC-backed Classes bytes supply provenance, while
      * the numeric reader supplies only bounded raw class identity.
      * Names, entity graphs and final paint remain disallowed. */
@@ -844,6 +847,23 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                     audit.target_three_nonempty;
                                 hint.source_classes_r2010_tu_505_ascii_only=
                                     audit.target_ascii_only;
+                                if(audit.target_three_nonempty &&
+                                   audit.target_ascii_only){
+                                    char safe_dxf[97]={0};
+                                    size_t safe_len=0u;
+                                    if(musa_dwg_ac1024_classes_r2010_dxf_identifier(
+                                         bytes,extracted,
+                                         MUSA_AC1024_CLASSES_EXTRA_RL,505u,
+                                         safe_dxf,sizeof(safe_dxf),&safe_len)&&
+                                       safe_len>0u&&safe_len<sizeof(safe_dxf)){
+                                        memcpy(
+                                          hint.source_classes_r2010_505_dxf_identifier,
+                                          safe_dxf,safe_len+1u);
+                                        hint.source_classes_r2010_505_dxf_identifier_length=
+                                            safe_len;
+                                        hint.source_classes_r2010_505_dxf_identifier_verified=1;
+                                    }
+                                }
                             }
                         }
                     }
@@ -2406,6 +2426,9 @@ static void report(const char *signature, const char *result,
                "\"source_classes_r2010_tu_units\":%zu,"
                "\"source_classes_r2010_tu_505_three_nonempty\":%s,"
                "\"source_classes_r2010_tu_505_ascii_only\":%s,"
+               "\"source_classes_r2010_505_dxf_identifier_verified\":%s,"
+               "\"source_classes_r2010_505_dxf_identifier_length\":%zu,"
+               "\"source_classes_r2010_505_dxf_identifier\":\"%s\","
                "\"source_classes_r2010_numeric_verified\":%s,"
                "\"source_classes_r2010_ot505_present\":%s,"
                "\"source_classes_r2010_ot505_entity\":%s,"
@@ -2819,6 +2842,9 @@ static void report(const char *signature, const char *result,
                hint->source_classes_r2010_tu_units,
                hint->source_classes_r2010_tu_505_three_nonempty ? "true" : "false",
                hint->source_classes_r2010_tu_505_ascii_only ? "true" : "false",
+               hint->source_classes_r2010_505_dxf_identifier_verified ? "true" : "false",
+               hint->source_classes_r2010_505_dxf_identifier_length,
+               hint->source_classes_r2010_505_dxf_identifier,
                hint->source_classes_r2010_numeric_verified ? "true" : "false",
                hint->source_classes_r2010_ot505_present ? "true" : "false",
                hint->source_classes_r2010_ot505_entity ? "true" : "false",
