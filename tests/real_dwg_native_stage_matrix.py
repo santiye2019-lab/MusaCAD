@@ -168,6 +168,30 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         # A string bit-window does not prove valid TU strings, any class
         # name, or a shared class identity across two different drawings.
 
+        tu_verified = hint.get("source_classes_r2010_tu_verified")
+        tu_fields = hint.get("source_classes_r2010_tu_fields")
+        tu_units = hint.get("source_classes_r2010_tu_units")
+        tu_nonempty = hint.get("source_classes_r2010_tu_505_three_nonempty")
+        tu_ascii = hint.get("source_classes_r2010_tu_505_ascii_only")
+        if any(type(x) is not bool for x in (tu_verified,tu_nonempty,tu_ascii)):
+            raise ValueError("invalid_ac1024_tu_audit_flags")
+        if (type(tu_fields) is not int or type(tu_units) is not int
+                or not 0 <= tu_fields <= 12288
+                or not 0 <= tu_units <= 8 * 1024 * 1024):
+            raise ValueError("invalid_ac1024_tu_audit_counts")
+        if tu_verified:
+            if (not span_ok or
+                    not hint["source_classes_r2010_numeric_verified"] or
+                    not hint["source_classes_r2010_ot505_present"] or
+                    tu_fields != 3 * hint["source_classes_r2010_numeric_count"] or
+                    tu_units < int(tu_nonempty) * 3 or
+                    tu_units > span_bits // 16):
+                raise ValueError("tu_audit_without_exact_source_provenance")
+        elif tu_fields or tu_units or tu_nonempty or tu_ascii:
+            raise ValueError("tu_audit_values_without_proof")
+        # TU Unicode validity establishes bounded class-name fields only.
+        # No class-name contents, class semantics, or draw acceptance is emitted.
+
         numeric_flags = (
             "source_classes_r2010_numeric_verified",
             "source_classes_r2010_ot505_present",
