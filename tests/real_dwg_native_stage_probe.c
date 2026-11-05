@@ -473,7 +473,7 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_appid_verified;
     size_t sampled_layer_eed_appid_refused;
     size_t sampled_layer_eed_appid_refs_verified;
-    /* Strict original OT50/H2 + OT42/H3 H-stream graph. Unparsed
+    /* Strict original OT50/H4 + OT42/H3 H-stream graph. Unparsed
      * trailing layer material, plotstyle, linetype and viewport refs
      * remain outside all display acceptance and visibility. */
     size_t sampled_layer_eed_xdic_graph_attempts;
@@ -514,6 +514,15 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_first_h_size_2;
     size_t sampled_layer_eed_first_h_size_other;
     size_t sampled_layer_eed_xdic_graph_has_tail;
+    /* Only raw next H headers; no target roles, color, or drawing. */
+    size_t sampled_layer_eed_tail_header_attempts;
+    size_t sampled_layer_eed_tail_header_verified;
+    size_t sampled_layer_eed_tail_header_refused;
+    size_t sampled_layer_eed_tail_header_code_5;
+    size_t sampled_layer_eed_tail_header_code_other;
+    size_t sampled_layer_eed_tail_header_size_0;
+    size_t sampled_layer_eed_tail_header_size_1;
+    size_t sampled_layer_eed_tail_header_size_other;
     size_t sampled_line_common_after_meta_refused;
     size_t sampled_line_xyz_after_common_refused;
     /* Precedence-classified subset of common refusals AFTER meta admission. */
@@ -1143,8 +1152,37 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                             layer_graph.original_records_crc_verified &&
                                             layer_graph.display_accepted == 0u) {
                                             ++hint.sampled_layer_eed_xdic_graph_verified;
-                                            if (layer_graph.remaining_handle_tail_bits)
+                                            if (layer_graph.remaining_handle_tail_bits) {
                                                 ++hint.sampled_layer_eed_xdic_graph_has_tail;
+                                                ++hint.sampled_layer_eed_tail_header_attempts;
+                                                MusaDwgAc1024LayerEedTailRawHeader raw_tail = {0};
+                                                if (musa_dwg_ac1024_layer_eed_tail_raw_header_probe(
+                                                        objects, nb, recovered, legacy_count,
+                                                        recovered[k].embedded_absolute_handle,
+                                                        &raw_tail) &&
+                                                    raw_tail.layer_handle ==
+                                                        recovered[k].embedded_absolute_handle &&
+                                                    raw_tail.layer_record_offset ==
+                                                        recovered[k].record_offset &&
+                                                    raw_tail.remaining_handle_tail_bits ==
+                                                        layer_graph.remaining_handle_tail_bits &&
+                                                    raw_tail.original_records_crc_verified &&
+                                                    raw_tail.display_accepted == 0u) {
+                                                    ++hint.sampled_layer_eed_tail_header_verified;
+                                                    if (raw_tail.raw_h_code == 5u)
+                                                        ++hint.sampled_layer_eed_tail_header_code_5;
+                                                    else
+                                                        ++hint.sampled_layer_eed_tail_header_code_other;
+                                                    if (raw_tail.raw_h_size == 0u)
+                                                        ++hint.sampled_layer_eed_tail_header_size_0;
+                                                    else if (raw_tail.raw_h_size == 1u)
+                                                        ++hint.sampled_layer_eed_tail_header_size_1;
+                                                    else
+                                                        ++hint.sampled_layer_eed_tail_header_size_other;
+                                                } else {
+                                                    ++hint.sampled_layer_eed_tail_header_refused;
+                                                }
+                                            }
                                         } else {
                                             ++hint.sampled_layer_eed_xdic_graph_refused;
                                             switch (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
@@ -2081,6 +2119,14 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_first_h_size_2\":%zu,"
                "\"sampled_layer_eed_first_h_size_other\":%zu,"
                "\"sampled_layer_eed_xdic_graph_has_tail\":%zu,"
+               "\"sampled_layer_eed_tail_header_attempts\":%zu,"
+               "\"sampled_layer_eed_tail_header_verified\":%zu,"
+               "\"sampled_layer_eed_tail_header_refused\":%zu,"
+               "\"sampled_layer_eed_tail_header_code_5\":%zu,"
+               "\"sampled_layer_eed_tail_header_code_other\":%zu,"
+               "\"sampled_layer_eed_tail_header_size_0\":%zu,"
+               "\"sampled_layer_eed_tail_header_size_1\":%zu,"
+               "\"sampled_layer_eed_tail_header_size_other\":%zu,"
                "\"sampled_line_common_after_meta_refused\":%zu,"
                "\"sampled_line_xyz_after_common_refused\":%zu,"
                "\"sampled_line_common_mode_unsupported\":%zu,"
@@ -2365,6 +2411,14 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_first_h_size_2,
                hint->sampled_layer_eed_first_h_size_other,
                hint->sampled_layer_eed_xdic_graph_has_tail,
+               hint->sampled_layer_eed_tail_header_attempts,
+               hint->sampled_layer_eed_tail_header_verified,
+               hint->sampled_layer_eed_tail_header_refused,
+               hint->sampled_layer_eed_tail_header_code_5,
+               hint->sampled_layer_eed_tail_header_code_other,
+               hint->sampled_layer_eed_tail_header_size_0,
+               hint->sampled_layer_eed_tail_header_size_1,
+               hint->sampled_layer_eed_tail_header_size_other,
                hint->sampled_line_common_after_meta_refused,
                hint->sampled_line_xyz_after_common_refused,
                hint->sampled_line_common_mode_unsupported,
