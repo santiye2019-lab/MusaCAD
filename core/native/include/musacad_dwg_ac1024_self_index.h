@@ -329,6 +329,42 @@ int musa_dwg_ac1024_line_eed_handle_graph_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t entity_handle, MusaDwgAc1024LineEedHandleGraph *out);
 
+
+/* R2010 source-LITERAL LAYER OT51 numeric FLAGS preflight:
+ * after CRC-proven absolute self-H and zero EED, the original object
+ * common BL reactors (must be zero), B XDictionary flag, then LAYER's
+ * B 64-bit-entity flag, BS xref-index+1, B xref-dependent, and BS raw
+ * combined 70/290/370 values. No TU name, CMC color, viewport override,
+ * XDictionary target or complete H graph is inferred by this function.
+ * Low 10 raw bits are reported independently, NOT rendered as visibility.
+ * A nonzero unmapped mask is preserved; display_accepted ALWAYS 0.
+ * Caller supplies source-H/CRC recovered index; *out is fail-atomic. */
+typedef struct MusaDwgAc1024LayerRawFlagsEvidence {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t raw_flags_start_bit;
+    size_t raw_flags_end_bit;
+    uint16_t xref_index_plus_one;
+    uint16_t raw_values_70_290_370;
+    uint16_t unmapped_bits;
+    uint8_t entry_64_flag;
+    uint8_t xref_dependent;
+    uint8_t xdictionary_missing;
+    uint8_t frozen_bit;
+    uint8_t on_bit;
+    uint8_t frozen_new_viewports_bit;
+    uint8_t locked_bit;
+    uint8_t plotting_bit;
+    uint8_t lineweight_field;
+    uint8_t original_record_crc_verified;
+    uint8_t display_accepted;
+} MusaDwgAc1024LayerRawFlagsEvidence;
+
+int musa_dwg_ac1024_layer_raw_flags_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out);
+
 #ifdef __cplusplus
 }
 #endif
