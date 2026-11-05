@@ -326,6 +326,14 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t source_classes_logical_bytes;
     size_t source_classes_count_no_extra;
     size_t source_classes_count_with_extra;
+    /* Source-backed section, but R2010 binary class header shape only.
+     * Never conflates mandatory RL bitsize with class metadata success. */
+    int source_classes_r2010_bitcount_no_extra;
+    size_t source_classes_r2010_bits_no_extra;
+    size_t source_classes_r2010_max_class_no_extra;
+    int source_classes_r2010_bitcount_with_extra;
+    size_t source_classes_r2010_bits_with_extra;
+    size_t source_classes_r2010_max_class_with_extra;
     size_t candidate_handles;
     size_t object_section_page_count, handle_section_page_count;
     int legacy_frame_probe_completed;
@@ -711,6 +719,32 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                         class_count > 0u && class_count <= 4096u) {
                         hint.source_classes_numeric_with_extra = 1;
                         hint.source_classes_count_with_extra = class_count;
+                    }
+                    MusaDwgAc1024ClassesR2010BitcountPrefix prefix = {0};
+                    if (musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+                            bytes, extracted,
+                            MUSA_AC1024_CLASSES_NO_EXTRA_RL, &prefix) &&
+                        prefix.structural_prefix_verified &&
+                        !prefix.original_section_authenticated &&
+                        !prefix.class_name_resolved && !prefix.display_accepted) {
+                        hint.source_classes_r2010_bitcount_no_extra = 1;
+                        hint.source_classes_r2010_bits_no_extra =
+                            prefix.declared_data_bits;
+                        hint.source_classes_r2010_max_class_no_extra =
+                            prefix.maximum_class_number;
+                    }
+                    memset(&prefix, 0, sizeof(prefix));
+                    if (musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+                            bytes, extracted,
+                            MUSA_AC1024_CLASSES_EXTRA_RL, &prefix) &&
+                        prefix.structural_prefix_verified &&
+                        !prefix.original_section_authenticated &&
+                        !prefix.class_name_resolved && !prefix.display_accepted) {
+                        hint.source_classes_r2010_bitcount_with_extra = 1;
+                        hint.source_classes_r2010_bits_with_extra =
+                            prefix.declared_data_bits;
+                        hint.source_classes_r2010_max_class_with_extra =
+                            prefix.maximum_class_number;
                     }
                 }
                 free(bytes);
@@ -2255,6 +2289,12 @@ static void report(const char *signature, const char *result,
                "\"source_classes_count_no_extra\":%zu,"
                "\"source_classes_numeric_with_extra\":%s,"
                "\"source_classes_count_with_extra\":%zu,"
+               "\"source_classes_r2010_bitcount_no_extra\":%s,"
+               "\"source_classes_r2010_bits_no_extra\":%zu,"
+               "\"source_classes_r2010_max_class_no_extra\":%zu,"
+               "\"source_classes_r2010_bitcount_with_extra\":%s,"
+               "\"source_classes_r2010_bits_with_extra\":%zu,"
+               "\"source_classes_r2010_max_class_with_extra\":%zu,"
                "\"object_section_page_count\":%zu,"
                "\"handle_section_page_count\":%zu,"
                "\"legacy_frame_probe_completed\":%s,"
@@ -2626,6 +2666,12 @@ static void report(const char *signature, const char *result,
                hint->source_classes_count_no_extra,
                hint->source_classes_numeric_with_extra ? "true" : "false",
                hint->source_classes_count_with_extra,
+               hint->source_classes_r2010_bitcount_no_extra ? "true" : "false",
+               hint->source_classes_r2010_bits_no_extra,
+               hint->source_classes_r2010_max_class_no_extra,
+               hint->source_classes_r2010_bitcount_with_extra ? "true" : "false",
+               hint->source_classes_r2010_bits_with_extra,
+               hint->source_classes_r2010_max_class_with_extra,
                hint->object_section_page_count,
                hint->handle_section_page_count,
                hint->legacy_frame_probe_completed ? "true" : "false",

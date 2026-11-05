@@ -121,6 +121,25 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             if (hint[present] != (1 <= count <= 4096)
                     or (hint[present] and not hint["source_classes_extracted"])):
                 raise ValueError("unsupported_ac1024_numeric_class_claim")
+        for flag, bits, maximum in (
+            ("source_classes_r2010_bitcount_no_extra",
+             "source_classes_r2010_bits_no_extra",
+             "source_classes_r2010_max_class_no_extra"),
+            ("source_classes_r2010_bitcount_with_extra",
+             "source_classes_r2010_bits_with_extra",
+             "source_classes_r2010_max_class_with_extra"),
+        ):
+            if (type(hint.get(flag)) is not bool or
+                    type(hint.get(bits)) is not int or
+                    type(hint.get(maximum)) is not int):
+                raise ValueError("invalid_ac1024_r2010_bitcount_type")
+            if hint[flag]:
+                if (not hint["source_classes_extracted"] or
+                        not 36 <= hint[bits] <= 8 * hint["source_classes_logical_bytes"] or
+                        not 500 <= hint[maximum] <= 5000):
+                    raise ValueError("unverified_ac1024_r2010_class_prefix")
+            elif hint[bits] or hint[maximum]:
+                raise ValueError("unsupported_ac1024_r2010_class_prefix")
         keys = ("page_map_header", "physical_page_map",
                 "objects_section_pages", "handles_section_pages",
                 "candidate_handle_index")

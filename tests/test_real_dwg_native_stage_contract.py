@@ -38,6 +38,12 @@ def ac1024_probe_record():
             "source_classes_count_no_extra": 0,
             "source_classes_numeric_with_extra": False,
             "source_classes_count_with_extra": 0,
+            "source_classes_r2010_bitcount_no_extra": False,
+            "source_classes_r2010_bits_no_extra": 0,
+            "source_classes_r2010_max_class_no_extra": 0,
+            "source_classes_r2010_bitcount_with_extra": False,
+            "source_classes_r2010_bits_with_extra": 0,
+            "source_classes_r2010_max_class_with_extra": 0,
             "object_section_page_count": 558,
             "handle_section_page_count": 77,
             "legacy_frame_probe_completed": False,
@@ -411,6 +417,38 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_r2010_bitcount_prefix_never_promotes_unverified_classes(self):
+        record = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(record), record)
+        for field, value in (
+            ("source_classes_r2010_bitcount_no_extra", True),
+            ("source_classes_r2010_bits_no_extra", 96),
+            ("source_classes_r2010_max_class_no_extra", 505),
+            ("source_classes_r2010_bitcount_with_extra", True),
+            ("source_classes_r2010_bits_with_extra", 96),
+            ("source_classes_r2010_max_class_with_extra", 505),
+        ):
+            wrong = deepcopy(record)
+            wrong["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_fake_result(wrong)
+        good = deepcopy(record)
+        hint = good["ac1024_compatibility_hypothesis"]
+        hint["source_page_map_header"] = True
+        hint["source_physical_page_map"] = True
+        hint["source_physical_page_count"] = 2
+        hint["source_classes_section_verified"] = True
+        hint["source_classes_extracted"] = True
+        hint["source_classes_page_count"] = 1
+        hint["source_classes_logical_bytes"] = 96
+        hint["source_classes_r2010_bitcount_no_extra"] = True
+        hint["source_classes_r2010_bits_no_extra"] = 96
+        hint["source_classes_r2010_max_class_no_extra"] = 505
+        self.assertEqual(validate_fake_result(good), good)
+        hint["source_classes_r2010_bits_no_extra"] = 0
+        with self.assertRaises(ValueError):
+            validate_fake_result(good)
+
     def test_original_ac1024_classes_require_original_crc_provenance(self):
         valid = ac1024_probe_record()
         self.assertEqual(validate_fake_result(valid), valid)
