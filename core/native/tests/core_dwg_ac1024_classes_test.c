@@ -250,6 +250,47 @@ static int test_r2010_bitcount(int extra){
     return 1;
 }
 
+
+static int test_r2010_end_sentinel_tail(int extra){
+    _Alignas(MusaDwgAc1024ClassesR2010BitcountPrefix)
+        uint8_t section[96]={0};
+    const size_t original_len=r2010_bitcount_fixture(section,extra);
+    const size_t n=original_len+8u;
+    if(n>sizeof(section))return 0;
+    /* Keeping the original sentinel at original_len-16 leaves exactly
+     * 8 opaque bytes behind it in the real logical source buffer. */
+    for(size_t k=original_len;k<n;++k)section[k]=(uint8_t)(k+4u);
+    uint8_t preserved[96];
+    memcpy(preserved,section,sizeof(section));
+    MusaDwgAc1024ClassesR2010BitcountPrefix prefix={0};
+    if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           section,n,(uint8_t)extra,&prefix)||
+       !prefix.end_sentinel_followed_by_eight_bytes||
+       !prefix.byte_area_extent_exact||
+       prefix.original_section_authenticated||
+       prefix.class_name_resolved||prefix.display_accepted||
+       memcmp(preserved,section,sizeof(section)))
+        return 0;
+    const MusaDwgAc1024ClassesR2010BitcountPrefix saved=prefix;
+    if(musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           section,n-1u,(uint8_t)extra,&prefix)||
+       memcmp(&saved,&prefix,sizeof(saved)))
+        return 0;
+    section[original_len-1u]^=1u; /* damage close sentinel */
+    if(musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           section,n,(uint8_t)extra,&prefix)||
+       memcmp(&saved,&prefix,sizeof(saved)))
+        return 0;
+    section[original_len-1u]^=1u;
+    /* Sentinel intact but both extent and bounded data bit count are
+     * authenticated as structure only, never a class-name conclusion. */
+    section[16u]=1u;
+    if(musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+           section,n,(uint8_t)extra,&prefix)||
+       memcmp(&saved,&prefix,sizeof(saved)))
+        return 0;
+    return 1;
+}
 static int test_survey(void){
     _Alignas(MusaDwgAc1024ClassesHeaderSurvey) uint8_t section[96]={0};
     MusaDwgAc1024ClassesHeaderSurvey observed={0};
@@ -306,6 +347,8 @@ int main(void){
     if(!test_r2010_bitcount(0))return 15;
     if(!test_r2010_bitcount(1))return 16;
     if(!test_survey())return 17;
+    if(!test_r2010_end_sentinel_tail(0))return 18;
+    if(!test_r2010_end_sentinel_tail(1))return 19;
     puts("AC1024 Classes numeric prefix only; no CRC, names or source acceptance");
     return 0;
 }

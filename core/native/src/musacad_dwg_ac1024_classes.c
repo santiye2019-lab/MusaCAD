@@ -203,17 +203,24 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
        len<16u+4u+4u+5u+18u||
        len>MUSA_R2010_CLASSES_MAX||
        overlaps(section,len,out,sizeof(*out))||
-       memcmp(section,start_sentinel,sizeof(start_sentinel))!=0||
-       memcmp(section+len-sizeof(end_sentinel),end_sentinel,
-              sizeof(end_sentinel))!=0)
+       memcmp(section,start_sentinel,sizeof(start_sentinel))!=0)
         return 0;
+    /* Original R2010 Classes pages may have exactly eight opaque bytes
+     * AFTER the close sentinel. Never assume the sentinel ends at EOF
+     * or allow arbitrary trailing bytes: use only two exact layouts. */
+    size_t tail=0u;
+    if(memcmp(section+len-16u,end_sentinel,16u)!=0){
+        if(len<24u||memcmp(section+len-24u,end_sentinel,16u)!=0)
+            return 0;
+        tail=8u;
+    }
     const size_t offset=24u+(extra?4u:0u);
-    if(len<offset+5u+18u)return 0;
+    if(len<offset+5u+18u+tail)return 0;
     const uint32_t declared=read_le32(section+16u);
     const uint32_t maintenance=extra?read_le32(section+20u):0u;
     const uint32_t declared_bits=read_le32(section+20u+(extra?4u:0u));
     if(declared<5u||declared>MUSA_R2010_CLASSES_MAX||
-       declared>len-offset-18u||
+       declared>len-offset-18u-tail||
        declared_bits<36u||
        (uint64_t)declared_bits>(uint64_t)declared*8u)
         return 0;
@@ -235,6 +242,9 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
     next.bitstream_start_byte=offset;
     next.numeric_records_start_bit=pos;
     next.extra_rl_present=extra;
+    next.end_sentinel_followed_by_eight_bytes=(uint8_t)(tail==8u);
+    next.byte_area_extent_exact=(uint8_t)(
+        (size_t)declared==len-offset-18u-tail);
     next.structural_prefix_verified=1u;
     *out=next;
     return 1;

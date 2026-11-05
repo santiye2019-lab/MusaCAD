@@ -45,6 +45,9 @@ int musa_dwg_ac1024_classes_prefix_shape_probe(
  * RC0, B1. This deliberately coexists with the older hypothesis and
  * does not promote any source bytes to a verified class/name/scene.
  * The supplied logical section is NOT independently authenticated here.
+ * An exact trailing 8-byte opaque footer is admitted only if the closing
+ * sentinel itself is in the verified offset len-24; no arbitrary scan,
+ * trailing data or unverified footer semantics are permitted.
  * Explicit layout choice avoids silently guessing maintenance rules. */
 typedef struct MusaDwgAc1024ClassesR2010BitcountPrefix {
     uint32_t declared_data_area_bytes;
@@ -54,6 +57,8 @@ typedef struct MusaDwgAc1024ClassesR2010BitcountPrefix {
     size_t bitstream_start_byte;
     size_t numeric_records_start_bit;
     uint8_t extra_rl_present;
+    uint8_t end_sentinel_followed_by_eight_bytes;
+    uint8_t byte_area_extent_exact;
     uint8_t structural_prefix_verified;
     uint8_t original_section_authenticated; /* ALWAYS zero */
     uint8_t class_name_resolved; /* ALWAYS zero */
