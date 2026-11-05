@@ -661,6 +661,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_tail_shape_other_raw_h",
             "sampled_layer_eed_tail_shape_token_count",
             "sampled_layer_eed_tail_shape_payload_octets",
+            "sampled_layer_eed_tail_shape_h5_payload",
+            "sampled_layer_eed_tail_shape_non_h5_zero",
+            "sampled_layer_eed_tail_shape_non_h5_payload",
+            "sampled_layer_eed_tail_shape_total_bits",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -734,6 +738,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_tail_size_0, layer_tail_size_1, layer_tail_size_other,
          layer_shape_attempts, layer_shape_verified, layer_shape_refused,
          layer_shape_h5_zero, layer_shape_other, layer_shape_tokens, layer_shape_octets,
+         layer_shape_h5_payload, layer_shape_non_h5_zero,
+         layer_shape_non_h5_payload, layer_shape_total_bits,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -833,6 +839,11 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 layer_shape_tokens > 64 * layer_shape_verified or
                 layer_shape_h5_zero + layer_shape_other != layer_shape_tokens or
                 layer_shape_octets > 8 * layer_shape_tokens or
+                layer_shape_other != (layer_shape_h5_payload +
+                                      layer_shape_non_h5_zero +
+                                      layer_shape_non_h5_payload) or
+                layer_shape_total_bits !=
+                    8 * (layer_shape_tokens + layer_shape_octets) or
                 layer_first_h_attempts !=
                     layer_first_h_verified + layer_first_h_refused or
                 layer_first_h_attempts != layer_eed_attempts or
