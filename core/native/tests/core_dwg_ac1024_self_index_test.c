@@ -789,14 +789,14 @@ static int test_layer_raw_flags_preflight(void) {
     set_bits(p, 37u, 8u, 0xabu); /* raw 70/290/370 numeric field */
     uint16_t crc = 0u;
     if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     source[19] = (uint8_t)crc;
     source[20] = (uint8_t)(crc >> 8u);
     const uint64_t offsets[1] = {0u};
     MusaDwgAc1024SelfIdentity idx[1] = {{0}};
     if (!musa_dwg_ac1024_recover_self_index(
             source, sizeof(source), offsets, 1u, idx, 1u))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     uint8_t pristine[sizeof(source)];
     memcpy(pristine, source, sizeof(source));
     MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
@@ -819,21 +819,21 @@ static int test_layer_raw_flags_preflight(void) {
         !flags.original_record_crc_verified ||
         flags.display_accepted != 0u ||
         memcmp(source, pristine, sizeof(source)))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     const MusaDwgAc1024LayerRawFlagsEvidence saved = flags;
     if (musa_dwg_ac1024_layer_raw_flags_failure_stage(
             source, sizeof(source), idx, 1u, 42u) != MUSA_DWG_LAYER_FLAGS_OK ||
         musa_dwg_ac1024_layer_raw_flags_failure_stage(
             NULL, sizeof(source), idx, 1u, 42u) !=
                 MUSA_DWG_LAYER_FLAGS_ARGUMENT)
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
 
     /* Unknown upper numeric bits are exposed, never ignored or rendered. */
     set_bits(p, 35u, 2u, 0u); /* BS raw16 */
     set_bits(p, 37u, 8u, 0xe0u); /* low */
     set_bits(p, 45u, 8u, 0x80u); /* high -> raw 0x80e0 */
     if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     source[19] = (uint8_t)crc;
     source[20] = (uint8_t)(crc >> 8u);
     if (!musa_dwg_ac1024_layer_raw_flags_probe(
@@ -842,7 +842,7 @@ static int test_layer_raw_flags_preflight(void) {
         flags.unmapped_bits != 0x8000u ||
         flags.lineweight_field != 7u ||
         flags.display_accepted != 0u)
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
     flags = saved;
 
@@ -850,13 +850,13 @@ static int test_layer_raw_flags_preflight(void) {
      * verified here, so it cannot authorize visibility or drawing. */
     set_bits(p, 30u, 1u, 0u);
     if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     source[19] = (uint8_t)crc;
     source[20] = (uint8_t)(crc >> 8u);
     if (!musa_dwg_ac1024_layer_raw_flags_probe(
             source, sizeof(source), idx, 1u, 42u, &flags) ||
         flags.xdictionary_missing != 0u || flags.display_accepted)
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
     flags = saved;
 
@@ -864,7 +864,7 @@ static int test_layer_raw_flags_preflight(void) {
     set_bits(p, 28u, 2u, 1u); /* BL raw8 reactor count 1 */
     set_bits(p, 30u, 8u, 1u);
     if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     source[19] = (uint8_t)crc;
     source[20] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_layer_raw_flags_probe(
@@ -873,13 +873,16 @@ static int test_layer_raw_flags_preflight(void) {
             source, sizeof(source), idx, 1u, 42u) !=
                 MUSA_DWG_LAYER_FLAGS_REACTORS ||
         memcmp(&flags, &saved, sizeof(saved)))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
 
-    /* Unsupported BS flag selector is a numeric-stage refusal. */
-    set_bits(p, 35u, 2u, 3u);
+    /* Raw16 BS cannot fit inside the CRC-authenticated DATA stream:
+     * MC moves handle start to bit40, after preamble, before raw flags
+     * end at bit53. BS selector 3 is valid 256 and must NOT be rejected. */
+    source[2] = 88u; /* 128 total payload bits - 88 H bits = 40 DATA */
+    set_bits(p, 35u, 2u, 0u); /* needs 16 more bits before H */
     if (!musa_core_crc16_arc(0xc0c1u, source, 19u, &crc))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     source[19] = (uint8_t)crc;
     source[20] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_layer_raw_flags_probe(
@@ -888,21 +891,21 @@ static int test_layer_raw_flags_preflight(void) {
             source, sizeof(source), idx, 1u, 42u) !=
                 MUSA_DWG_LAYER_FLAGS_NUMERIC ||
         memcmp(&flags, &saved, sizeof(saved)))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
 
     source[20] ^= 1u;
     if (musa_dwg_ac1024_layer_raw_flags_probe(
             source, sizeof(source), idx, 1u, 42u, &flags) ||
         memcmp(&flags, &saved, sizeof(saved)))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     memcpy(source, pristine, sizeof(source));
 
     idx[0].raw_ot = 19u;
     if (musa_dwg_ac1024_layer_raw_flags_probe(
             source, sizeof(source), idx, 1u, 42u, &flags) ||
         memcmp(&flags, &saved, sizeof(saved)))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     idx[0].raw_ot = 51u;
     if (musa_dwg_ac1024_layer_raw_flags_probe(
             source, sizeof(source), idx, 1u, 0u, &flags) ||
@@ -916,7 +919,7 @@ static int test_layer_raw_flags_preflight(void) {
             (MusaDwgAc1024LayerRawFlagsEvidence *)(void *)idx) ||
         memcmp(&flags, &saved, sizeof(saved)) ||
         memcmp(source, pristine, sizeof(source)))
-        do { fprintf(stderr, "OT51 fixture failed at line %d\\n", __LINE__); return 0; } while (0);
+        return 0;
     return 1;
 }
 
