@@ -140,6 +140,14 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                     raise ValueError("unverified_ac1024_r2010_class_prefix")
             elif hint[bits] or hint[maximum]:
                 raise ValueError("unsupported_ac1024_r2010_class_prefix")
+        for tail_field in (
+            "source_classes_r2010_tail8_with_extra",
+            "source_classes_r2010_extent_exact_with_extra",
+        ):
+            if type(hint.get(tail_field)) is not bool:
+                raise ValueError("invalid_ac1024_class_tail_type")
+            if hint[tail_field] and not hint["source_classes_r2010_bitcount_with_extra"]:
+                raise ValueError("unverified_ac1024_class_tail_evidence")
         survey_fields = (
             "source_classes_survey_begin_at_zero",
             "source_classes_survey_end_at_eof",

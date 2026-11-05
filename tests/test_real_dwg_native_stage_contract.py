@@ -44,6 +44,8 @@ def ac1024_probe_record():
             "source_classes_r2010_bitcount_with_extra": False,
             "source_classes_r2010_bits_with_extra": 0,
             "source_classes_r2010_max_class_with_extra": 0,
+            "source_classes_r2010_tail8_with_extra": False,
+            "source_classes_r2010_extent_exact_with_extra": False,
             "source_classes_header_survey_checked": False,
             "source_classes_survey_begin_at_zero": False,
             "source_classes_survey_end_at_eof": False,
@@ -431,6 +433,18 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_r2010_tail_evidence_requires_validated_header(self):
+        record = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(record), record)
+        for key in (
+            "source_classes_r2010_tail8_with_extra",
+            "source_classes_r2010_extent_exact_with_extra",
+        ):
+            bad = deepcopy(record)
+            bad["ac1024_compatibility_hypothesis"][key] = True
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_fake_result(bad)
+
     def test_original_class_survey_is_strictly_structural(self):
         valid = ac1024_probe_record()
         self.assertEqual(validate_fake_result(valid), valid)

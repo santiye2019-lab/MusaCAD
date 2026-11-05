@@ -334,6 +334,8 @@ typedef struct MusaAc1024CompatibilityHint {
     int source_classes_r2010_bitcount_with_extra;
     size_t source_classes_r2010_bits_with_extra;
     size_t source_classes_r2010_max_class_with_extra;
+    int source_classes_r2010_tail8_with_extra;
+    int source_classes_r2010_extent_exact_with_extra;
     int source_classes_header_survey_checked;
     MusaDwgAc1024ClassesHeaderSurvey source_classes_header_survey;
     size_t candidate_handles;
@@ -756,6 +758,10 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                             prefix.declared_data_bits;
                         hint.source_classes_r2010_max_class_with_extra =
                             prefix.maximum_class_number;
+                        hint.source_classes_r2010_tail8_with_extra =
+                            prefix.end_sentinel_followed_by_eight_bytes;
+                        hint.source_classes_r2010_extent_exact_with_extra =
+                            prefix.byte_area_extent_exact;
                     }
                 }
                 free(bytes);
@@ -2306,6 +2312,8 @@ static void report(const char *signature, const char *result,
                "\"source_classes_r2010_bitcount_with_extra\":%s,"
                "\"source_classes_r2010_bits_with_extra\":%zu,"
                "\"source_classes_r2010_max_class_with_extra\":%zu,"
+               "\"source_classes_r2010_tail8_with_extra\":%s,"
+               "\"source_classes_r2010_extent_exact_with_extra\":%s,"
                "\"source_classes_header_survey_checked\":%s,"
                "\"source_classes_survey_begin_at_zero\":%s,"
                "\"source_classes_survey_end_at_eof\":%s,"
@@ -2697,6 +2705,8 @@ static void report(const char *signature, const char *result,
                hint->source_classes_r2010_bitcount_with_extra ? "true" : "false",
                hint->source_classes_r2010_bits_with_extra,
                hint->source_classes_r2010_max_class_with_extra,
+               hint->source_classes_r2010_tail8_with_extra ? "true" : "false",
+               hint->source_classes_r2010_extent_exact_with_extra ? "true" : "false",
                hint->source_classes_header_survey_checked ? "true" : "false",
                hint->source_classes_header_survey.begin_at_zero ? "true" : "false",
                hint->source_classes_header_survey.end_at_eof ? "true" : "false",
