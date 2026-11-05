@@ -26,6 +26,10 @@ def ac1024_probe_record():
             "handles_section_pages": True,
             "candidate_handle_index": True,
             "candidate_handle_count": 145279,
+            "source_page_map_header": False,
+            "source_physical_page_map": False,
+            "source_physical_page_count": 0,
+            "source_patched_page_count_equal": False,
             "object_section_page_count": 558,
             "handle_section_page_count": 77,
             "legacy_frame_probe_completed": False,
@@ -399,6 +403,36 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_original_ac1024_page_map_claims_are_fail_closed(self):
+        valid = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(valid), valid)
+        for key, value in (
+            ("source_page_map_header", 1),
+            ("source_physical_page_map", "true"),
+            ("source_physical_page_count", True),
+            ("source_physical_page_count", -1),
+            ("source_physical_page_count", 131073),
+        ):
+            record = deepcopy(valid)
+            record["ac1024_compatibility_hypothesis"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                validate_fake_result(record)
+        record = deepcopy(valid)
+        record["ac1024_compatibility_hypothesis"]["source_physical_page_map"] = True
+        with self.assertRaises(ValueError):
+            validate_fake_result(record)
+        record = deepcopy(valid)
+        record["ac1024_compatibility_hypothesis"]["source_patched_page_count_equal"] = True
+        with self.assertRaises(ValueError):
+            validate_fake_result(record)
+        record = deepcopy(valid)
+        hint = record["ac1024_compatibility_hypothesis"]
+        hint["source_page_map_header"] = True
+        hint["source_physical_page_map"] = True
+        hint["source_physical_page_count"] = 2
+        hint["source_patched_page_count_equal"] = True
+        self.assertEqual(validate_fake_result(record), record)
+
     def test_unverified_full_tail_shape_cannot_claim_success(self):
         record = ac1024_probe_record()
         for field in ("sampled_layer_eed_tail_shape_attempts",

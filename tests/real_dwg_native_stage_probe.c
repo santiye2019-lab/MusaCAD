@@ -310,6 +310,11 @@ static int ac1024_hmap_last_six_candidate(
 
 typedef struct MusaAc1024CompatibilityHint {
     int header, physical_map, object_pages, handle_pages, handle_index;
+    /* Independently checks ORIGINAL AC1024 signature. Structural
+     * page-map evidence only, not validated AC1024 class section. */
+    int source_page_map_header, source_physical_page_map;
+    int source_patched_page_count_equal;
+    size_t source_physical_page_count;
     size_t candidate_handles;
     size_t object_section_page_count, handle_section_page_count;
     int legacy_frame_probe_completed;
@@ -641,8 +646,24 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
     if (!scratch || length < 256u || memcmp(scratch, "AC1024", 6u) != 0) {
         return hint;
     }
-    /* Re-use existing bounded structural validators only; never copy
-       LibreDWG source or include GPL reference-tool headers here. */
+    /* Original AC1024 first-party protected page-map structure,
+     * checked BEFORE the older signature-patched family hypothesis.
+     * Neither path authenticates Classes data or admits a scene. */
+    MusaDwgAc1018FileMapHeader original_header = {0};
+    hint.source_page_map_header = musa_dwg_ac1024_page_map_header(
+        scratch, length, &original_header);
+    if (hint.source_page_map_header) {
+        size_t source_count = 0u;
+        hint.source_physical_page_map =
+            musa_dwg_ac1024_page_locations(
+                scratch, length, NULL, 0u, &source_count) &&
+            source_count > 0u &&
+            source_count == original_header.page_count;
+        if (hint.source_physical_page_map)
+            hint.source_physical_page_count = source_count;
+    }
+    /* Borrowed R2004-family sections and handle index still run on a
+       disposable copy for DIAGNOSTICS only. */
     memcpy(scratch, "AC1018", 6u);
     MusaDwgAc1018FileMapHeader header = {0};
     MusaDwgAc1018SectionDescriptor desc = {0};
@@ -652,6 +673,13 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
         hint.physical_map = musa_dwg_ac1018_page_locations(
             scratch, length, NULL, 0u, &locations) && locations > 0u;
     }
+    if (hint.physical_map && hint.source_physical_page_map &&
+        hint.source_physical_page_count == locations &&
+        original_header.page_map_id == header.page_map_id &&
+        original_header.section_map_id == header.section_map_id &&
+        original_header.page_map_offset == header.page_map_offset &&
+        original_header.map_decoded_bytes == header.map_decoded_bytes)
+        hint.source_patched_page_count_equal = 1;
     if (hint.physical_map) {
         hint.object_pages = musa_dwg_ac1018_section_pages(
             scratch, length, MUSA_DWG_AC1018_OBJECTS,
@@ -2160,6 +2188,10 @@ static void report(const char *signature, const char *result,
                "\"page_map_header\":%s,\"physical_page_map\":%s,"
                "\"objects_section_pages\":%s,\"handles_section_pages\":%s,"
                "\"candidate_handle_index\":%s,\"candidate_handle_count\":%zu,"
+               "\"source_page_map_header\":%s,"
+               "\"source_physical_page_map\":%s,"
+               "\"source_physical_page_count\":%zu,"
+               "\"source_patched_page_count_equal\":%s,"
                "\"object_section_page_count\":%zu,"
                "\"handle_section_page_count\":%zu,"
                "\"legacy_frame_probe_completed\":%s,"
@@ -2519,6 +2551,10 @@ static void report(const char *signature, const char *result,
                hint->handle_pages ? "true" : "false",
                hint->handle_index ? "true" : "false",
                hint->candidate_handles,
+               hint->source_page_map_header ? "true" : "false",
+               hint->source_physical_page_map ? "true" : "false",
+               hint->source_physical_page_count,
+               hint->source_patched_page_count_equal ? "true" : "false",
                hint->object_section_page_count,
                hint->handle_section_page_count,
                hint->legacy_frame_probe_completed ? "true" : "false",

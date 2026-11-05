@@ -68,6 +68,26 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             or hint.get("validated_original_ac1024_decoder") is not False
         ):
             raise ValueError("unsupported_ac1024_claim")
+        original_keys = (
+            "source_page_map_header", "source_physical_page_map",
+            "source_patched_page_count_equal",
+        )
+        if any(type(hint.get(key)) is not bool for key in original_keys):
+            raise ValueError("invalid_ac1024_original_page_map_type")
+        original_count = hint.get("source_physical_page_count")
+        if (type(original_count) is not int or not 0 <= original_count <= 131072):
+            raise ValueError("invalid_ac1024_original_page_count")
+        if hint["source_physical_page_map"] and (
+            not hint["source_page_map_header"] or original_count == 0
+        ):
+            raise ValueError("unverified_ac1024_original_page_map")
+        if not hint["source_physical_page_map"] and original_count:
+            raise ValueError("unsupported_ac1024_original_page_count")
+        if hint["source_patched_page_count_equal"] and (
+            not hint["source_physical_page_map"]
+            or not hint.get("physical_page_map")
+        ):
+            raise ValueError("unverified_ac1024_original_page_comparison")
         keys = ("page_map_header", "physical_page_map",
                 "objects_section_pages", "handles_section_pages",
                 "candidate_handle_index")
