@@ -185,6 +185,34 @@ int musa_dwg_ac1024_classes_r2010_string_span_probe(
     const uint8_t *logical_classes,size_t logical_bytes,
     uint8_t extra_rl_present,MusaDwgAc1024ClassesStringSpan *out);
 
+/* R2010 class-name TU stream integrity audit. The numeric class order is
+ * independently verified against the section's class records; each class
+ * contributes 3 length-prefixed UTF-16LE fields in the detached stream.
+ * Target metadata is a one-way diagnostic fingerprint, never a name or
+ * permission to infer class semantics/paint. Caller authenticates the
+ * original physical section separately. No raw name bytes leave the API.
+ * Strict fail-atomic output with immutable input. */
+typedef struct MusaDwgAc1024ClassesTuAudit {
+    size_t classes_verified;
+    size_t tu_fields_verified;
+    size_t utf16_code_units_verified;
+    size_t trailing_padding_bits; /* bounded 0..7 only */
+    uint64_t target_triplet_fingerprint; /* non-cryptographic diagnostic */
+    uint16_t target_class_number;
+    uint16_t target_name_code_units[3];
+    uint8_t target_found;
+    uint8_t target_three_nonempty;
+    uint8_t target_ascii_only;
+    uint8_t complete_bounded_stream;
+    uint8_t original_section_authenticated; /* ALWAYS zero */
+    uint8_t class_semantics_accepted; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024ClassesTuAudit;
+int musa_dwg_ac1024_classes_r2010_tu_audit(
+    const uint8_t *logical_classes,size_t logical_bytes,
+    uint8_t extra_rl_present,uint16_t target_class_number,
+    MusaDwgAc1024ClassesTuAudit *out);
+
 #ifdef __cplusplus
 }
 #endif
