@@ -54,6 +54,9 @@ def ac1024_probe_record():
             "source_classes_r2010_tu_units": 0,
             "source_classes_r2010_tu_505_three_nonempty": False,
             "source_classes_r2010_tu_505_ascii_only": False,
+            "source_classes_r2010_505_dxf_identifier_verified": False,
+            "source_classes_r2010_505_dxf_identifier_length": 0,
+            "source_classes_r2010_505_dxf_identifier": "",
             "source_classes_r2010_numeric_verified": False,
             "source_classes_r2010_ot505_present": False,
             "source_classes_r2010_ot505_entity": False,
@@ -573,6 +576,59 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
         h["source_classes_r2010_numeric_count"]=0
         with self.assertRaises(ValueError):
             validate_fake_result(valid)
+
+    def test_real_class505_dxf_name_is_strictly_proven_and_sanitized(self):
+        baseline=ac1024_probe_record()
+        self.assertEqual(validate_fake_result(baseline),baseline)
+        for key,value in (
+            ("source_classes_r2010_505_dxf_identifier_verified",True),
+            ("source_classes_r2010_505_dxf_identifier_length",4),
+            ("source_classes_r2010_505_dxf_identifier","TEST"),
+        ):
+            invalid=deepcopy(baseline)
+            invalid["ac1024_compatibility_hypothesis"][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                validate_fake_result(invalid)
+        valid=deepcopy(baseline)
+        h=valid["ac1024_compatibility_hypothesis"]
+        h["source_page_map_header"]=True
+        h["source_physical_page_map"]=True
+        h["source_physical_page_count"]=2
+        h["source_classes_section_verified"]=True
+        h["source_classes_extracted"]=True
+        h["source_classes_page_count"]=1
+        h["source_classes_logical_bytes"]=100
+        h["source_classes_r2010_bitcount_with_extra"]=True
+        h["source_classes_r2010_bits_with_extra"]=512
+        h["source_classes_r2010_max_class_with_extra"]=505
+        h["source_classes_r2010_extent_exact_with_extra"]=True
+        h["source_classes_r2010_numeric_verified"]=True
+        h["source_classes_r2010_numeric_count"]=1
+        h["source_classes_r2010_ot505_present"]=True
+        h["source_classes_r2010_ot505_object"]=True
+        h["source_classes_r2010_string_span_bounded"]=True
+        h["source_classes_r2010_string_bits"]=128
+        h["source_classes_r2010_tu_verified"]=True
+        h["source_classes_r2010_tu_fields"]=3
+        h["source_classes_r2010_tu_units"]=3
+        h["source_classes_r2010_tu_505_three_nonempty"]=True
+        h["source_classes_r2010_tu_505_ascii_only"]=True
+        h["source_classes_r2010_505_dxf_identifier_verified"]=True
+        h["source_classes_r2010_505_dxf_identifier_length"]=4
+        h["source_classes_r2010_505_dxf_identifier"]="TEST"
+        self.assertEqual(validate_fake_result(valid),valid)
+        for key,value in (
+            ("source_classes_r2010_505_dxf_identifier_length",5),
+            ("source_classes_r2010_505_dxf_identifier","TEST\n"),
+            ("source_classes_r2010_505_dxf_identifier","A B"),
+            ("source_classes_r2010_tu_verified",False),
+            ("source_classes_r2010_tu_505_three_nonempty",False),
+            ("source_classes_r2010_tu_505_ascii_only",False),
+        ):
+            invalid=deepcopy(valid)
+            invalid["ac1024_compatibility_hypothesis"][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                validate_fake_result(invalid)
 
     def test_r2010_tail_evidence_requires_validated_header(self):
         record = ac1024_probe_record()
