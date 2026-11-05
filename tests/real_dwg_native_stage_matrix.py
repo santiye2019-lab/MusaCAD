@@ -608,6 +608,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_appid_verified",
             "sampled_layer_eed_appid_refused",
             "sampled_layer_eed_appid_refs_verified",
+            "sampled_layer_eed_xdic_graph_attempts",
+            "sampled_layer_eed_xdic_graph_verified",
+            "sampled_layer_eed_xdic_graph_refused",
+            "sampled_layer_eed_xdic_graph_has_tail",
             "sampled_line_common_after_meta_refused",
             "sampled_line_xyz_after_common_refused",
             "sampled_line_common_mode_unsupported",
@@ -665,6 +669,8 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
          layer_eed_unmapped, layer_eed_xdic,
          layer_appid_attempts, layer_appid_ok, layer_appid_bad,
          layer_appid_refs,
+         layer_xdic_graph_attempts, layer_xdic_graph_ok,
+         layer_xdic_graph_bad, layer_xdic_graph_has_tail,
          line_common_after_meta_rejected, line_xyz_after_common_rejected,
          line_mode_rejected, line_reactors_rejected, line_xdic_rejected,
          line_fields_rejected,
@@ -738,6 +744,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 layer_appid_ok + layer_appid_bad != layer_appid_attempts or
                 layer_appid_refs < layer_appid_ok or
                 layer_appid_refs > 64 * layer_appid_ok or
+                layer_xdic_graph_attempts != layer_appid_ok or
+                layer_xdic_graph_ok + layer_xdic_graph_bad !=
+                    layer_xdic_graph_attempts or
+                layer_xdic_graph_has_tail > layer_xdic_graph_ok or
                 eed_xyz_verified + line_xyz_ok > line_attempts or
                 line_common_bad != line_meta_rejected + line_common_after_meta_rejected or
                 line_xyz_bad != line_common_bad + line_xyz_after_common_rejected or
