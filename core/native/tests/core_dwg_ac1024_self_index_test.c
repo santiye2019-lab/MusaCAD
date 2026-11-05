@@ -1171,7 +1171,7 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     set_bits(p, 66u, 2u, 2u); /* zero xrefindex+1 */
     set_bits(p, 69u, 2u, 1u); /* raw layer flags BS byte */
     set_bits(p, 71u, 8u, 0xabu);
-    set_bits(p, 160u, 4u, 2u); /* soft pointer H2 to layer CTRL */
+    set_bits(p, 160u, 4u, 4u); /* soft pointer H4 to layer CTRL */
     set_bits(p, 164u, 4u, 1u);
     set_bits(p, 168u, 8u, 41u);
     set_bits(p, 176u, 4u, 3u); /* hard owner H3 to dictionary */
@@ -1199,7 +1199,7 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         result.xdictionary_record_offset != 26u ||
         result.remaining_handle_tail_bits != 0u ||
         result.eed_appid_reference_count != 1u ||
-        result.layer_control_raw_h_code != 2u ||
+        result.layer_control_raw_h_code != 4u ||
         result.xdictionary_raw_h_code != 3u ||
         !result.original_records_crc_verified || result.display_accepted ||
         memcmp(unchanged, bytes, sizeof(bytes)))
@@ -1210,7 +1210,7 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         raw.layer_handle != 45u || raw.layer_record_offset != 39u ||
         raw.original_handle_start_bit != 160u ||
         raw.handle_tail_bits != 32u ||
-        raw.first_h_code != 2u || raw.first_h_size != 1u ||
+        raw.first_h_code != 4u || raw.first_h_size != 1u ||
         !raw.record_crc_verified || raw.display_accepted ||
         memcmp(unchanged, bytes, sizeof(bytes)))
         return 0;
@@ -1291,6 +1291,22 @@ static int test_layer_eed_xdictionary_original_graph(void) {
             (MusaDwgAc1024LayerEedRawHandleHeader *)(void *)index) ||
         memcmp(&raw, &raw_saved, sizeof(raw_saved)))
         return 0;
+    /* A CRC-resealed H2 ownership code is NOT the H4 soft-pointer
+     * required for LAYER_CONTROL; do not infer a valid parent target. */
+    set_bits(p, 160u, 4u, 2u);
+    if (!musa_core_crc16_arc(0xc0c1u, layer, 27u, &crc))
+        return 0;
+    layer[27] = (uint8_t)crc;
+    layer[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_xdictionary_graph_failure_stage(
+            bytes, sizeof(bytes), index, 4u, 45u) !=
+            MUSA_DWG_LAYER_XDIC_GRAPH_CONTROL_H ||
+        musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+            bytes, sizeof(bytes), index, 4u, 45u, &result) ||
+        memcmp(&preserved, &result, sizeof(result)))
+        return 0;
+    memcpy(bytes, unchanged, sizeof(bytes));
+
     /* No aliasing, NULL, forged handle or source mutation. */
     if (musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
             bytes, sizeof(bytes), index, 4u, 44u, &result) ||
