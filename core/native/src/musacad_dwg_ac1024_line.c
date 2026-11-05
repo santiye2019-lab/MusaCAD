@@ -17,7 +17,10 @@ static int overlap(const void *a, size_t an, const void *b, size_t bn) {
 
 static int musa_line_common_probe_impl(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
-    MusaDwgAc1024LineCommon *out, int has_eed, uint8_t *stage) {
+    MusaDwgAc1024LineCommon *out, int has_eed, uint8_t *stage,
+    uint8_t *scale_refusal) {
+    if (scale_refusal)
+        *scale_refusal = MUSA_DWG_LINE_LTSCALE_NOT_REJECTED_HERE;
     if (stage) *stage = MUSA_DWG_LINE_COMMON_ARGUMENT;
     if (!objects || !out || !object_bytes ||
         overlap(objects, object_bytes, out, sizeof(*out))) return 0;
@@ -90,9 +93,22 @@ static int musa_line_common_probe_impl(
     uint32_t shadow = 0u, full = 0u, face = 0u, edge = 0u;
     uint32_t weight = 0u;
     if (stage) *stage = MUSA_DWG_LINE_COMMON_LTYPE_SCALE;
-    if (!musa_dwg_ac1015_bits_read_bd(&b, &next.linetype_scale) ||
-        !isfinite(next.linetype_scale) || next.linetype_scale <= 0.0)
+    if (!musa_dwg_ac1015_bits_read_bd(&b, &next.linetype_scale)) {
+        if (scale_refusal)
+            *scale_refusal = MUSA_DWG_LINE_LTSCALE_PARSE_REFUSED;
         return 0;
+    }
+    if (!isfinite(next.linetype_scale)) {
+        if (scale_refusal)
+            *scale_refusal = MUSA_DWG_LINE_LTSCALE_NONFINITE;
+        return 0;
+    }
+    if (next.linetype_scale <= 0.0) {
+        if (scale_refusal)
+            *scale_refusal = next.linetype_scale == 0.0 ?
+                MUSA_DWG_LINE_LTSCALE_ZERO : MUSA_DWG_LINE_LTSCALE_NEGATIVE;
+        return 0;
+    }
     if (stage) *stage = MUSA_DWG_LINE_COMMON_APPEARANCE;
     if (!musa_dwg_ac1015_bits_read_u(&b, 2u, &ltype) ||
         !musa_dwg_ac1015_bits_read_u(&b, 2u, &plot) ||
@@ -123,7 +139,7 @@ int musa_dwg_ac1024_line_common_probe(
     const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
     MusaDwgAc1024LineCommon *out) {
     return musa_line_common_probe_impl(
-        objects, object_bytes, indexed_offset, out, 0, NULL);
+        objects, object_bytes, indexed_offset, out, 0, NULL, NULL);
 }
 
 /* The same strict reader produces a bounded stage code, never scene data. */
@@ -132,8 +148,17 @@ uint8_t musa_dwg_ac1024_line_common_failure_stage(
     MusaDwgAc1024LineCommon ignored = {0};
     uint8_t stage = MUSA_DWG_LINE_COMMON_ARGUMENT;
     (void)musa_line_common_probe_impl(
-        objects, object_bytes, indexed_offset, &ignored, 0, &stage);
+        objects, object_bytes, indexed_offset, &ignored, 0, &stage, NULL);
     return stage;
+}
+
+uint8_t musa_dwg_ac1024_line_ltscale_refusal_kind(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset) {
+    MusaDwgAc1024LineCommon ignored = {0};
+    uint8_t kind = MUSA_DWG_LINE_LTSCALE_NOT_REJECTED_HERE;
+    (void)musa_line_common_probe_impl(
+        objects, object_bytes, indexed_offset, &ignored, 0, NULL, &kind);
+    return kind;
 }
 
 static int musa_line_fields_probe_impl(
@@ -150,7 +175,7 @@ static int musa_line_fields_probe_impl(
           musa_dwg_ac1024_record_entity_meta_prefix(
               objects, object_bytes, indexed_offset, &meta)) ||
         !musa_line_common_probe_impl(
-            objects, object_bytes, indexed_offset, &common, has_eed, NULL) ||
+            objects, object_bytes, indexed_offset, &common, has_eed, NULL, NULL) ||
         common.indexed_handle != meta.embedded_absolute_handle ||
         !common.record_crc_verified ||
         common.geometry_start_bit >= common.data_end_bit ||
@@ -354,7 +379,7 @@ int musa_dwg_ac1024_line_eed_verified_probe(
         meta.embedded_absolute_handle != canonical_line_handle ||
         !meta.original_crc16_verified ||
         !musa_line_common_probe_impl(
-            objects, object_bytes, identity.record_offset, &common, 1, NULL) ||
+            objects, object_bytes, identity.record_offset, &common, 1, NULL, NULL) ||
         !musa_dwg_ac1024_line_eed_fields_probe(
             objects, object_bytes, identity.record_offset, &next.geometry) ||
         !musa_dwg_ac1024_line_eed_handle_graph_probe(
