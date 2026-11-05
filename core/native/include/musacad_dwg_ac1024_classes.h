@@ -47,14 +47,16 @@ int musa_dwg_ac1024_classes_prefix_shape_probe(
  * The supplied logical section is NOT independently authenticated here.
  * The extra-RL R2010 variant treats the declared area from byte +24:
  * it includes the four-byte bit count preceding the data at +28.
- * This matches the authenticated original AC1024 section-size witness,
- * but neither the extra word at +20 nor the tail is assigned semantics.
+ * This matches the authenticated original AC1024 section-size witness.
+ * The bitcount in that variant is also measured from the +24 RL start:
+ * subtract exactly 32 bits before bounding the data stream at +28.
+ * Neither the extra word at +20 nor the tail is assigned semantics.
  * An exact trailing 8-byte opaque footer is admitted only when the
  * closing sentinel itself sits at len-24; arbitrary trailers are refused.
  * Explicit layout choice avoids silently guessing maintenance rules. */
 typedef struct MusaDwgAc1024ClassesR2010BitcountPrefix {
     uint32_t declared_data_area_bytes; /* R2010 extra-RL form INCLUDES bitcount RL */
-    uint32_t declared_data_bits;
+    uint32_t declared_data_bits; /* source bitcount, extra-RL form INCLUDES 32-bit RL */
     uint32_t maintenance_word; /* opaque word at +20, NOT a validated semantic */
     uint16_t maximum_class_number;
     size_t bitstream_start_byte;

@@ -228,11 +228,17 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
        declared>MUSA_R2010_CLASSES_MAX||
        len<24u+18u+tail||
        (size_t)declared!=len-24u-18u-tail||
-       declared_bits<36u||
-       (uint64_t)declared_bits>
-           (uint64_t)(declared-preceding_rl_bytes)*8u)
+       declared_bits<36u+32u*(uint32_t)extra)
         return 0;
     const size_t data_bytes=(size_t)declared-preceding_rl_bytes;
+    /* Original R2010 extra-RL bit count spans itself: AC1032's
+     * independent verified class stream applies the same 32-bit
+     * subtraction before admitting data stream bits. Keep this
+     * explicit and fail on any bit count beyond physical data. */
+    const uint32_t class_data_bits=
+        declared_bits-(extra?32u:0u);
+    if((uint64_t)class_data_bits>(uint64_t)data_bytes*8u)
+        return 0;
     size_t pos=0u;
     uint16_t maximum=0u;
     uint32_t zero1=0u,zero2=0u,flag=0u;
@@ -241,7 +247,7 @@ int musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
        !bit_read(section+offset,data_bytes,&pos,8u,&zero2)||
        !bit_read(section+offset,data_bytes,&pos,1u,&flag)||
        maximum<500u||maximum>5000u||
-       zero1||zero2||flag!=1u||pos>=declared_bits)
+       zero1||zero2||flag!=1u||pos>=class_data_bits)
         return 0;
     MusaDwgAc1024ClassesR2010BitcountPrefix next={0};
     next.declared_data_area_bytes=declared;

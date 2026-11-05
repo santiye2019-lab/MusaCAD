@@ -216,6 +216,23 @@ static int test_r2010_bitcount(int extra){
        prefix.class_name_resolved||prefix.display_accepted||
        memcmp(bytes,original,sizeof(original)))
         return 0;
+    /* Explicit R2010 extra-RL proof: 150 declared source bits cannot
+     * fit inside 16 data bytes until the 32-bit RL is excluded.
+     * No amount of extra source beyond the bounded physical data is
+     * admitted or published as a decoded class. */
+    if(extra){
+        bytes[24u]=150u;
+        if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+               bytes,len,(uint8_t)extra,&prefix)||
+           prefix.declared_data_bits!=150u||
+           prefix.maximum_class_number!=505u||
+           !prefix.byte_area_extent_exact)
+            return 0;
+        bytes[24u]=96u;
+        if(!musa_dwg_ac1024_classes_r2010_bitcount_prefix_probe(
+               bytes,len,(uint8_t)extra,&prefix))
+            return 0;
+    }
     const MusaDwgAc1024ClassesR2010BitcountPrefix saved=prefix;
     const size_t start=24u+(extra?4u:0u);
 #define REFUSE_R2010() do{\
@@ -229,7 +246,8 @@ static int test_r2010_bitcount(int extra){
     bytes[16]=(uint8_t)(extra?20u:16u);
     bytes[20u+(extra?4u:0u)]=0u;REFUSE_R2010();
     bytes[20u+(extra?4u:0u)]=96u;
-    bytes[20u+(extra?4u:0u)]=129u;REFUSE_R2010();
+    bytes[20u+(extra?4u:0u)]=(uint8_t)(extra?161u:129u);
+    REFUSE_R2010();
     bytes[20u+(extra?4u:0u)]=96u;
     bit_set(bytes+start,34u,1u,0u);REFUSE_R2010();
     bit_set(bytes+start,34u,1u,1u);
