@@ -976,6 +976,117 @@ uint8_t musa_dwg_ac1024_layer_raw_flags_failure_stage(
 }
 
 
+
+/* Only first two documented original OT51 reference roles are admitted.
+ * LAYER_CONTROL is a soft-pointer H2 to OT50, then XDictionary is a
+ * hard-owner H3 to OT42. Later references remain deliberately unparsed. */
+int musa_dwg_ac1024_layer_eed_xdictionary_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerEedXDictionaryGraph *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity layer = {0}, control = {0}, xdic = {0};
+    MusaDwgAc1024SelfPrefix original_control = {0}, original_xdic = {0};
+    MusaDwgAc1024EedChainEvidence eed = {0};
+    MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
+    MusaDwgAc1024EedAppidEvidence appids = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_layer_handle, &layer) ||
+        layer.raw_ot != 51u || !layer.frame_crc16_verified ||
+        !layer.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, layer.record_offset, &eed) ||
+        eed.raw_ot != 51u ||
+        eed.indexed_object_offset != layer.record_offset ||
+        eed.embedded_absolute_handle != canonical_layer_handle ||
+        !eed.original_crc16_verified || !eed.eed_boundaries_verified ||
+        !eed.application_count ||
+        !musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &flags) ||
+        flags.layer_handle != canonical_layer_handle ||
+        flags.layer_record_offset != layer.record_offset ||
+        flags.xdictionary_missing != 0u ||
+        !flags.original_record_crc_verified || flags.display_accepted ||
+        !musa_dwg_ac1024_layer_eed_appid_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &appids) ||
+        appids.chain.indexed_object_offset != layer.record_offset ||
+        appids.chain.embedded_absolute_handle != canonical_layer_handle ||
+        appids.chain.application_count != eed.application_count ||
+        !appids.original_appid_records_crc_verified ||
+        appids.appid_reference_count != eed.application_count ||
+        eed.payload_start_byte >= object_bytes ||
+        eed.handle_stream_end_bit / 8u >
+            object_bytes - eed.payload_start_byte ||
+        eed.handle_stream_start_bit >= eed.handle_stream_end_bit)
+        return 0;
+
+    MusaDwgAc1015Bits tail = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &tail, objects + eed.payload_start_byte,
+            eed.handle_stream_end_bit / 8u,
+            eed.handle_stream_start_bit, eed.handle_stream_end_bit))
+        return 0;
+    uint64_t control_h = 0u, xdic_h = 0u;
+    uint8_t control_code = 0u, xdic_code = 0u;
+    if (!r2010_link_h(&tail, canonical_layer_handle, 2u,
+                      &control_h, &control_code) ||
+        !r2010_link_h(&tail, canonical_layer_handle, 3u,
+                      &xdic_h, &xdic_code) ||
+        control_h == xdic_h ||
+        !musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, control_h, &control) ||
+        !musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, xdic_h, &xdic) ||
+        control.raw_ot != 50u || xdic.raw_ot != 42u ||
+        !control.frame_crc16_verified || !xdic.frame_crc16_verified ||
+        !control.embedded_handle_code0_verified ||
+        !xdic.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, control.record_offset,
+            &original_control) ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, xdic.record_offset, &original_xdic) ||
+        original_control.raw_ot != 50u || original_xdic.raw_ot != 42u ||
+        original_control.embedded_absolute_handle != control_h ||
+        original_xdic.embedded_absolute_handle != xdic_h ||
+        !original_control.frame_crc16_verified ||
+        !original_xdic.frame_crc16_verified ||
+        !original_control.embedded_handle_code0_verified ||
+        !original_xdic.embedded_handle_code0_verified ||
+        tail.bit_pos > tail.bit_end)
+        return 0;
+
+    MusaDwgAc1024LayerEedXDictionaryGraph next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = layer.record_offset;
+    next.layer_control_handle = control_h;
+    next.layer_control_record_offset = control.record_offset;
+    next.xdictionary_handle = xdic_h;
+    next.xdictionary_record_offset = xdic.record_offset;
+    next.remaining_handle_tail_bits = tail.bit_end - tail.bit_pos;
+    next.eed_appid_reference_count = appids.appid_reference_count;
+    next.layer_control_raw_h_code = control_code;
+    next.xdictionary_raw_h_code = xdic_code;
+    next.original_records_crc_verified = 1u;
+    next.display_accepted = 0u;
+    *out = next;
+    return 1;
+}
+
+
 int musa_dwg_ac1024_recover_self_index(
     const uint8_t *objects, size_t object_bytes,
     const uint64_t *offset_in_handle_order, size_t record_count,
