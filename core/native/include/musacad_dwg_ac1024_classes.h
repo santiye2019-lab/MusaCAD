@@ -66,6 +66,17 @@ int musa_dwg_ac1024_classes_numeric_records(
     const uint8_t *logical_classes,size_t logical_bytes,
     uint8_t extra_rl_present,
     MusaDwgAc1024ClassNumeric *records,size_t capacity,size_t *out_count);
+/* First-party original AC1024 *physical* Classes section:
+ * source signature, protected map and page CRC/Adler checked.
+ * Only opaque logical bytes are exposed. No CLASS names, semantics,
+ * drawing/rendering, file-open or import acceptance. */
+int musa_dwg_ac1024_classes_section_probe(
+    const uint8_t *file,size_t file_bytes,uint64_t *logical_bytes,
+    size_t *page_count);
+int musa_dwg_ac1024_extract_classes_section(
+    const uint8_t *file,size_t file_bytes,uint8_t *output,
+    size_t capacity,size_t *out_bytes);
+
 #ifdef __cplusplus
 }
 #endif

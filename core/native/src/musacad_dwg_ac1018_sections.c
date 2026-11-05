@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1024_classes.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1018_lz.h"
@@ -60,21 +61,31 @@ static int scan(const uint8_t *file,size_t file_bytes,
                 MusaDwgAc1032SectionCatalogEntry *catalog_entries,
                 size_t catalog_capacity,size_t *out_catalog_count,
                 const char *explicit_section_name) {
+    /* mode 2 only exposes the original AC1024 Classes section.
+     * No AC1018 signature rewriting or geometry reader admission. */
     const int catalog_mode=(out_catalog_count!=NULL);
-    if(explicit_section_name && (!modern||catalog_mode))
+    if(modern<0||modern>2||
+       (modern==2&&(!explicit_section_name||
+         strcmp(explicit_section_name,"AcDb:Classes")!=0))||
+       (catalog_mode&&modern!=1)||
+       (explicit_section_name&&(!modern||catalog_mode)))
         return 0;
     if(!file||!desc||!out_count||
        (kind!=MUSA_DWG_AC1018_OBJECTS&&kind!=MUSA_DWG_AC1018_HANDLES))
         return 0;
     MusaDwgAc1018FileMapHeader hdr={0};
-    const int header_ok=modern?
-            musa_dwg_ac1032_page_map_header(file,file_bytes,&hdr):
-            musa_dwg_ac1018_page_map_header(file,file_bytes,&hdr);
+    const int header_ok=modern==2?
+            musa_dwg_ac1024_page_map_header(file,file_bytes,&hdr):
+            (modern==1?musa_dwg_ac1032_page_map_header(file,file_bytes,&hdr):
+            musa_dwg_ac1018_page_map_header(file,file_bytes,&hdr));
     if(!header_ok||hdr.page_count>R2004_MAX_PAGES)return 0;
     size_t num=0u;
-    const int map_ok=modern?
-            musa_dwg_ac1032_page_locations(file,file_bytes,NULL,0u,&num):
-            musa_dwg_ac1018_page_locations(file,file_bytes,NULL,0u,&num);
+    const int map_ok=modern==2?
+            musa_dwg_ac1024_page_locations(file,file_bytes,NULL,0u,&num):
+            (modern==1?musa_dwg_ac1032_page_locations(
+                 file,file_bytes,NULL,0u,&num):
+             musa_dwg_ac1018_page_locations(
+                 file,file_bytes,NULL,0u,&num));
     if(!map_ok||num!=hdr.page_count||num>R2004_MAX_PAGES)return 0;
     MusaDwgAc1018PageLocation *locations=
         (MusaDwgAc1018PageLocation*)calloc(num,sizeof(*locations));
@@ -83,9 +94,12 @@ static int scan(const uint8_t *file,size_t file_bytes,
     MusaDwgAc1032SectionCatalogEntry *catalog=NULL;
     uint8_t *seen_pages=NULL;
     int ok=0;
-    const int entries_ok=modern?
-        musa_dwg_ac1032_page_locations(file,file_bytes,locations,num,&num):
-        musa_dwg_ac1018_page_locations(file,file_bytes,locations,num,&num);
+    const int entries_ok=modern==2?
+        musa_dwg_ac1024_page_locations(file,file_bytes,locations,num,&num):
+        (modern==1?musa_dwg_ac1032_page_locations(
+             file,file_bytes,locations,num,&num):
+         musa_dwg_ac1018_page_locations(
+             file,file_bytes,locations,num,&num));
     if(!entries_ok)goto finish;
     const MusaDwgAc1018PageLocation *section_page=
         find_physical_page(locations,num,hdr.section_map_id,NULL);
@@ -438,4 +452,50 @@ int musa_dwg_ac1032_extract_named_section(
     return shared_extract_section(file,file_bytes,
                                   MUSA_DWG_AC1018_OBJECTS,1,
                                   section_name,output,capacity,out_bytes);
+}
+
+/* Classes source authentication can be used without interpreting any
+ * class fields or original Unicode names. The public classes numeric
+ * parser remains explicitly separate and fail-closed. */
+int musa_dwg_ac1024_classes_section_probe(
+    const uint8_t *file,size_t file_bytes,
+    uint64_t *logical_bytes,size_t *page_count){
+    if(!file||!logical_bytes||!page_count||file_bytes<256u||
+       file_bytes>256u*1024u*1024u||
+       ranges_overlap(file,file_bytes,logical_bytes,sizeof(*logical_bytes))||
+       ranges_overlap(file,file_bytes,page_count,sizeof(*page_count))||
+       ranges_overlap(logical_bytes,sizeof(*logical_bytes),
+                      page_count,sizeof(*page_count)))
+        return 0;
+    MusaDwgAc1018SectionDescriptor desc={0};
+    size_t pages=0u;
+    if(!shared_section_pages(file,file_bytes,MUSA_DWG_AC1018_OBJECTS,
+          2,"AcDb:Classes",NULL,0u,&desc,&pages)||
+       !pages||pages>R2004_MAX_PAGES||
+       desc.logical_bytes<34u||
+       desc.logical_bytes>8u*1024u*1024u||
+       !desc.map_checksum_verified||
+       !desc.data_page_checksums_verified)
+        return 0;
+    *logical_bytes=desc.logical_bytes;
+    *page_count=pages;
+    return 1;
+}
+int musa_dwg_ac1024_extract_classes_section(
+    const uint8_t *file,size_t file_bytes,
+    uint8_t *output,size_t capacity,size_t *out_bytes){
+    if(!file||!output||!out_bytes||
+       ranges_overlap(file,file_bytes,output,capacity)||
+       ranges_overlap(file,file_bytes,out_bytes,sizeof(*out_bytes))||
+       ranges_overlap(output,capacity,out_bytes,sizeof(*out_bytes)))
+        return 0;
+    uint64_t logical=0u;
+    size_t pages=0u;
+    if(!musa_dwg_ac1024_classes_section_probe(
+          file,file_bytes,&logical,&pages)||
+       logical>SIZE_MAX||capacity<(size_t)logical)
+        return 0;
+    return shared_extract_section(
+        file,file_bytes,MUSA_DWG_AC1018_OBJECTS,2,"AcDb:Classes",
+        output,capacity,out_bytes);
 }

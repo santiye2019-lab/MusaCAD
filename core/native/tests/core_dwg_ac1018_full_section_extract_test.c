@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_sections.h"
+#include "musacad_dwg_ac1024_classes.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -104,5 +105,42 @@ int main(void){
     assert(!musa_dwg_ac1018_extract_section(file,sizeof(file),
         MUSA_DWG_AC1018_HANDLES,result,sizeof(result),&bytes));
     assert(!memcmp(saved,result,sizeof(result))&&bytes==before);
+    /* Synthetic protected R2010 physical Classes page. Contents are
+     * opaque 16-byte 'X' payload, NOT valid semantic Classes fields. */
+    build(file);
+    memcpy(file,"AC1024",6u);
+    memcpy(file+468u+2u+52u,"AcDb:Classes",13u);
+    system_header(file+448u,UINT32_C(0x4163003b),132u,135u,
+                  file+468u);
+    uint64_t class_bytes=0u;
+    size_t class_pages=0u;
+    assert(musa_dwg_ac1024_classes_section_probe(
+         file,sizeof(file),&class_bytes,&class_pages));
+    assert(class_bytes==16u&&class_pages==1u);
+    uint8_t class_out[16]={0};
+    size_t written=0u;
+    assert(musa_dwg_ac1024_extract_classes_section(
+         file,sizeof(file),class_out,sizeof(class_out),&written));
+    assert(written==16u);
+    for(size_t i=0u;i<16u;i++)assert(class_out[i]=='X');
+    uint8_t saved_out[16];
+    memcpy(saved_out,class_out,16u);
+    assert(!musa_dwg_ac1024_extract_classes_section(
+         file,sizeof(file),class_out,15u,&written));
+    assert(!musa_dwg_ac1024_extract_classes_section(
+         file,sizeof(file),file,sizeof(file),&written));
+    file[288u]^=1u; /* authentic data-page payload CRC tampered */
+    assert(!musa_dwg_ac1024_classes_section_probe(
+         file,sizeof(file),&class_bytes,&class_pages));
+    assert(!musa_dwg_ac1024_extract_classes_section(
+         file,sizeof(file),class_out,16u,&written));
+    file[288u]^=1u;
+    memcpy(file,"AC1018",6u);
+    assert(!musa_dwg_ac1024_classes_section_probe(
+         file,sizeof(file),&class_bytes,&class_pages));
+    assert(!musa_dwg_ac1024_extract_classes_section(
+         file,sizeof(file),class_out,16u,&written));
+    assert(class_bytes==16u&&class_pages==1u&&written==16u);
+    assert(!memcmp(saved_out,class_out,16u));
     return 0;
 }
