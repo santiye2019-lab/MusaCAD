@@ -8,6 +8,7 @@
 #include "musacad_dwg_signature.h"
 #include "musacad_dwg_ac1015.h"
 #include "musacad_dwg_ac1018_file_index.h"
+#include "musacad_dwg_ac1018_scene.h"
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1032_page_map.h"
@@ -120,8 +121,25 @@ int main(int argc, char **argv) {
             stage = "ac1018_crc_backed_handle_index";
             count = 0u;
         } else {
-            result = "accepted";
-            stage = "ac1018_crc_backed_handle_index";
+            /* A verified handle index is not proof that all indexed object
+             * MS record frames, CRCs and physical spans are consistent.
+             * Close the temporary native scene on every branch. */
+            MusaDwgAc1018Scene *scene = NULL;
+            MusaDwgAc1018RecordRangeAudit ranges = {0};
+            if (!musa_dwg_ac1018_scene_open(file, bytes, &scene)) {
+                stage = "ac1018_native_scene_open";
+            } else if (!musa_dwg_ac1018_scene_audit_record_ranges(
+                           scene, &ranges) ||
+                       !ranges.ranges_nonoverlapping ||
+                       ranges.indexed_records != count ||
+                       !ranges.indexed_records) {
+                stage = "ac1018_record_ranges_and_crcs";
+            } else {
+                result = "accepted";
+                stage = "ac1018_record_ranges_and_crcs";
+                count = ranges.indexed_records;
+            }
+            musa_dwg_ac1018_scene_close(scene);
         }
     } else if (format == MUSA_DWG_2018_2026) {
         MusaDwgAc1032FileMapHeader header = {0};

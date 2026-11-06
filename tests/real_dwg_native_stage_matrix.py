@@ -28,6 +28,8 @@ KNOWN_STAGES = {
     "ac1018_objects_section_pages",
     "ac1018_handles_section_pages",
     "ac1018_crc_backed_handle_index",
+    "ac1018_native_scene_open",
+    "ac1018_record_ranges_and_crcs",
     "ac1032_page_map_header",
     "ac1032_physical_page_locations",
     "ac1032_crc_backed_handle_index",
@@ -56,6 +58,12 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
     if result["result"] == "accepted":
         if not result["native_stage"].startswith("ac") or not result["evidence_count"]:
             raise ValueError("unsupported_native_acceptance")
+        # AC1018 index-only success is no longer enough to declare a
+        # successful real-file stage. Every indexed record must pass the
+        # native C11 CRC/frame and overlap audit before acceptance.
+        if (result.get("signature") == "AC1018"
+                and result["native_stage"] != "ac1018_record_ranges_and_crcs"):
+            raise ValueError("ac1018_index_only_is_not_full_record_acceptance")
     return result
 
 
