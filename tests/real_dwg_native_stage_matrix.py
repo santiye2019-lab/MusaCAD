@@ -129,6 +129,28 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
     return result
 
 
+def require_original_ac1024_handles_join(version: str, result: dict) -> None:
+    """Corpus-only gate: source-authenticated logical join, not CAD objects.
+
+    The original immutable R2010 LFS samples used for this regression now
+    prove Handles logical-section reconstruction. Do not silently downgrade
+    them to physical-page-only acceptance on future changes.
+    """
+    if version != "AC1024":
+        return
+    if (
+        result.get("result") != "accepted"
+        or result.get("native_stage") != "ac1024_physical_page_locations"
+        or result.get("ac1024_handles_join_verified") is not True
+        or type(result.get("ac1024_handles_join_logical_bytes")) is not int
+        or not (0 < result["ac1024_handles_join_logical_bytes"] <= 16 * 1024 * 1024)
+        or result.get("ac1024_handles_join_inner_failure_stage") != 0
+        or result.get("geometry_verified") is not False
+        or result.get("rendering_verified") is not False
+    ):
+        raise ValueError("original_ac1024_handles_logical_join_not_verified")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, default=Path("."))
@@ -176,6 +198,7 @@ def main() -> int:
                     raise ValueError("expected_native_probe_not_invoked")
             elif observed["result"] == "accepted":
                 raise ValueError("unsupported_version_falsely_accepted")
+            require_original_ac1024_handles_join(version, observed)
             record.update(observed)
             record["committed_sha256"] = expected_sha
             record["size_bytes"] = actual_size
