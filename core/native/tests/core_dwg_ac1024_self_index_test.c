@@ -1576,6 +1576,24 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     /* Repoint only the raw absolute H5 value to an independently
      * CRC-backed OT42 record; classify it as OTHER without granting a
      * drawing role. Source remains unchanged after restoring bytes. */
+    /* A two-token/3-bit synthetic fragment must never be promoted to a
+     * three-target LAYER property proof. Failure is strictly atomic. */
+    MusaDwgAc1024LayerTailTypeTriplet triplet = {0};
+    triplet.layer_handle = UINT64_C(999);
+    const MusaDwgAc1024LayerTailTypeTriplet saved_triplet = triplet;
+    if (musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, &triplet) ||
+        musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u,
+            (MusaDwgAc1024LayerTailTypeTriplet *)(void *)with_fragment) ||
+        musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 0u, &triplet) ||
+        memcmp(&triplet, &saved_triplet, sizeof(triplet)))
+        return 0;
+
     const MusaDwgAc1024LayerTailCandidateCensus old_candidates = candidates;
     set_bits(fragment_body, 205u, 8u, 43u);
     if (!musa_core_crc16_arc(0xc0c1u, fragment_layer, 31u, &crc))
