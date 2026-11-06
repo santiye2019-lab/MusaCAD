@@ -1,0 +1,423 @@
+"""Source-scoped native OT51/OT505 bridge contract tests; no render admission."""
+import copy
+import unittest
+
+from real_dwg_layer_class_bridge import EvidenceError, summarize, require_minimum_evidence
+
+
+def sample(n=2, *, material=True):
+    return {
+        "signature": "AC1024",
+        "source_modified": False,
+        "source_unchanged": True,
+        "geometry_verified": False,
+        "rendering_verified": False,
+        "ac1024_compatibility_hypothesis": {
+            "sampled_layer_eed_terminal_candidate_verified": n,
+            "sampled_layer_eed_terminal_candidate_matched": 3*n,
+            "sampled_layer_eed_terminal_candidate_attempts": n,
+            "sampled_layer_eed_terminal_triplet_attempts": n,
+            "sampled_layer_eed_terminal_triplet_verified": n,
+            "sampled_layer_eed_terminal_triplet_nonzero_fragment": 0,
+            "sampled_layer_eed_terminal_alignment_attempts": n,
+            "sampled_layer_eed_terminal_alignment_verified": n,
+            "sampled_layer_eed_terminal_alignment_nonzero": 0,
+            "sampled_layer_eed_state_join_attempts": n,
+            "sampled_layer_eed_state_join_verified": n,
+            "sampled_layer_eed_cmc_attempts": n,
+            "sampled_layer_eed_cmc_postflags_bs_attempts": n,
+            "sampled_layer_eed_cmc_postflags_bs_verified": n,
+            "sampled_layer_eed_cmc_postflags_bs_refused": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_0": n,
+            "sampled_layer_eed_cmc_postflags_bs_value_1_255": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_256": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_257_1023": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_1024_plus": 0,
+            "sampled_layer_eed_cmc_postflags_tail_attempts": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified": n,
+            "sampled_layer_eed_cmc_postflags_tail_refused": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_bs": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_frame": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_bl": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_rc": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_other": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bs_zero": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bl_zero": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_zero": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits": 0,
+            "sampled_layer_eed_cmc_verified": 0,
+            "sampled_layer_eed_cmc_refused": n,
+            "sampled_layer_eed_cmc_refused_preflight": n,
+            "sampled_layer_eed_cmc_refused_index_nonzero": 0,
+            "sampled_layer_eed_cmc_refused_bl": 0,
+            "sampled_layer_eed_cmc_refused_rc": 0,
+            "sampled_layer_eed_cmc_refused_rc_flags": 0,
+            "sampled_layer_eed_cmc_refused_other": 0,
+            "sampled_layer_eed_cmc_named": 0,
+            "sampled_layer_eed_cmc_book_named": 0,
+            "sampled_layer_eed_state_join_frozen": 0,
+            "sampled_layer_eed_state_join_on": 0,
+            "sampled_layer_eed_state_join_locked": 0,
+            "sampled_layer_eed_state_join_unmapped": 0,
+            "sampled_line_eed_join_verified": 0,
+            "sampled_line_eed_layer_state_attempts": 0,
+            "sampled_line_eed_layer_state_verified": 0,
+            "sampled_line_eed_layer_state_refused": 0,
+            "sampled_line_eed_layer_state_frozen": 0,
+            "sampled_line_eed_layer_state_on": 0,
+            "sampled_line_eed_layer_state_locked": 0,
+            "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_raw_256_cmc_prefix_verified": 0,
+            "sampled_line_eed_layer_state_raw_color_0": 0,
+            "sampled_line_eed_layer_state_raw_color_1_255": 0,
+            "sampled_line_eed_layer_state_raw_color_257": 0,
+            "sampled_line_eed_layer_state_raw_color_other": 0,
+            "sampled_line_eed_layer_state_explicit_rgb": 0,
+            "sampled_line_eed_layer_state_refused_flags": 0,
+            "sampled_line_eed_layer_state_refused_h_triplet": 0,
+            "sampled_line_eed_layer_state_refused_alignment": 0,
+            "sampled_line_eed_layer_state_refused_other": 0,
+            "sampled_layer_eed_flags_verified": n,
+            "sampled_layer_eed_flags_frozen_bit": 0,
+            "sampled_layer_eed_flags_on_bit": 0,
+            "sampled_layer_eed_flags_locked_bit": 0,
+            "sampled_layer_eed_flags_unmapped_bits": 0,
+            "sampled_layer_eed_terminal_candidate_absolute": 3*n,
+            "sampled_layer_eed_terminal_candidate_unmatched": 0,
+            "sampled_layer_eed_terminal_fragment_attempts": n,
+            "sampled_layer_eed_terminal_fragment_verified": n,
+            "sampled_layer_eed_terminal_fragment_bits_2": n,
+            "sampled_layer_eed_terminal_fragment_bits_4": 0,
+            "sampled_layer_eed_terminal_fragment_zero": n,
+            "sampled_layer_eed_terminal_fragment_nonzero": 0,
+            "sampled_layer_eed_terminal_fragment_prefix_four_tokens": n,
+            "sampled_layer_eed_terminal_fragment_2bit_pattern_mask": 1 if n else 0,
+            "sampled_layer_eed_terminal_fragment_4bit_pattern_mask": 0,
+            "sampled_layer_eed_terminal_fragment_start_mod8_mask": 64 if n else 0,
+            "sampled_layer_eed_terminal_fragment_end_mod8_mask": 1 if n else 0,
+            "sampled_layer_eed_terminal_candidate_ot80_placeholder": n,
+            "sampled_layer_eed_terminal_candidate_ot57_ltype": n,
+            "sampled_layer_eed_terminal_candidate_dynamic_class_unresolved": n,
+            "sampled_layer_eed_terminal_candidate_ordinal_2_matched": n,
+            "sampled_layer_eed_terminal_candidate_ordinal_3_matched": n,
+            "sampled_layer_eed_terminal_candidate_ordinal_4_matched": n,
+            "sampled_layer_eed_terminal_candidate_ordinal_2_raw_ot_consensus": 81 if n else 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus": 506 if n else 0,
+            "sampled_layer_eed_terminal_candidate_ordinal_4_raw_ot_consensus": 58 if n else 0,
+            "source_classes_section_verified": True,
+            "source_classes_extracted": True,
+            "source_classes_r2010_numeric_verified": True,
+            "source_classes_r2010_505_dxf_identifier_verified": material,
+            "source_classes_r2010_505_dxf_identifier": "MATERIAL" if material else "",
+            "source_classes_r2010_ot505_present": material,
+            "source_classes_r2010_ot505_object": material,
+            "source_classes_r2010_tu_verified": material,
+        },
+    }
+
+
+def stage(*files):
+    return {
+        "files_checked": len(files),
+        "files": list(files),
+        "no_geometry_layers_blocks_colors_writing_claim": True,
+    }
+
+
+class LayerClassBridgeTests(unittest.TestCase):
+    def test_supported_source_scoped_joins(self):
+        out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))
+        self.assertEqual(out["layer_samples_with_three_crc_backed_targets"], 14)
+        self.assertEqual(out["layer_samples_local_ot505_material_class_proven"], 14)
+        self.assertEqual(out["drawings_with_local_material_class_join"], 5)
+        self.assertEqual(out["verified_raw_target_records"], 42)
+        self.assertEqual(out["first_party_native_type_triplets_verified"], 14)
+        self.assertEqual(out["first_party_native_byte_alignment_witnesses"], 14)
+        self.assertEqual(out["first_party_source_local_raw_state_joins"], 14)
+        self.assertEqual(out["raw_state_frozen_bit_samples"], 0)
+        self.assertEqual(out["raw_state_on_bit_samples"], 0)
+        self.assertEqual(out["raw_state_locked_bit_samples"], 0)
+        self.assertFalse(out["layer_visibility_parity_proven"])
+        self.assertTrue(out["byte_alignment_supports_padding_hypothesis_only"])
+        self.assertTrue(out["fixed_placeholder_ot80_identity_confirmed"])
+        self.assertTrue(out["fixed_ltype_ot57_identity_confirmed"])
+        self.assertEqual(out["terminal_fragment_2_bit_samples"], 14)
+        self.assertEqual(out["terminal_fragment_undecoded_samples"], 14)
+        self.assertEqual(out["terminal_fragment_2bit_pattern_values_seen"], [0])
+        self.assertEqual(out["terminal_fragment_4bit_pattern_values_seen"], [])
+        self.assertFalse(out["h_tail_fully_decoded"])
+        self.assertFalse(out["material_property_link_semantics_proven"])
+        self.assertFalse(out["ot57_semantics_proven"])
+        self.assertFalse(out["layer_visibility_parity_proven"])
+
+    def test_505_is_not_assumed_shared_across_drawings(self):
+        out = summarize(stage(sample(2), sample(4, material=False)))
+        self.assertEqual(out["layer_samples_with_three_crc_backed_targets"], 6)
+        self.assertEqual(out["layer_samples_local_ot505_material_class_proven"], 2)
+        self.assertEqual(out["layer_samples_with_unresolved_target_class"], 4)
+
+    def test_no_success_without_three_same_source_target_roles(self):
+        bad = sample(4)
+        h = bad["ac1024_compatibility_hypothesis"]
+        h["sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus"] = 57
+        h["sampled_layer_eed_terminal_triplet_verified"] = 0
+        h["sampled_layer_eed_terminal_alignment_attempts"] = 0
+        h["sampled_layer_eed_terminal_alignment_verified"] = 0
+        out = summarize(stage(bad))
+        self.assertEqual(out["layer_samples_with_three_crc_backed_targets"], 0)
+        self.assertEqual(out["layer_samples_with_unresolved_target_class"], 4)
+
+    def test_reject_fabricated_total_or_missing_original_crc(self):
+        for field, value in [
+            ("sampled_layer_eed_terminal_candidate_matched", 0),
+            ("source_classes_section_verified", False),
+            ("source_classes_extracted", False),
+            ("source_classes_r2010_numeric_verified", False),
+        ]:
+            bad = sample(2)
+            bad["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
+
+    def test_reject_claims_when_source_changed(self):
+        for field, value in [
+            ("source_modified", True),
+            ("source_unchanged", False),
+            ("geometry_verified", True),
+            ("rendering_verified", True),
+        ]:
+            bad = sample()
+            bad[field] = value
+            with self.subTest(field=field), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
+
+    def test_nonzero_terminal_fragment_is_not_painted_or_dismissed(self):
+        item = sample(2)
+        h = item["ac1024_compatibility_hypothesis"]
+        h["sampled_layer_eed_terminal_fragment_zero"] = 0
+        h["sampled_layer_eed_terminal_fragment_nonzero"] = 2
+        h["sampled_layer_eed_terminal_triplet_nonzero_fragment"] = 2
+        h["sampled_layer_eed_terminal_alignment_nonzero"] = 2
+        h["sampled_layer_eed_terminal_fragment_bits_2"] = 0
+        h["sampled_layer_eed_terminal_fragment_bits_4"] = 2
+        h["sampled_layer_eed_terminal_fragment_2bit_pattern_mask"] = 0
+        h["sampled_layer_eed_terminal_fragment_4bit_pattern_mask"] = 1 << 5
+        h["sampled_layer_eed_terminal_fragment_start_mod8_mask"] = 1 << 4
+        observed = summarize(stage(item))
+        self.assertEqual(observed["terminal_fragment_nonzero_samples"], 2)
+        self.assertEqual(observed["terminal_fragment_4_bit_samples"], 2)
+        self.assertEqual(observed["terminal_fragment_undecoded_samples"], 2)
+        self.assertFalse(observed["layer_visibility_parity_proven"])
+        self.assertFalse(observed["rendering_verified"])
+        self.assertFalse(observed["h_tail_fully_decoded"])
+
+    def test_corrupt_tail_shape_and_excess_target_counts_refused(self):
+        for field, value in (
+            ("sampled_layer_eed_terminal_fragment_verified", 0),
+            ("sampled_layer_eed_terminal_fragment_bits_2", 1),
+            ("sampled_layer_eed_terminal_fragment_zero", 3),
+            ("sampled_layer_eed_terminal_fragment_prefix_four_tokens", 0),
+            ("sampled_layer_eed_terminal_candidate_absolute", 7),
+            ("sampled_layer_eed_terminal_candidate_matched", 7),
+            ("sampled_layer_eed_terminal_candidate_ot80_placeholder", 3),
+            ("sampled_layer_eed_terminal_candidate_unmatched", 1),
+            ("sampled_layer_eed_terminal_triplet_attempts", 1),
+            ("sampled_layer_eed_terminal_triplet_verified", 1),
+            ("sampled_layer_eed_terminal_triplet_nonzero_fragment", 1),
+            ("sampled_layer_eed_terminal_alignment_attempts", 1),
+            ("sampled_layer_eed_terminal_alignment_verified", 1),
+            ("sampled_layer_eed_terminal_alignment_nonzero", 1),
+            ("sampled_layer_eed_state_join_attempts", 1),
+            ("sampled_layer_eed_state_join_verified", 1),
+            ("sampled_layer_eed_state_join_frozen", 1),
+            ("sampled_layer_eed_state_join_on", 1),
+            ("sampled_layer_eed_state_join_locked", 1),
+            ("sampled_layer_eed_state_join_unmapped", 1),
+        ):
+            item = sample(2)
+            item["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(EvidenceError):
+                summarize(stage(item))
+
+    def test_eed_line_color_index_is_not_bylayer_render_parity(self):
+        item = sample(2)
+        h = item["ac1024_compatibility_hypothesis"]
+        h["sampled_line_eed_join_verified"] = 3
+        h["sampled_line_eed_layer_state_attempts"] = 3
+        h["sampled_line_eed_layer_state_verified"] = 1
+        h["sampled_line_eed_layer_state_refused"] = 2
+        h["sampled_line_eed_layer_state_refused_flags"] = 1
+        h["sampled_line_eed_layer_state_refused_h_triplet"] = 1
+        h["sampled_line_eed_layer_state_raw_color_256"] = 1
+        out = summarize(stage(item))
+        self.assertEqual(out["line_eed_to_source_layer_state_verified"], 1)
+        self.assertEqual(out["line_eed_to_source_layer_state_refused"], 2)
+        self.assertEqual(out["line_eed_join_raw_color_index_256_candidates"], 1)
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        self.assertEqual(out["line_eed_refused_missing_layer_flags"], 1)
+        self.assertEqual(out["line_eed_refused_h_target_triplet"], 1)
+        h["sampled_line_eed_layer_state_refused"] = 1
+        with self.assertRaises(EvidenceError):
+            summarize(stage(item))
+
+    def test_postflags_bs_candidate_is_not_verified_cmc(self):
+        baseline = sample(2)
+        out = summarize(stage(baseline))
+        self.assertEqual(out["layer_after_flags_bs_value_0"], 2)
+        self.assertTrue(out["layer_after_flags_bs_is_not_verified_cmc"])
+        for key in ("sampled_layer_eed_cmc_postflags_bs_attempts",
+                    "sampled_layer_eed_cmc_postflags_bs_value_0",
+                    "sampled_layer_eed_cmc_postflags_bs_value_256"):
+            broken = copy.deepcopy(baseline)
+            broken["ac1024_compatibility_hypothesis"][key] += 1
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(broken))
+
+    def test_cmc_raw_prefix_is_diagnostic_not_bylayer_render(self):
+        good = sample(2)
+        h = good["ac1024_compatibility_hypothesis"]
+        h["sampled_layer_eed_cmc_verified"] = 1
+        h["sampled_layer_eed_cmc_refused"] = 1
+        h["sampled_layer_eed_cmc_refused_preflight"] = 1
+        h["sampled_layer_eed_cmc_named"] = 1
+        summary = summarize(stage(good))
+        self.assertEqual(summary["layer_eed_cmc_raw_prefix_verified"], 1)
+        self.assertEqual(summary["layer_eed_cmc_raw_prefix_refused"], 1)
+        self.assertTrue(summary["layer_cmc_prefix_not_render_color_parity"])
+        self.assertFalse(summary["layer_visibility_parity_proven"])
+        for key in ("sampled_layer_eed_cmc_verified",
+                    "sampled_layer_eed_cmc_attempts",
+                    "sampled_layer_eed_cmc_named"):
+            bad = copy.deepcopy(good)
+            bad["ac1024_compatibility_hypothesis"][key] += 2
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
+
+    def test_disjoint_original_line_color_categories(self):
+        one = sample(2)
+        h = one["ac1024_compatibility_hypothesis"]
+        h["sampled_line_eed_join_verified"] = 4
+        h["sampled_line_eed_layer_state_attempts"] = 4
+        h["sampled_line_eed_layer_state_verified"] = 4
+        h["sampled_line_eed_layer_state_raw_color_0"] = 1
+        h["sampled_line_eed_layer_state_raw_color_1_255"] = 1
+        h["sampled_line_eed_layer_state_raw_color_256"] = 2
+        out = summarize(stage(one))
+        self.assertEqual(out["line_eed_join_raw_color_index_0_candidates"], 1)
+        self.assertEqual(out["line_eed_join_raw_color_index_1_255_candidates"], 1)
+        self.assertEqual(out["line_eed_join_raw_color_index_256_candidates"], 2)
+        self.assertTrue(out["line_eed_index_categories_are_source_only"])
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        for key in ("sampled_line_eed_layer_state_raw_color_0",
+                    "sampled_line_eed_layer_state_raw_color_257",
+                    "sampled_line_eed_layer_state_raw_color_other",
+                    "sampled_line_eed_layer_state_raw_color_256"):
+            wrong = copy.deepcopy(one)
+            wrong["ac1024_compatibility_hypothesis"][key] += 1
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(wrong))
+
+    def test_source_tail_hypothesis_atomic_counts(self):
+        good = sample(2)
+        out = summarize(stage(good))
+        self.assertEqual(out["layer_after_flags_tail_candidate_attempts"], 2)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified"], 2)
+        self.assertTrue(out["layer_after_flags_tail_is_not_verified_cmc"])
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        base = good["ac1024_compatibility_hypothesis"]
+        for key in (
+            "sampled_layer_eed_cmc_postflags_tail_attempts",
+            "sampled_layer_eed_cmc_postflags_tail_verified",
+            "sampled_layer_eed_cmc_postflags_tail_refused_bs",
+            "sampled_layer_eed_cmc_postflags_tail_refused_bl",
+            "sampled_layer_eed_cmc_postflags_tail_refused_rc",
+        ):
+            bad = copy.deepcopy(good)
+            bad["ac1024_compatibility_hypothesis"][key] += 1
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
+        base["sampled_layer_eed_cmc_postflags_tail_verified"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_verified_bs_zero"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_verified_bl_zero"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_verified_rc_zero"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_refused"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_refused_bl"] = 1
+        out = summarize(stage(good))
+        self.assertEqual(out["layer_after_flags_tail_candidate_refused_bl"], 1)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified"], 1)
+        self.assertFalse(out["layer_after_flags_tail_is_not_verified_cmc"] is False)
+
+    def test_postflags_source_categories_are_disjoint_and_not_colors(self):
+        fixture = sample(2)
+        h = fixture["ac1024_compatibility_hypothesis"]
+        # One CRC-backed BS=0, one BS=25; raw BL nonzero and raw RC
+        # with high bits remain mere DIAGNOSTICS, never display colors.
+        h["sampled_layer_eed_cmc_postflags_bs_value_0"] = 1
+        h["sampled_layer_eed_cmc_postflags_bs_value_1_255"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bs_zero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bl_zero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_rc_zero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits"] = 1
+        out = summarize(stage(fixture))
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified_bs_nonzero"], 1)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified_bl_nonzero"], 1)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified_rc_reserved_bits"], 1)
+        self.assertTrue(out["layer_after_flags_tail_is_not_verified_cmc"])
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        for key in (
+            "sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero",
+            "sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero",
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero",
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits",
+        ):
+            bad = copy.deepcopy(fixture)
+            bad["ac1024_compatibility_hypothesis"][key] = 3
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
+
+    def test_real_corpus_minimum_coverage_gate(self):
+        out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))
+        require_minimum_evidence(out, 14, 5)
+        for native_min, drawings_min in ((15, 5), (14, 6), (1, 6)):
+            with self.subTest(native=native_min, drawings=drawings_min):
+                with self.assertRaises(EvidenceError):
+                    require_minimum_evidence(out, native_min, drawings_min)
+        for threshold in (-1, 2.5, True):
+            with self.subTest(threshold=threshold), self.assertRaises(EvidenceError):
+                require_minimum_evidence(out, threshold, 0)
+        only_fourteen = summarize(stage(sample(2), sample(4), sample(4),
+                                        sample(4, material=False)))
+        with self.assertRaises(EvidenceError):
+            require_minimum_evidence(only_fourteen, 14, 5)
+
+    def test_pattern_without_original_suffix_is_rejected(self):
+        for key, value in (
+            ("sampled_layer_eed_terminal_fragment_2bit_pattern_mask", 0),
+            ("sampled_layer_eed_terminal_fragment_4bit_pattern_mask", 2),
+            ("sampled_layer_eed_terminal_fragment_start_mod8_mask", 0),
+            ("sampled_layer_eed_terminal_fragment_end_mod8_mask", 0),
+        ):
+            invalid = sample(2)
+            invalid["ac1024_compatibility_hypothesis"][key] = value
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(invalid))
+
+    def test_missing_provenance_is_rejected(self):
+        bad = sample()
+        bad["ac1024_compatibility_hypothesis"].pop(
+            "sampled_layer_eed_terminal_candidate_ordinal_4_matched")
+        with self.assertRaises(EvidenceError):
+            summarize(stage(bad))
+        with self.assertRaises(EvidenceError):
+            summarize({"files_checked": 2, "files": [sample()],
+                       "no_geometry_layers_blocks_colors_writing_claim": True})
+
+
+if __name__ == "__main__":
+    unittest.main()

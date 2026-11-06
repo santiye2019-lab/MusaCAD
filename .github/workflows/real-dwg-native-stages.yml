@@ -7,10 +7,16 @@ on:
     paths:
       - 'Projeler/**'
       - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/test_ac1024_mc_frame_probe.c'
+      - 'tests/test_real_dwg_native_stage_contract.py'
       - 'tests/real_dwg_rejected_map_diagnostic.c'
       - 'tests/real_dwg_rejected_map_triage.py'
       - 'tests/test_real_dwg_rejected_map_diagnostic.py'
       - 'tests/real_dwg_native_stage_matrix.py'
+      - 'tests/real_dwg_classes_corpus_evidence.py'
+      - 'tests/test_real_dwg_classes_corpus_evidence.py'
+      - 'tests/real_dwg_layer_class_bridge.py'
+      - 'tests/test_real_dwg_layer_class_bridge.py'
       - 'tests/test_real_dwg_native_stage_probe.py'
       - 'tests/real_dwg_lfs_corpus_audit.py'
       - '.github/workflows/real-dwg-native-stages.yml'
@@ -20,10 +26,16 @@ on:
     paths:
       - 'Projeler/**'
       - 'tests/real_dwg_native_stage_probe.c'
+      - 'tests/test_ac1024_mc_frame_probe.c'
+      - 'tests/test_real_dwg_native_stage_contract.py'
       - 'tests/real_dwg_rejected_map_diagnostic.c'
       - 'tests/real_dwg_rejected_map_triage.py'
       - 'tests/test_real_dwg_rejected_map_diagnostic.py'
       - 'tests/real_dwg_native_stage_matrix.py'
+      - 'tests/real_dwg_classes_corpus_evidence.py'
+      - 'tests/test_real_dwg_classes_corpus_evidence.py'
+      - 'tests/real_dwg_layer_class_bridge.py'
+      - 'tests/test_real_dwg_layer_class_bridge.py'
       - 'tests/test_real_dwg_native_stage_probe.py'
       - 'tests/real_dwg_lfs_corpus_audit.py'
       - '.github/workflows/real-dwg-native-stages.yml'
@@ -55,6 +67,43 @@ jobs:
             -Icore/native/include tests/real_dwg_native_stage_probe.c \
             /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
             -o /tmp/musacad-real-stage-probe
+      - name: Verify shared-core AC1024 frame ABI, atomic output and source immutability
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include core/native/tests/core_dwg_ac1024_record_test.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-core-record-test
+          /tmp/musacad-ac1024-core-record-test
+
+      - name: Verify C11 AC1024 full recovered self-H index and atomic failures
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include core/native/tests/core_dwg_ac1024_self_index_test.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-self-index-test
+          /tmp/musacad-ac1024-self-index-test
+
+      - name: Verify strict AC1024 2D/3D LINE endpoints and CRC atomicity
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            -Icore/native/include core/native/tests/core_dwg_ac1024_line_test.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-line-test
+          /tmp/musacad-ac1024-line-test
+
+      - name: Verify synthetic R2010 MC frame and CRC failure cases
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror \
+            -Icore/native/include tests/test_ac1024_mc_frame_probe.c \
+            /tmp/musacad-real-stage-core/libmusacad_core.a -lm \
+            -o /tmp/musacad-ac1024-mc-frame-test
+          /tmp/musacad-ac1024-mc-frame-test
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_native_stage_contract.py' -v
       - name: Reject fake and unsupported container signatures
         env:
           MUSACAD_NATIVE_STAGE_PROBE: /tmp/musacad-real-stage-probe
@@ -67,6 +116,24 @@ jobs:
             --repository . --probe /tmp/musacad-real-stage-probe \
             --timeout-seconds 45 \
             --report /tmp/musacad-real-native-stages.json
+      - name: Verify class 505 claims stay numeric and drawing-local
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_classes_corpus_evidence.py' -v
+          python3 tests/real_dwg_classes_corpus_evidence.py \
+            --stage-report /tmp/musacad-real-native-stages.json \
+            --report /tmp/musacad-real-classes-numeric-census.json
+      - name: Verify original OT51 target types link to per-drawing MATERIAL class
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_layer_class_bridge.py' -v
+          python3 tests/real_dwg_layer_class_bridge.py \
+            --stage-report /tmp/musacad-real-native-stages.json \
+            --report /tmp/musacad-real-layer-class-bridge.json \
+            --min-native-triplets 14 \
+            --min-source-drawings 5
       - name: Compile read-only rejected map diagnostics
         run: |
           set -euo pipefail
@@ -94,6 +161,8 @@ jobs:
           name: musacad-real-dwg-native-stage-diagnostic
           path: |
             /tmp/musacad-real-native-stages.json
+            /tmp/musacad-real-classes-numeric-census.json
+            /tmp/musacad-real-layer-class-bridge.json
             /tmp/musacad-real-rejected-map-triage.json
           if-no-files-found: ignore
           retention-days: 14

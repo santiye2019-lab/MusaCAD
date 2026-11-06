@@ -1,0 +1,240 @@
+# GitHub'da izole LibreDWG referans testi — Karagümrük pilotu
+
+Bu test **MusaCAD uygulamasına LibreDWG eklemez**. GitHub Actions geçici
+Ubuntu 24.04 bilgisayarında LibreDWG'nin sabit
+34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43 commit'inden
+dwgread derler. MusaCAD'in mevcut özgün core/native C kütüphanesi ve
+tests/real_dwg_native_stage_probe.c ayrıca derlenir. İkisi aynı
+gerçek DWG'yi salt okunur inceler.
+
+İlk test dosyası: **Projeler/01-KARAGÜMRÜK STADYUM - PİS SU TESİSATI.dwg**.
+Manuel workflow_dispatch ve scope=all seçeneğiyle bütün public DWG
+korpusu sınanabilir. Telefona veya bilgisayara program kurulmaz.
+
+## Şu anda gerçek ölçüm
+
+- Referans dwgread -O JSON çıktısında OBJECTS altındaki açıkça tanımlanmış
+  LINE, INSERT, TEXT, LAYER vb. nesnelerin türlerine göre sayımı yapılır.
+  Bilinmeyen kayıtlar sayısal type alanından uydurulmaz.
+- MusaCAD'in mevcut birinci taraf C sondası aynı dosyada ulaştığı
+  bölüm/sayfa/handle okuma aşamasını bildirir; bu aşama nesne sayısı değildir.
+- Rapor sadece nesne tür/sayıları, native stage, kaynak SHA-256 ve
+  public dosya adını içerir. Ham DWG, layer adları, koordinatlar,
+  text içerikleri, handle listesi ve LibreDWG JSON dosyası yüklenmez.
+- Git LFS kaynağının SHA-256 değeri testten önce ve sonra kontrol edilir;
+  kaynak değişimi veya eksik indirme altyapı hatası olarak işaretlenir.
+  Rapor GitHub Actions artifact olarak 14 gün saklanır.
+
+## Büyük LibreDWG JSON çıktıları (PR #720 sınır düzeltmesi)
+
+İlk testte LibreDWG JSON çıktısı 128 MiB toplam dosya sınırına takılarak
+`libredwg_json_exceeds_bounded_limit` durumuna düşüyordu. Host-only
+karşılaştırıcı artık tüm JSON'u belleğe yüklemez: sabit sürümlü `ijson`
+olay ayrıştırıcısı ile `OBJECTS` içindeki tür alanlarını tek geçişte
+sayar. Ham koordinat, metin, handle ve layer adları rapora aktarılmaz.
+Toplam JSON boyutu 128 MiB'yi aşsa da sayım devam eder; korunan sınır
+tek bir çizimdeki 2.000.000 nesne kayıt sınırıdır. CI testi özellikle
+128 MiB üzeri JSON ve iç içe sahte kayıtları doğrular. Bu değişiklik
+LibreDWG'yi sadece izole host testine ekler; MusaCAD çekirdeğine eklemez.
+
+## LibreDWG'nin geçersiz JSON çıktısına karşı doğrudan tür sayımı
+
+Karagümrük AC1024 dosyasında normal JSON (150,8 MB) ve minJSON
+(101,5 MB) geçersiz belirteç içerdiğinden, yalnızca JSON ayrıştırıcısı
+ile kesin referans envanteri çıkartılamıyordu. GitHub Actions artık
+bunları sırayla dener ve ikisi de geçersizse `tests/libredwg_host_type_inventory.c`
+adlı **yalnızca CI host'unda derlenen** yardımcı programı kullanır.
+Bu program pinned LibreDWG ile aynı DWG'yi okur, yalnızca çözümlenmiş
+`Dwg_Object` kayıtlarının türlerini yayımlar; koordinat/handle/katman
+adı/metin içeriğini asla çıktıya almaz. Ham çizim veya ham LibreDWG
+JSON verisi artifact olarak yüklenmez. Çözücü uyarı bitleri
+`reference_decoder_warning_mask` alanında saklanır.
+Her üç yöntem başarısızsa iş akışı kırmızı kalır; başarısız bir
+referans okuması başarı diye raporlanmaz.
+
+Bu doğrudan host yardımcı aracı GPL LibreDWG kütüphanesine **sadece
+geçici GitHub Actions bilgisayarında** bağlanır. MusaCAD'in özgün
+çekirdeğine, Android APK'sına veya dağıtım çıktısına eklenmez.
+
+## AC1024 Karagümrük: ilk özgün okuyucu karşılaştırması
+
+GitHub'daki Karagümrük pis su çizimi **AC1024** biçimindedir ve mevcut
+MusaCAD native sürüm sondasının gerçek AC1024 parser kabulü yoktur.
+Bu nedenle test-only `real_dwg_native_stage_probe.c`, disk üzerindeki
+kaynak dosyayı değiştirmeden, geçici RAM kopyasının ilk altı baytını
+yalnızca tanı amacıyla `AC1018` biçimine alıp mevcut doğrulayıcılar ile
+korumalı bölüm haritası, sayfa haritası, bölüm sayfaları ve CRC tabanlı
+handle indeksini sınar. Çıkmadan önce bellek kopyasının imzası geri
+yüklenir. Bu giriş `ac1024_family_hypothesis_only` aşamasıdır; gerçek
+AC1024 biçimi olarak **asla accepted raporlanmaz**.
+
+Karagümrük pis su dosyasında bu test **145.279 aday indeks** buldu;
+ayrı LibreDWG host sayacı da **145.279 referans nesne kaydı** bildirdi.
+Sayı eşleşmesi tesadüfi veya kısmi indeks / sınıflandırma hatalarını
+dışlamaz. 10 AC1024 çizimden 9'u aday indeks aşamasına ulaştı;
+otomasyon çizimi korumalı dosya başlığından sonra fiziksel sayfa
+haritasında durdu. Bunlar henüz AC1024 tam okuyucu uyumluluğu değildir.
+
+İzleyen *ayrı* testte aynı geçici RAM kopyasıyla, geçerli aday indeksi
+olan ve kaynak boyutu en çok 12 MiB olan çizimlerde mevcut R2004
+kayıt-çerçeve CRC okuyucusu bütün indeksleri sınar. Sadece ham numerik
+BS türleri 17, 18, 19, 77 için aday sayımlar çıkarılır; bunlar tek
+başına sınıf/nesne adı, gövde koordinatı, embedded self handle,
+owner/layer bağlantısı veya AutoCAD eşdeğerliği kanıtı değildir.
+Eşleşen sayılar bile raporda yalnızca **candidate count correlation**
+olarak kalır; `entity_parity=NOT_MEASURABLE` değişmez.
+Yetersiz veya yanlış indeks/CRC durumunda kesin eşdeğerlik iddiası
+üretilmez. Çizim kaynağı SHA-256 değeri iki kez denetlenir.
+
+## Kayıt ofseti karşılaştırması (R2010)
+
+İlk kapsamlı orijinal Karagümrük pis su taramasında R2004 kayıt
+çerçevesi yalnızca **558 / 145.279** aday kaydın CRC'sini doğruladı;
+**144.721** kayıt için kabul üretilmedi. ODA'nın yayımlanmış
+DWG format tanımı R2010'un R2004 bölüm yapısı ile R2007
+ayrılmış string/handle alanını ve farklı object-type kodlamasını
+birleştirdiğini belirtir:
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+
+Bu nedenle sonraki CI tanısı, doğrulanmış `AcDbObjects` ve
+`AcDb:Handles` ham bölüm baytlarında *sürekli (continuous) nesne
+ofsetleri* hipotezini eski sayfa-içi ofset modelinden ayrı olarak
+test eder. İkinci harita da kendi CRC16 doğrulamasından geçer;
+kayıt CRC'leri her orijinal aday ofseti için ayrı doğrulanır.
+Sürekli ofsetli indeks profili Karagümrük'teki 10 AC1024 çizimden
+hiçbirinde mevcut katı ve CRC denetimli indeks kabulünü geçemedi.
+Bir diğer olası alternatif olan `page_absolute_handles` profili
+aynı kaynak üzerinde ayrı sınanır. Her profil özgün handle-map CRC'si
+ve orijinal kayıt çerçevesi CRC ölçümlerini ayrı raporlar;
+hiçbiri son kullanıcı çizim modeline otomatik kabul edilmez.
+
+Bu yöntem yalnızca geçici, izole tanı kodudur. Tam AC1024
+nesne sınıfı/handle self/owner/layer/renk doğrulaması ya da
+normal uygulama açılışı değildir. Yanlış ofset profilini
+başarıya yükseltmek yasaktır.
+
+## AC1024 komşu kayıt çerçevesi / indeks ofseti karşılaştırması
+
+Karagümrük pis su AC1024 orijinalinde **392 nesne veri sayfası** ve
+**14 handle veri sayfası** doğrulanmıştır. Bu değerler, önceki
+558/145.279 R2004-kayıt CRC geçişiyle aynı değildir; sayfa sayısı
+ile CRC başarısı arasında basit bir sayısal eşleşme bulunmamaktadır.
+
+Yeni salt-okunur, uygulama dışı tanı; CRC doğrulanmış `AcDb:Handles`
+indeksinden alınmış *farklı* nesne ofsetlerini sıralayıp komşu ofset
+farkını inceler. İlgili adresteki R2004 tipi MS uzunluk önekinden
+hesaplanan geçici kayıt boyu, sonraki farklı ofsetin başlangıcıyla
+tam eşleşiyor mu, kısa mı kalıyor, yoksa onu aşıyor mu sayılır.
+Uzunluk öneki geçersiz veya bölüm dışına taşıyorsa ayrıca sayılır.
+Toplam her zaman `farklı_ofset_sayısı - 1` olmalıdır.
+
+Bu deneme yalnızca **kayıt çerçevesi yerleşimi hipotezidir**.
+Bir komşu ofset ve uzunluk eşleşmesi tek başına CRC doğrulaması,
+embedded self-handle eşleşmesi, gerçek AC1024 nesne türü,
+owner/layer/renk veya geometri doğrulaması değildir.
+Çizim içindeki hiçbir koordinat, handle, ofset, metin veya blok adı
+CI raporuna yazılmaz. Gerçek CAD içeriği orijinal dosyada değişmez.
+
+## AC1024 komşu kayıt ofsetlerinin tüm dosyadaki sonucu
+
+İlk pilot AC1024 Karagümrük pis su testi, **145.278** komşu farklı
+ofset çiftinden **0**'ında ödünç alınan R2004 MS çerçeve boyunun
+bir sonraki ofsete tam denk geldiğini gösterdi. **145.276** geçerli
+çerçeve boyu bir sonraki ofsetten *önce* sona erdi, **0**'ı aştı,
+**2** adayda MS alanı geçersizdi. Aynı karakteristik, indekslenebilen
+diğer AC1024 çizimlerde de gözlendi.
+Referans: GitHub Actions run `41722782988`.
+
+Ölçümü daha anlamlı hale getirmek için test artık her pozitif
+komşu-ofset boşluğunu 1, 2, 3, 4, 5–16, 17–64, 65+
+bayt aralıklarında sayıyor; aralık toplamı mutlaka kısa çerçeve
+sayısına eşit olmalı. Bu istatistikler kaynak çizim baytları, adres
+listeleri, handle değerleri, koordinatlar veya kişisel bilgiler
+yayımlanmadan hesaplanır. Bir boşluk boyu eşleşmesi dahi tek başına
+AC1024 nesne dekoderi veya render kanıtı değildir.
+
+## Özgün MusaCAD ortak çekirdeğinde AC1024 kayıt-kanıt API'si
+
+`core/native/include/musacad_dwg_ac1024_record.h` ve
+`core/native/src/musacad_dwg_ac1024_record.c` ilk taraf MIT C11
+kaynaklarıdır. Tek bir indeks adresinden R2010 **MS + unsigned MC +
+OT + CRC16** kayıt çerçevesini salt-okunur, sınır kontrollü ve
+atomik biçimde doğrular. Özgün çizim/dekomprese kaynak ve çıktı
+birbirine alias olamaz; hatada çıktı değişmez.
+
+Gerçek Karagümrük pis su DWG'sinde bu yeni ortak çekirdek yordamı,
+bağımsız salt-okunur tanı koduyla karşılaştırıldığında:
+
+- **145.277 / 145.279** CRC doğrulanmış çerçeve,
+- **0** çekirdek doğrulama hatası,
+- **0** çekirdek / tanı kodu MS+MC boyu veya ham OT tür uyuşmazlığı,
+- **2** halen desteklenmeyen özel kayıt.
+
+Bağımsız tanı + ortak çekirdek karşılaştırma GitHub Actions
+`41727421605` çalışmasında başarılı sonuçlandı. C çekirdeği için
+ayrı `core_dwg_ac1024_record_test.c` regresyonu ile geçersiz MC,
+yanlış CRC, kısa tampon, bozulmamış orijinal giriş ve atomik çıktı
+kontrolleri ayrıca devreye alındı.
+
+Karagümrük çiziminde CRC doğrulanmış ham OT kayıt türleri ile izole
+LibreDWG host referans **sayım eşitliği** (LINE/INSERT/TEXT/MTEXT/
+ARC/CIRCLE/LWPOLYLINE/LAYER/BLOCK_HEADER) var. Bu **kesinlikle**
+kayıt kimliği, handle self, blok sahipliği, geometri, koordinat,
+renk, katman ilişkisi veya görüntüleme eşdeğerliği değildir. Tam
+AC1024 DWG açma yolu hâlâ fail-closed.
+
+## Kesinlikle kanıtlanmayan şeyler
+
+MusaCAD'in mevcut native stage sondası **tam entity envanteri üretmiyor**.
+Bu sebeple entity_parity = NOT_MEASURABLE, render_parity = NOT_TESTED ve
+autocad_equivalence = NOT_TESTED olarak kalır. Native accepted sonucu
+tam projeyi açtık anlamına gelmez. LibreDWG de nihai AutoCAD referansı
+değildir.
+
+## Sonraki gerçek geliştirme eşiği
+
+1. Özgün MusaCAD host okuyucudan orijinal DWG entity type, source handle,
+   owner, layer ve color envanterini eksiksiz dışarı verecek somut kanıt.
+2. Bu envanteri aynı dosyanın izole LibreDWG referans çıktısıyla ve
+   bağımsız AutoCAD çıktılarıyla karşılaştırmak.
+3. Kanıtlanan eksik reader/decoder adımlarını mevcut koda düzeltme olarak
+   uygulamak; yeni paralel owner/layer/block çözücüsü açmamak.
+
+LibreDWG GPL kapsamı host test süreciyle sınırlıdır; kaynak veya binary
+bağımsız MusaCAD çekirdeğine link/kopya edilmez. Önceki repodaki lisans
+izleri ticari dağıtım öncesi ayrıca incelenmelidir.
+
+İş akışı: .github/workflows/real-dwg-libredwg-host-oracle.yml
+
+
+## AC1024 LINE: model-space DATA ve doğrulanmış sahiplik sınırı (4 Kasım 2026)
+
+Salt-okunur GitHub Actions run `41895570094`, aynı 8 Karagümrük
+AC1024 dosyasındaki 5.142 örneklenmiş ham OT19 LINE kaydı için:
+
+- **4.113** kaydın DATA XYZ alanı dar, CRC-korumalı
+  `musa_dwg_ac1024_line_fields_probe` tarafından çözümlendi;
+  daha önce bu sayı **2.801** idi. Yeni **1.312** başarı
+  `entity_mode == 2` (model-space; açık owner H içermeyen) örnekleridir.
+- **2.801** kayıt, ayrıca orijinal CRC/OT/self-H ile doğrulanan
+  sahip OT49 ve katman OT51 bağlantısına sahiptir; bu sayının
+  artmaması doğrudur. `entity_mode == 1` (paper-space) örneklenen
+  kayıtlarda **0** kez görüldü.
+- Kalan **1.029** örnekte LINE DATA çözümü reddedildi:
+  **776** doğrulanamayan META ön eki,
+  **247** hâlen desteklenmeyen mode durumu ve kalan diğer
+  kısıtlı ortak-alan durumları. Bu sayılar kullanıcıya çizim
+  uyumluluk oranı olarak sunulamaz.
+- RAM dışında hiçbir DWG kaynağı değiştirilmedi. API başarısı
+  AutoCAD koordinat eşitliği veya ekran çizim kabulü değildir.
+
+Yeni `musa_dwg_ac1024_line_graph_probe` ortak C çekirdek API'si
+koordinat, LINE self-H ve farklı CRC/OT/self-H ile doğrulanmış
+BLOCK_HEADER OT49 / LAYER OT51 bağlantısını **aynı kaynak kayda**
+bağlar. Yalnızca açık sahiplikli (`mode 0`) kayıtları kabul eder;
+model/kâğıt alanındaki (`mode 1/2`) koordinatlar yine salt
+**provisional DATA** olarak kalır. Atomik sonuç ve sahte katman/
+owner, hatalı CRC ve bozuk indeks reddi sentetik C testleriyle
+sınanır. İzleyen gerçek-DWG tanısı, bu yeni API'yi aynı korpus
+üzerinde ayrıca ölçer. Tüm 2D/3D CAD işlevleri ve sahne kabulü
+ayrı bağımsız doğrulamaya tabidir.

@@ -82,6 +82,45 @@ class SharedCorePortabilityContract(unittest.TestCase):
         self.assertNotIn("assembleDirectDebug", workflow)
         self.assertNotIn("release_approved: true", workflow)
 
+    def test_apple_ios_simulator_core_swift_abi_is_required(self):
+        workflow = CROSS.read_text(encoding="utf-8")
+        script = (ROOT / "tests/run_native_crossbuild.sh").read_text(encoding="utf-8")
+        swift = (ROOT / "platforms/ios/MusaCADCoreAdapter.swift").read_text(encoding="utf-8")
+        module = (ROOT / "platforms/ios/include/module.modulemap").read_text(encoding="utf-8")
+        bridge = (ROOT / "platforms/ios/include/MusaCADCoreBridge.h").read_text(encoding="utf-8")
+        link = (ROOT / "tests/apple_core_abi_link_smoke.c").read_text(encoding="utf-8")
+
+        # Apple builds must exercise the real shared engine, not just a
+        # fake/dummy ABI or a source-file subset. No iOS app success is implied.
+        for required in [
+            "'platforms/ios/**'", "ios-simulator-abi:", "runs-on: macos-latest",
+            "run_native_crossbuild.sh ios-simulator",
+            "swiftc -target arm64-apple-ios15.0",
+            "MusaCADCoreAdapter.swift",
+        ]:
+            with self.subTest(workflow=required):
+                self.assertIn(required, workflow)
+        for required in [
+            "ios-simulator)", "iphonesimulator --show-sdk-path",
+            "arm64-apple-ios15.0-simulator", "set(sources) != tracked",
+            "core/native/CMakeLists.txt", "iphonesimulator clang",
+            "iphonesimulator ar", "iphonesimulator nm", "symbols.txt",
+            "apple_core_abi_link_smoke.c", "-typecheck",
+            "musa_dwg_ac1024_line_fields_probe",
+        ]:
+            with self.subTest(script=required):
+                self.assertIn(required, script)
+        self.assertIn("module MusaCADCore", module)
+        self.assertIn('header "MusaCADCoreBridge.h"', module)
+        self.assertIn('#include "musacad_core.h"', bridge)
+        self.assertIn("import MusaCADCore", swift)
+        self.assertIn("musa_core_abi_version()", swift)
+        self.assertIn("MUSA_CORE_ABI_VERSION", swift)
+        self.assertIn("musa_dwg_ac1024_line_fields_probe", link)
+        for forbidden in ["libredwg", "dwgread", "xcodebuild archive", "assembleDirectDebug"]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, script.lower())
+
     def test_shared_core_sources_are_explicitly_declared(self):
         cmake = CMAKE.read_text(encoding="utf-8")
         match = re.search(r"add_library\(musacad_core STATIC\s+(.*?)\)", cmake, re.S)

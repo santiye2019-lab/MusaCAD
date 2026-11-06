@@ -46,7 +46,20 @@ class NativeDwgStageProbeTest(unittest.TestCase):
     def test_r2010_version_is_not_falsely_accepted_as_r2004(self):
         record = self.probe(b"AC1024" + bytes(506))
         self.assertEqual(record["result"], "not_covered_by_this_native_probe")
-        self.assertEqual(record["native_stage"], "signature_only")
+        self.assertEqual(record["native_stage"], "ac1024_family_hypothesis_only")
+        self.assertEqual(record["evidence_count"], 0)
+        hypothesis = record["ac1024_compatibility_hypothesis"]
+        self.assertTrue(hypothesis["patched_signature_in_memory_only"])
+        self.assertFalse(hypothesis["validated_original_ac1024_decoder"])
+        for key in ("page_map_header", "physical_page_map",
+                    "objects_section_pages", "handles_section_pages",
+                    "candidate_handle_index"):
+            self.assertFalse(hypothesis[key], key)
+        self.assertEqual(hypothesis["candidate_handle_count"], 0)
+        self.assertFalse(hypothesis["continuous_offset_candidate_index"])
+        self.assertEqual(hypothesis["continuous_candidate_handles"], 0)
+        self.assertEqual(hypothesis["continuous_frame_crc_ok"], 0)
+        self.assertEqual(hypothesis["continuous_frame_crc_failed"], 0)
 
     def test_r2013_version_is_not_falsely_accepted_as_r2018(self):
         record = self.probe(b"AC1027" + bytes(506))

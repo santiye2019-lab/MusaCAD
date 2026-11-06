@@ -1,0 +1,199 @@
+# MusaCAD AC1024 — OT51 LAYER → OT505 MATERIAL kaynak-içi kanıt köprüsü
+
+**Tarih:** 2026-11-06  
+**PR:** https://github.com/santiye2019-lab/MusaCAD/pull/720  
+**Önceden geçen tam kaynak testi:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42124302570  
+**Yeni kanıt kodu:** tests/real_dwg_layer_class_bridge.py  
+**Yeni CI aşaması:** .github/workflows/real-dwg-native-stages.yml  
+**Yeni CI doğrulaması:** Bu yeni aşamanın sonuçları ayrıca kontrol edilmelidir; önceki yeşil CI, sonraki commitlerin doğrulaması değildir.
+
+## Kaynaktan doğrulanmış dar ilişki
+
+- 23 kaynak çizim içinden Karagümrük'ün beş AC1024 dosyasında incelenen toplam 14 adet OT51 LAYER örneğinde, önceki bağımsız C11 okuyucu özgün CRC/self-H ile üç terminal H hedefini doğruladı.
+- İkinci, üçüncü ve dördüncü terminal H referanslarının ham OT türleri sırasıyla **80, 505, 57** (14/14). 42/42 hedef ofseti ve nesne kimliği kaynak içinde doğrulandı.
+- Aynı kaynak çizimlerin kendi fiziksel AcDb:Classes bölümünden doğrulanmış sınıf numarası 505'in türü **OBJECT** ve DXF adı **MATERIAL** olarak okundu.
+- Bu bulgular aynı DWG kaynağına göre birleştirilebilir. Yeni CI raporunda tek bir çizimin sınıf kaydı başka çizimin OT505 hedefini kabul ettiremez. Sınıf kaydı çözülemeyen dosyalarda semantik bağlantı **reddedilir**.
+- Yeni tanı sadece örnek sayıları ve doğrulama durumlarını aktarır; ham handle, koordinat, katman adı, TEXT, uygulama EED verisi veya DWG kaynak baytlarını açıklamaz.
+
+## Henüz kanıtlanmayan CAD işlevleri
+
+Bu test **malzeme atama semantiği**, gerçek malzeme verileri, OT80/OT57'nin katman içindeki kesin rollerini, BYLAYER/BYBLOCK renk kalıtımını, CMC renklerini, katman açık/kapalı, frozen/locked, ölçüm, blok, render eşdeğerliği, DWG yazımı veya Android normal açmayı kabul etmez.
+
+OT80 ve OT57 türü ile ilgili sayısal kayıtlar, referans sırası nedeniyle *plotstyle* veya *linetype* diye otomatik atanmamalıdır. Son 2–4 terminal H bitinin anlamı çözülmeden bütün H akışı tamamlandı iddiası kurulamaz.
+
+## Sonraki kabul kapıları
+
+1. OT80/OT57 hedef nesnelerinin veri sözlüğü ve gerçek referans rolü için kaynak-içi kimlik/CRC dışındaki ek bağımsız semantik kanıt.
+2. Katman CMC + görünürlük bitlerinin gerçek kaynak eşleşmesi; gerekiyorsa viewport durumu.
+3. Aynı DWG için bağımsız görünürlük/renk render eşdeğerlik testi.
+4. Başarılı Android/iOS/macOS/Windows çekirdek kapıları ve final APK değerlendirmesi ancak tüm işlevsel kapsam doğrulandıktan sonra.
+
+**Birleştirme:** PR #720 açık kalır, main'e otomatik aktarım ve APK iddiası yoktur. LibreDWG yalnızca ayrı GitHub CI host oracle sürecindedir.
+
+
+## 6 Kasım 2026 — özgün C11 katman hedef üçlüsü doğrulaması
+
+**Saat dilimi:** Europe/Istanbul (UTC+03:00)  
+**Yeni test kod commit'i:** 45d9b7dd0206ae2c2bccbcb27e247574d0c33100  
+**Başarılı gerçek DWG kaynak testi:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42182888167  
+**CI çıktısı:** musacad-real-layer-class-bridge.json  
+**Bağımsız çekirdek:** core/native/src/musacad_dwg_ac1024_self_index.c
+
+Önceki yalnızca toplulaştırılmış sayımların ötesine geçildi. Yeni özgün C11
+musa_dwg_ac1024_layer_eed_tail_type_triplet_probe fonksiyonu, her bir gerçek
+OT51 LAYER kaydında dört tam H belirtecini ve ilk H5/0 boş belirtecini kontrol
+edip sonraki üç H hedefini kaynak CRC16/self-H ile yeniden doğruluyor:
+OT80 (sabit PLACEHOLDER), OT505 (bu kaynakta DXF MATERIAL olarak ayrı
+Classes bölümünden çözümlenmiş dinamik sınıf) ve OT57 (sabit LTYPE).
+
+**Gerçek kaynak sonucu:**
+- **14/14** gerçek katman kaydı, aynı kaynak içindeki C11 üçlü tip kanıtından geçti.
+- **42/42** hedef nesnesi, CRC / indeks / kendi H kimliği ve ham OT eşleşmesinden geçti.
+- **10** kayıtta 2 bit ve **4** kayıtta 4 bit bitmemiş H-kuyruk parçası kaldı.
+- Son parçaların **12**'si sıfır, **2**'si sıfır değildi; sıfır olanlara dolgu denmiyor.
+- Python kaynak matrisi ayrıca C11 üçlü kabul sayısını ve kayıtlardaki terminal
+  bit sayısını çapraz kontrol ediyor. Negatif sentetik testler tutarsız
+  toplamları, kayıp hedefleri, kaynak çakışmasını ve eksik parçaları reddediyor.
+
+**KESİN SINIR:** Bu bir veri kimliği ve ham H dizisi kanıtıdır. PLACEHOLDER,
+LTYPE ve MATERIAL isimleri, söz konusu H sırasının nihai CAD rolünü,
+malzeme atanmasını, çizgi tipi kalıtımını, CMC/BYLAYER rengini,
+layer açık/kapalı/donmuş durumunu, geometri ya da render eşdeğerliğini
+**kanıtlamaz**. C11 sonucunda h_tail_fully_decoded=0,
+target_roles_verified=0 ve display_accepted=0 korunur. Tam son H
+parçası çözülmeden hiçbir katman sahneye alınmaz.
+
+LibreDWG yalnızca CI'daki ayrı host referans aracıdır; uygulamanın
+özgün çekirdeğine eklenmedi. Kaynak DWG'ler değişmedi, PR #720
+main'e birleştirilmedi ve APK üretilmedi.
+
+
+
+## 6 Kasım 2026 — kaynak bit-deseni ve bayt-hizası incelemesi
+
+**Saat dilimi:** Europe/Istanbul (UTC+03:00)  
+**Kaynak kanıtın test edildiği commit:** 473147930e989ff6d0958abe35bae9f43e6aa93f  
+**Başarılı gerçek kaynak Actions çalışması:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42185003836  
+**Teknik çıktı:** musacad-real-layer-class-bridge.json
+
+Özgün birinci taraf C11 çözümleyicisine kısa OT51 H-terminal parçasının
+1..7 bitlik ham değeri ve bit-başı/bit-sonu mod 8 hizası eklendi.
+Dosya adı, katman adı, koordinatlar, handle'lar veya DWG kaynak baytları
+CI raporuna alınmıyor. Python sözleşmesi bit maskelerini örnek sayılarıyla
+karşılaştırıyor; imkânsız değerleri ve sahte örnek kapsamasını reddediyor.
+
+Kaynak DWG örnekleri üzerinde:
+- **5 kaynak çizim**, **14 doğrulanmış OT51 kaydı** ve **42 CRC/self-H destekli hedef**.
+- **10** parçanın uzunluğu **2 bit**, **4** parçanın uzunluğu **4 bit**.
+- **12** parçada ham değer **0**, **2** parçada **2-bit değer 3 (binary 11)**.
+- 2-bitliklerde görülen benzersiz ham değerler **{0,3}**;
+  4-bitliklerde görülen benzersiz ham değerler **{0}**.
+- Başlangıç hizası maskesi **80 (bit konumu 4 veya 6)**;
+  bitiş hizası maskesi **1 (konum 0)**. Tüm 14 parça bayt sınırında bitiyor.
+- Hiçbir parça henüz güvenilir biçimde padding sayılmadı. Sıfır olmayan
+  2-bit alanlar özellikle kesin dolgu varsayımını engelliyor.
+  h_tail_fully_decoded=false, rendering_verified=false ve
+  layer_visibility_parity_proven=false korunuyor.
+
+**Biçimle uyumlu, henüz işlev kabulü olmayan yorum:** ODA Open Design
+Specification for .dwg files 5.1, madde 18.1.51 LAYER (sayfa 152),
+R2000+ plotstyle/PLACEHOLDER; R2007+ material; common linetype
+H referanslarını bu sırayla tarif ediyor. Bu biçim sırası
+OT80 PLACEHOLDER → yerel OT505 MATERIAL → OT57 LTYPE üçlüsüyle uyumlu.
+Belge: https://kldp.org/files/OpenDesign_Specification_for_.dwg_files.pdf
+Buradaki biçim uyumu, gerçek malzeme/plotstyle/linetype kalıtımı,
+görüntü renkleri veya AutoCAD eşdeğerliğini tek başına kanıtlamaz.
+
+**Yeni regresyon koruması:** CI iş akışında en az **14 özgün C11 üçlü
+kanıtı ve 5 kaynak DWG** aranıyor. Daha az kanıt üretildiğinde, yanlışlıkla
+yeşil rapor verilmesi yerine CI başarısız olacak.
+Bu yeni asgari eşik için son commitin test sonucu, önceki
+4731479 kaynak çalışmasından ayrı izlenmelidir.
+
+
+## 6 Kasım 2026 — C11 orijinal handle-kuyruk bayt hizası kanıtı
+
+**Saat dilimi:** Europe/Istanbul (UTC+03:00)  
+**Kanıtlanan kod commit'i:** 9de2a34eb9e09fd437b0865777fada946a185a8d  
+**Başarılı gerçek DWG Actions:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42208768753  
+**Rapor çıktısı:** musacad-real-layer-class-bridge.json
+
+Özgün C11 çekirdeğine musa_dwg_ac1024_layer_eed_tail_alignment_witness
+eklendi. Bu yordam aynı orijinal kaynak DWG'nin CRC/self-H doğrulamalı
+OT51 kayıtlarında önce sabit OT80 PLACEHOLDER, çizim-yerel OT505
+ve sabit OT57 LTYPE ham tür üçlüsünü tekrar denetler. Daha sonra
+son 2 veya 4 bitlik H-kuyruk parçasının ham değerini ve
+bayt-içi başlangıç/bitiş hizasını kontrol eder. Fazladan tam bir H
+belirteci için 8 bit bulunmadığını kaydeder, fakat son bitlerin
+mutlaka dolgu olduğunu kabul etmez.
+
+Gerçek kaynak derlemesinden doğrulanmış sonuç:
+- **23** kaynak DWG incelendi; **10** AC1024, bunların **5** dosyasında
+  aşağıdaki 14 kaydın orijinal C11 kanıtı elde edildi.
+- **14/14** CRC/self-H doğrulamalı OT80 → OT505 → OT57 üçlüsü.
+- **14/14** yeni **C11 bayt hizası tanığı** başarıyla doğrulandı.
+- **42/42** hedef nesne orijinal kayıt kimliğiyle eşleşti.
+- Son parça uzunluğu **10 kez 2 bit**, **4 kez 4 bit**.
+- Ham değerler 2-bit: **0 ve 3**; 4-bit: **0**;
+  toplam **12 sıfır**, **2 sıfır olmayan** parça.
+- Bütün 14 örneğin bitişi **mod8=0**, başlangıcı mod8=4/6.
+- Sözleşme testleri bozuk sayıları, eksik kaynak kimliğini,
+  uyuşmayan C11/Python sonuçlarını ve test kapsama kaybını reddeder.
+
+**Kabul sınırı:** byte_alignment_compatible=1 yalnızca R2010
+biçimiyle uyumlu kısmi fiziksel gözlemdir.
+padding_proven=0, target_roles_verified=0, display_accepted=0
+ve h_tail_fully_decoded=false korunur. Bu test katmanların gerçek
+açık/kapalı/donmuş durumunu, CMC/BYLAYER rengini, görünürlük/render
+eşdeğerliğini veya normal Android DWG açılışını kanıtlamaz.
+
+**Biçim referansı:** ODA Open Design Specification for .dwg files
+5.4.1 (20.4.54 LAYER; ortak nesne/varlık bayt tamamlama bilgisi).
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+
+**İzole test ilkesi:** LibreDWG yalnızca ayrı GitHub CI host referans
+aracı; özgün MusaCAD C11 çekirdeğine veya mobil uygulamaya dahil
+edilmedi. DWG kaynakları değiştirilmedi. PR #720 main'e birleştirilmedi.
+
+
+
+## 6 Kasım 2026 — aynı kaynakta OT51 ham durum biti ve H bağlantısı
+
+**Saat dilimi:** Türkiye saati, UTC+03:00  
+**C11 kod commit'i:** d9b76968e3829b100ac01e4d820851d6450f36bb  
+**Başarılı gerçek DWG testi:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42216896504  
+**Kanıt arşivi:** musacad-real-dwg-native-stage-diagnostic / musacad-real-layer-class-bridge.json
+
+Yeni özgün C11 musa_dwg_ac1024_layer_eed_raw_state_join yordamı, aynı
+orijinal OT51 LAYER kaydında CRC16/self-H ile doğrulanmış kayıt kimliği,
+EED sonrası ham 70/290/370 bitleri, üç bağımsız OT80 → OT505 → OT57
+hedefini ve son 2/4 bitin bayt hizasını çapraz doğruluyor.
+
+**Gerçek Karagümrük kaynak sonucu:**
+
+- **23** DWG incelendi; bunların **10'u AC1024**.
+- **5** gerçek çizimde **14/14** özgün C11 kaynak-içi bit/H eşleşmesi.
+- **42/42** hedef nesne ayrı CRC/self-H kimliğinden geçti.
+- Ham frozen=1: **0** örnek, ham on=1: **0** örnek,
+  ham locked=1: **0** örnek, eşlenmemiş bit: **0** örnek.
+- Kaynak dosyalar değişmedi; katman adı, koordinat ve handle
+  değerleri rapora aktarılmadı.
+
+**KESİN SINIR:** Sıfır ham bit değerleri bütün katmanlar açık,
+görünür, kilitsiz veya doğru renkte çiziliyor anlamına gelmez.
+Bu yalnızca 14 örnekteki ham bit değerleridir. Viewport overrides,
+CMC/indexed/RGB renkler, BYLAYER/BYBLOCK kalıtımı, materyal veya
+linetype görselleştirmesi, LINE/INSERT katman bağları ve normal
+Android DWG render eşdeğerliği henüz doğrulanmış değildir.
+
+C11 kabul bayrakları hâlâ full_h_tail_decoded=0,
+layer_visibility_parity_verified=0, bylayer_color_verified=0,
+display_accepted=0. Son H bitlerinin dolgu olduğu kanıtlanmadı.
+
+**Sonraki teknik eşik:** Aynı özgün kaynakta doğrulanmış katman
+bitlerini gerçek çizim nesnesinin layer-handle bağına ve bağımsız CMC
+renk kaydına bağlayan bir kaynak ve görüntü eşdeğerlik kapısı.
+
+**Lisans ve çalışma zamanı:** LibreDWG yalnızca ayrı host CI
+referansıdır; MusaCAD'in özgün C11 runtime'ına ve APK'ya dahil
+edilmedi. PR #720 main dalına birleştirilmedi.
