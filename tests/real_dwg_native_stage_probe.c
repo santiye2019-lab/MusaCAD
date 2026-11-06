@@ -68,7 +68,8 @@ static void report(const char *signature, const char *result,
                    size_t r2010_headers,size_t r2010_payloads,
                    size_t r2010_header_crc,
                    size_t r2010_lz_eligible,size_t r2010_lz_verified,
-                   int handles_join,size_t handles_logical_bytes) {
+                   int handles_join,size_t handles_logical_bytes,
+                   int handles_reason) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
@@ -85,7 +86,8 @@ static void report(const char *signature, const char *result,
            "\"ac1024_data_lz_eligible_pages\":%zu,"
            "\"ac1024_data_lz_verified\":%zu,"
            "\"ac1024_handles_join_verified\":%s,"
-           "\"ac1024_handles_join_logical_bytes\":%zu}\n",
+           "\"ac1024_handles_join_logical_bytes\":%zu,"
+           "\"ac1024_handles_join_probe_reason\":%d}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
            r2010_strict_lz ? "true" : "false",
@@ -93,7 +95,8 @@ static void report(const char *signature, const char *result,
            r2010_links_candidate ? "true" : "false",r2010_link_count,
            r2010_headers,r2010_payloads,r2010_header_crc,
            r2010_lz_eligible,r2010_lz_verified,
-           handles_join?"true":"false",handles_logical_bytes);
+           handles_join?"true":"false",handles_logical_bytes,
+           handles_reason);
 }
 
 int main(int argc, char **argv) {
@@ -123,6 +126,7 @@ int main(int argc, char **argv) {
     size_t ac1024_lz_eligible=0u,ac1024_lz_verified=0u;
     int ac1024_handles_join=0;
     size_t ac1024_handles_bytes=0u;
+    int ac1024_handles_reason=0;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -221,6 +225,22 @@ int main(int argc, char **argv) {
                     envelope.source_handles_logical_join_verified!=0u;
                 ac1024_handles_bytes=
                     envelope.source_handles_logical_bytes;
+                if(!ac1024_handles_join&&envelope.directory_shape_candidate){
+                    if(!envelope.source_handles_name_candidates)
+                        ac1024_handles_reason=1;
+                    else if(envelope.source_directory_duplicate_names)
+                        ac1024_handles_reason=2;
+                    else if(envelope.source_handles_candidate_compression!=2u)
+                        ac1024_handles_reason=3;
+                    else if(envelope.source_handles_candidate_encryption!=0u)
+                        ac1024_handles_reason=4;
+                    else if(!envelope.source_handles_candidate_logical_bytes||
+                            envelope.source_handles_candidate_logical_bytes>
+                                16u*1024u*1024u)
+                        ac1024_handles_reason=5;
+                    else
+                        ac1024_handles_reason=6;
+                }
             }
         }
     } else if (format == MUSA_DWG_2018_2026) {
@@ -256,7 +276,8 @@ int main(int argc, char **argv) {
            ac1024_links_candidate,ac1024_links_matched,
            ac1024_masked_headers,ac1024_payloads,ac1024_header_crc,
            ac1024_lz_eligible,ac1024_lz_verified,
-           ac1024_handles_join,ac1024_handles_bytes);
+           ac1024_handles_join,ac1024_handles_bytes,
+           ac1024_handles_reason);
     free(file);
     return 0;
 }
