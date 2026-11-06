@@ -337,9 +337,12 @@ static void r2010_data_page_crc_candidate_test(void){
            !e.strict_lz_eligible_pages&&!e.strict_lz_verified);
     le32(decoded+40u,2u);
     loc[0].page_id=8u;
+    const MusaDwgAc1024PageChecksumEvidence prior=e;
     assert(!musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
-    assert(!e.masked_headers_verified);
+    /* Invalid metadata is fail-atomic: preserve the caller's old result,
+     * not zero it as in an accepted but individually refused DATA page. */
+    assert(memcmp(&e,&prior,sizeof e)==0);
     loc[0].page_id=7u;
     assert(!musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,
