@@ -1,0 +1,34 @@
+name: MusaCAD diagnostic report privacy and upload tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'server/ai-worker/**'
+      - '.github/workflows/diagnostic-report-privacy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/ai-worker/**'
+      - 'app/src/main/java/com/musa/cad/MusaCadDiagnosticReports.java'
+      - 'app/src/main/java/com/musa/cad/MainActivity.java'
+      - 'app/build.gradle'
+      - '.github/workflows/diagnostic-report-privacy.yml'
+permissions:
+  contents: read
+jobs:
+  private-report-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check and privacy contract tests
+        run: |
+          node --check server/ai-worker/src/index.js
+          node --check server/ai-worker/src/diagnostics.js
+          npm --prefix server/ai-worker test
