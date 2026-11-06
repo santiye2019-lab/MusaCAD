@@ -49,3 +49,43 @@ Yeni özgün C11 yordamı musa_dwg_ac1024_line_eed_raw_layer_color_join, **aynı
 - EED olmayan LINE'lar ve INSERT/blokları ayrı kabul kapısında ele almak; gerçek renk ve görünürlük için bağımsız render karşılaştırması gereklidir.
 
 **Mimari:** LibreDWG yalnızca izole GitHub host oracle karşılaştırmasıdır; özgün C11 MusaCAD çalışma zamanı, mobil uygulama veya APK'ya bağlanmadı. Orijinal DWG'ler değiştirilmedi. PR #720 henüz main'e birleştirilmedi.
+
+
+## 6 Kasım — Kaynak içi ham renk indeksi kategorileri (214 LINE)
+
+**Kod commit'i:** 0e92bb3f0b81d0c7a8b54137f56788e710bbbdc9  
+**Başarılı orijinal DWG Actions çalışması:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42221583472  
+**Kaynak raporu:** musacad-real-layer-class-bridge.json  
+**Saat dilimi:** Europe/Istanbul (UTC+03:00).
+
+Özgün C11 musa_dwg_ac1024_line_eed_raw_layer_color_join yordamından
+üretilen ham renk indeksleri, her doğrulanan OT19 LINE → OT51 LAYER
+kaydı için birbirini dışlayan beş kategoriye ayrıldı. Sayılar
+aynı AcDbObjects kaynağının CRC ve self-H kontrollerinden geliyor.
+Bütün kategoriler toplamı doğrulanmış kayıt sayısına eşit değilse
+GitHub CI testleri reddediyor.
+
+| LINE orijinal ham renk indeksi | Kayıt sayısı |
+| --- | ---: |
+| **256** (BYLAYER adayı; renk mirası KANITLANMADI) | **128** |
+| **1–255** (doğrudan ACI palet adayı; piksel KANITLANMADI) | **75** |
+| **0** (BYBLOCK adayı; blok zinciri KANITLANMADI) | **11** |
+| **257** | **0** |
+| **258 veya üzeri** | **0** |
+| **Toplam** | **214/214** |
+
+**Sahaya ait kaynak kapsamı:** 23 DWG, bunlardan 10 AC1024.
+Özgün LINE → LAYER kaydı doğrulaması için sınırlı 297 örnek seçildi,
+214'ü doğrulandı; 83 örnek eksik okuyucu kanıtı nedeniyle güvenli
+biçimde reddedildi (67 LAYER bayrak okuması, 16 H hedef üçlüsü).
+Reddedilme, kaynak DWG'nin bozuk olduğu anlamına gelmez.
+Açık RGB LINE sayımı **0**. Doğrulanan örneklerin raw frozen/on/locked
+bitleri 0; viewport ve blok görünürlüğü eşdeğerliği kanıtı değildir.
+
+**Sonraki çekirdek eşiği:** CRC/self-H doğrulamalı özgün LAYER CMC
+alanı çözülmeden ve entity/layer/blok/viewport özellikleri
+birlikte karşılaştırılmadan BYLAYER/ACI/BYBLOCK renkleri
+render tarafında kabul edilmeyecek. Parity bayrakları
+false ve display_accepted=0 kalır.
+LibreDWG ayrı CI host oracle olarak kalır. Orijinal DWG
+değiştirilmedi, PR #720 main'e birleştirilmedi ve APK üretilmedi.
