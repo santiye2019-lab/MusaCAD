@@ -48,6 +48,10 @@ typedef struct MusaDwgAc1024PageChecksumEvidence {
      * This is read-only diagnostic; neither count implies CAD semantics. */
     uint32_t strict_lz_eligible_pages;
     uint32_t strict_lz_verified;
+    /* Only aggregate counters for source-named Handles pages. */
+    uint32_t handles_page_references;
+    uint32_t handles_strict_lz_eligible;
+    uint32_t handles_strict_lz_verified;
 } MusaDwgAc1024PageChecksumEvidence;
 /* The source must have already passed original AC1024 physical map and
  * section-map Adler32/strict LZ; caller supplies original authenticated
