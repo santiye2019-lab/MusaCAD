@@ -1,0 +1,10 @@
+# MusaCAD multi-version DWG candidate routing — provenance
+
+- **Location:** `core/firstparty/dwg_route/`, independent portable C11 component, MIT licensed.
+- **Authorship:** Independently authored in MusaCAD from the public six-byte DWG format identifier convention. This is not a LibreDWG, ODA, Autodesk SDK, or legacy GPL source copy and links no third-party CAD parser.
+- **Intent:** A single format-specific routing decision for the three priority readers (AC1018, AC1024, AC1032), rather than implementing geometry three times. It also distinguishes recognized but not yet routed AC1009, AC1012, AC1014, AC1015, AC1021, and AC1027 file tokens, and rejects malformed/unknown formats.
+- **Guarantees:** Reads only the first six bytes; accepts arbitrary subsequent binary file content; never modifies caller bytes; returns an explicit candidate adapter or a fail-closed state. A short, NULL, invalid, or unrealistically oversized buffer cannot be routed.
+- **Non-guarantees:** This code **does not parse DWG sections, decompress pages, read objects, recognize a valid full DWG, perform rendering, or prove any version's reading percentage**. Candidate status is **not** a statement that the corresponding reader is implemented, integrated, or has passed source-fidelity tests.
+- **Separation:** No changes to the legacy GPL-marked `core/native` parser or shipping Android JNI. The native MusaCAD `MC1032` `.mcad` file signature remains distinct from the external AC1032 DWG signature. This component is a prerequisite for future clean-room dispatch integration, not a completed product feature.
+- **Verification:** `cmake -S core/firstparty/dwg_route -B build-dwg-route -DBUILD_TESTING=ON && cmake --build build-dwg-route && ctest --test-dir build-dwg-route --output-on-failure`. The new workflow runs Linux, Windows and macOS C11 checks.
+- **Acceptance policy:** Keep readers AC1018, AC1024 and AC1032 in the same feature-by-real-DWG acceptance matrix (issue #721). Do not declare three readers 100% until each has full reference, integration and platform evidence. AC1021/AC1027 and other format gaps remain explicit.
