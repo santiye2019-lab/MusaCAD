@@ -373,6 +373,10 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_fragment_bits_5": 0,
             "sampled_layer_eed_terminal_fragment_bits_6": 0,
             "sampled_layer_eed_terminal_fragment_bits_7": 0,
+            "sampled_layer_eed_terminal_fragment_2bit_pattern_mask": 0,
+            "sampled_layer_eed_terminal_fragment_4bit_pattern_mask": 0,
+            "sampled_layer_eed_terminal_fragment_start_mod8_mask": 0,
+            "sampled_layer_eed_terminal_fragment_end_mod8_mask": 0,
             "sampled_layer_eed_terminal_fragment_prefix_count": 0,
             "sampled_layer_eed_terminal_fragment_prefix_code_5": 0,
             "sampled_layer_eed_terminal_fragment_prefix_code_other": 0,
@@ -459,6 +463,20 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_source_terminal_bit_patterns_need_matching_witness(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for field, value in (
+            ("sampled_layer_eed_terminal_fragment_2bit_pattern_mask", 2),
+            ("sampled_layer_eed_terminal_fragment_4bit_pattern_mask", 8),
+            ("sampled_layer_eed_terminal_fragment_start_mod8_mask", 1),
+            ("sampled_layer_eed_terminal_fragment_end_mod8_mask", 1),
+        ):
+            bad = deepcopy(original)
+            bad["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_fake_result(bad)
+
     def test_original_layer_type_triplet_cannot_be_fabricated(self):
         baseline = ac1024_probe_record()
         self.assertEqual(validate_fake_result(baseline), baseline)
