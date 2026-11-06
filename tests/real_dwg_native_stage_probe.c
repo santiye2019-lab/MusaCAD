@@ -483,6 +483,15 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_join_explicit_owner;
     size_t sampled_line_eed_join_implicit_layer;
     size_t sampled_line_eed_join_xdictionary;
+    /* Bounded first 64 source-proven EED OT19 LINEs per source DWG. */
+    size_t sampled_line_eed_layer_state_attempts;
+    size_t sampled_line_eed_layer_state_verified;
+    size_t sampled_line_eed_layer_state_refused;
+    size_t sampled_line_eed_layer_state_frozen;
+    size_t sampled_line_eed_layer_state_on;
+    size_t sampled_line_eed_layer_state_locked;
+    size_t sampled_line_eed_layer_state_raw_color_256;
+    size_t sampled_line_eed_layer_state_explicit_rgb;
     /* Independent CRC/authenticated APPID OT67 target references from
      * the original EED frames; never an application-semantics claim. */
     size_t sampled_line_eed_appid_attempts;
@@ -2105,6 +2114,38 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                 joined.geometry.end[1] == eed_xyz.end[1] &&
                                                                 joined.geometry.end[2] == eed_xyz.end[2]) {
                                                                 ++hint.sampled_line_eed_join_verified;
+                                                                if (hint.sampled_line_eed_layer_state_attempts < 64u) {
+                                                                    ++hint.sampled_line_eed_layer_state_attempts;
+                                                                    MusaDwgAc1024LineEedRawLayerColorJoin raw_color = {0};
+                                                                    if (musa_dwg_ac1024_line_eed_raw_layer_color_join(
+                                                                            objects, nb, recovered, legacy_count,
+                                                                            recovered[k].embedded_absolute_handle,
+                                                                            &raw_color) &&
+                                                                        raw_color.line_geometry_crc_verified &&
+                                                                        raw_color.layer_raw_state_crc_verified &&
+                                                                        raw_color.layer_h_targets_crc_verified &&
+                                                                        !raw_color.bylayer_color_parity_verified &&
+                                                                        !raw_color.viewport_visibility_verified &&
+                                                                        !raw_color.display_accepted &&
+                                                                        raw_color.line_handle ==
+                                                                            recovered[k].embedded_absolute_handle &&
+                                                                        raw_color.line_record_offset ==
+                                                                            recovered[k].record_offset) {
+                                                                        ++hint.sampled_line_eed_layer_state_verified;
+                                                                        if (raw_color.frozen_raw_bit)
+                                                                            ++hint.sampled_line_eed_layer_state_frozen;
+                                                                        if (raw_color.on_raw_bit)
+                                                                            ++hint.sampled_line_eed_layer_state_on;
+                                                                        if (raw_color.locked_raw_bit)
+                                                                            ++hint.sampled_line_eed_layer_state_locked;
+                                                                        if (raw_color.line_raw_color_index == 256u)
+                                                                            ++hint.sampled_line_eed_layer_state_raw_color_256;
+                                                                        if (raw_color.line_has_explicit_rgb)
+                                                                            ++hint.sampled_line_eed_layer_state_explicit_rgb;
+                                                                    } else {
+                                                                        ++hint.sampled_line_eed_layer_state_refused;
+                                                                    }
+                                                                }
                                                                 if (joined.graph.handles.entity_mode == 0u)
                                                                     ++hint.sampled_line_eed_join_explicit_owner;
                                                                 else
@@ -2731,6 +2772,14 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_join_explicit_owner\":%zu,"
                "\"sampled_line_eed_join_implicit_layer\":%zu,"
                "\"sampled_line_eed_join_xdictionary\":%zu,"
+               "\"sampled_line_eed_layer_state_attempts\":%zu,"
+               "\"sampled_line_eed_layer_state_verified\":%zu,"
+               "\"sampled_line_eed_layer_state_refused\":%zu,"
+               "\"sampled_line_eed_layer_state_frozen\":%zu,"
+               "\"sampled_line_eed_layer_state_on\":%zu,"
+               "\"sampled_line_eed_layer_state_locked\":%zu,"
+               "\"sampled_line_eed_layer_state_raw_color_256\":%zu,"
+               "\"sampled_line_eed_layer_state_explicit_rgb\":%zu,"
                "\"sampled_line_eed_appid_attempts\":%zu,"
                "\"sampled_line_eed_appid_verified\":%zu,"
                "\"sampled_line_eed_appid_refused\":%zu,"
@@ -3164,6 +3213,14 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_join_explicit_owner,
                hint->sampled_line_eed_join_implicit_layer,
                hint->sampled_line_eed_join_xdictionary,
+               hint->sampled_line_eed_layer_state_attempts,
+               hint->sampled_line_eed_layer_state_verified,
+               hint->sampled_line_eed_layer_state_refused,
+               hint->sampled_line_eed_layer_state_frozen,
+               hint->sampled_line_eed_layer_state_on,
+               hint->sampled_line_eed_layer_state_locked,
+               hint->sampled_line_eed_layer_state_raw_color_256,
+               hint->sampled_line_eed_layer_state_explicit_rgb,
                hint->sampled_line_eed_appid_attempts,
                hint->sampled_line_eed_appid_verified,
                hint->sampled_line_eed_appid_refused,

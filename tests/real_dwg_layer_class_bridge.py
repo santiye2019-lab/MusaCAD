@@ -62,6 +62,12 @@ def summarize(stage: dict) -> dict:
         "terminal_fragment_end_alignment_mask": 0,
         "h_tail_fully_decoded": False,
         "verified_raw_target_records": 0,
+        "line_eed_to_source_layer_state_attempts": 0,
+        "line_eed_to_source_layer_state_verified": 0,
+        "line_eed_to_source_layer_state_refused": 0,
+        "line_eed_join_raw_color_index_256_candidates": 0,
+        "line_eed_join_explicit_rgb_candidates": 0,
+        "line_layer_bylayer_rendering_parity": False,
         "first_party_native_type_triplets_verified": 0,
         "first_party_native_byte_alignment_witnesses": 0,
         "first_party_source_local_raw_state_joins": 0,
@@ -93,6 +99,30 @@ def summarize(stage: dict) -> dict:
         if not isinstance(h, dict):
             raise EvidenceError("missing_ac1024_provenance")
 
+        ll_attempts = _integer(
+            h, "sampled_line_eed_layer_state_attempts", 64)
+        ll_verified = _integer(
+            h, "sampled_line_eed_layer_state_verified", 64)
+        ll_refused = _integer(
+            h, "sampled_line_eed_layer_state_refused", 64)
+        ll_raw_256 = _integer(
+            h, "sampled_line_eed_layer_state_raw_color_256", 64)
+        ll_rgb = _integer(
+            h, "sampled_line_eed_layer_state_explicit_rgb", 64)
+        raw_counts = [
+            _integer(h, "sampled_line_eed_layer_state_" + k, 64)
+            for k in ("frozen", "on", "locked")
+        ]
+        if (ll_attempts != min(
+                64, _integer(h, "sampled_line_eed_join_verified", 100000))
+                or ll_verified + ll_refused != ll_attempts or
+                max([ll_raw_256, ll_rgb] + raw_counts) > ll_verified):
+            raise EvidenceError("line_to_layer_raw_state_without_source_proof")
+        aggregate["line_eed_to_source_layer_state_attempts"] += ll_attempts
+        aggregate["line_eed_to_source_layer_state_verified"] += ll_verified
+        aggregate["line_eed_to_source_layer_state_refused"] += ll_refused
+        aggregate["line_eed_join_raw_color_index_256_candidates"] += ll_raw_256
+        aggregate["line_eed_join_explicit_rgb_candidates"] += ll_rgb
         n = _integer(h, "sampled_layer_eed_terminal_candidate_verified", 2048)
         raw80 = _integer(h, "sampled_layer_eed_terminal_candidate_ot80_placeholder", 8192)
         raw57 = _integer(h, "sampled_layer_eed_terminal_candidate_ot57_ltype", 8192)

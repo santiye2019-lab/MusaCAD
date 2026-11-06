@@ -174,6 +174,39 @@ int musa_dwg_ac1024_line_eed_verified_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_line_handle, MusaDwgAc1024LineEedJoinedEvidence *out);
 
+/* EED-bearing OT19 LINE source-local raw color + layer-state evidence.
+ * Validates original LINE coordinates / EED / H graph and the exact
+ * layer OT51's CRC/self-H, state and OT80/505/57 graph. No file blending.
+ * A raw index 256 is only a BYLAYER candidate, NOT accepted paint.
+ * This API never verifies CMC inheritance, viewport visibility, block
+ * placement or rendering. Fails atomically on invalid / aliased inputs. */
+typedef struct MusaDwgAc1024LineEedRawLayerColorJoin {
+    uint64_t line_handle;
+    uint64_t line_record_offset;
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    uint16_t layer_raw_70_290_370;
+    uint16_t line_raw_color_index;
+    uint8_t entity_mode;
+    uint8_t frozen_raw_bit;
+    uint8_t on_raw_bit;
+    uint8_t locked_raw_bit;
+    uint8_t line_has_explicit_rgb;
+    uint8_t line_rgb_method;
+    uint8_t line_has_color_reference;
+    uint8_t line_geometry_crc_verified;
+    uint8_t layer_raw_state_crc_verified;
+    uint8_t layer_h_targets_crc_verified;
+    uint8_t bylayer_color_parity_verified; /* ALWAYS zero */
+    uint8_t viewport_visibility_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LineEedRawLayerColorJoin;
+int musa_dwg_ac1024_line_eed_raw_layer_color_join(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024LineEedRawLayerColorJoin *out);
+
 #ifdef __cplusplus
 }
 #endif

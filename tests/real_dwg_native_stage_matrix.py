@@ -908,6 +908,34 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                     and mask2 <= 1 and mask4 <= 1)):
             raise ValueError("invalid_original_layer_terminal_raw_pattern")
 
+        # EED LINE -> independently authenticated raw OT51 state/CMC
+        # source-local evidence. A LINE indexed color 256 is only a
+        # BYLAYER candidate, NOT proof of actual rendered pixel color.
+        line_layer_keys = (
+            "sampled_line_eed_layer_state_attempts",
+            "sampled_line_eed_layer_state_verified",
+            "sampled_line_eed_layer_state_refused",
+            "sampled_line_eed_layer_state_frozen",
+            "sampled_line_eed_layer_state_on",
+            "sampled_line_eed_layer_state_locked",
+            "sampled_line_eed_layer_state_raw_color_256",
+            "sampled_line_eed_layer_state_explicit_rgb",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in line_layer_keys):
+            raise ValueError("invalid_source_local_line_layer_color_counts")
+        (ll_attempts, ll_verified, ll_refused, ll_frozen,
+         ll_on, ll_locked, ll_256, ll_rgb) = (
+             hint[k] for k in line_layer_keys
+        )
+        line_eed_verified = hint.get("sampled_line_eed_join_verified")
+        if (type(line_eed_verified) is not int or line_eed_verified < 0 or
+                ll_attempts != min(64, line_eed_verified) or
+                ll_verified + ll_refused != ll_attempts or
+                max(ll_frozen, ll_on, ll_locked, ll_256, ll_rgb)
+                > ll_verified):
+            raise ValueError("unproven_source_local_line_layer_color_bridge")
+
         line_keys = (
             "sampled_line_attempts",
             "sampled_line_common_verified",

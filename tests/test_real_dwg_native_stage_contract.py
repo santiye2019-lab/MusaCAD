@@ -260,6 +260,14 @@ def ac1024_probe_record():
             "sampled_line_eed_join_explicit_owner": 0,
             "sampled_line_eed_join_implicit_layer": 0,
             "sampled_line_eed_join_xdictionary": 0,
+            "sampled_line_eed_layer_state_attempts": 0,
+            "sampled_line_eed_layer_state_verified": 0,
+            "sampled_line_eed_layer_state_refused": 0,
+            "sampled_line_eed_layer_state_frozen": 0,
+            "sampled_line_eed_layer_state_on": 0,
+            "sampled_line_eed_layer_state_locked": 0,
+            "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_explicit_rgb": 0,
             "sampled_line_eed_appid_attempts": 0,
             "sampled_line_eed_appid_verified": 0,
             "sampled_line_eed_appid_refused": 0,
@@ -485,6 +493,24 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             bad["ac1024_compatibility_hypothesis"][field] = value
             with self.subTest(field=field), self.assertRaises(ValueError):
                 validate_fake_result(bad)
+
+    def test_source_local_line_layer_color_cannot_be_fabricated(self):
+        baseline = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(baseline), baseline)
+        for key in (
+            "sampled_line_eed_layer_state_attempts",
+            "sampled_line_eed_layer_state_verified",
+            "sampled_line_eed_layer_state_refused",
+            "sampled_line_eed_layer_state_frozen",
+            "sampled_line_eed_layer_state_on",
+            "sampled_line_eed_layer_state_locked",
+            "sampled_line_eed_layer_state_raw_color_256",
+            "sampled_line_eed_layer_state_explicit_rgb",
+        ):
+            fake = deepcopy(baseline)
+            fake["ac1024_compatibility_hypothesis"][key] = 1
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                validate_fake_result(fake)
 
     def test_original_layer_type_triplet_cannot_be_fabricated(self):
         baseline = ac1024_probe_record()

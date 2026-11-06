@@ -28,6 +28,15 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_state_join_on": 0,
             "sampled_layer_eed_state_join_locked": 0,
             "sampled_layer_eed_state_join_unmapped": 0,
+            "sampled_line_eed_join_verified": 0,
+            "sampled_line_eed_layer_state_attempts": 0,
+            "sampled_line_eed_layer_state_verified": 0,
+            "sampled_line_eed_layer_state_refused": 0,
+            "sampled_line_eed_layer_state_frozen": 0,
+            "sampled_line_eed_layer_state_on": 0,
+            "sampled_line_eed_layer_state_locked": 0,
+            "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_explicit_rgb": 0,
             "sampled_layer_eed_flags_verified": n,
             "sampled_layer_eed_flags_frozen_bit": 0,
             "sampled_layer_eed_flags_on_bit": 0,
@@ -189,6 +198,23 @@ class LayerClassBridgeTests(unittest.TestCase):
             item["ac1024_compatibility_hypothesis"][field] = value
             with self.subTest(field=field), self.assertRaises(EvidenceError):
                 summarize(stage(item))
+
+    def test_eed_line_color_index_is_not_bylayer_render_parity(self):
+        item = sample(2)
+        h = item["ac1024_compatibility_hypothesis"]
+        h["sampled_line_eed_join_verified"] = 3
+        h["sampled_line_eed_layer_state_attempts"] = 3
+        h["sampled_line_eed_layer_state_verified"] = 1
+        h["sampled_line_eed_layer_state_refused"] = 2
+        h["sampled_line_eed_layer_state_raw_color_256"] = 1
+        out = summarize(stage(item))
+        self.assertEqual(out["line_eed_to_source_layer_state_verified"], 1)
+        self.assertEqual(out["line_eed_to_source_layer_state_refused"], 2)
+        self.assertEqual(out["line_eed_join_raw_color_index_256_candidates"], 1)
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        h["sampled_line_eed_layer_state_refused"] = 1
+        with self.assertRaises(EvidenceError):
+            summarize(stage(item))
 
     def test_real_corpus_minimum_coverage_gate(self):
         out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))

@@ -961,7 +961,32 @@ static int test_eed_appid_original_records(void) {
     return 1;
 }
 
+
+static int test_eed_raw_layer_color_bridge_refuses_unproven_source(void) {
+    uint8_t source[64] = {0};
+    MusaDwgAc1024SelfIdentity index[1] = {{0}};
+    MusaDwgAc1024LineEedRawLayerColorJoin out = {0};
+    out.line_handle = UINT64_C(12345);
+    const MusaDwgAc1024LineEedRawLayerColorJoin saved = out;
+    if (musa_dwg_ac1024_line_eed_raw_layer_color_join(
+            source, sizeof(source), index, 1u, 45u, &out) ||
+        musa_dwg_ac1024_line_eed_raw_layer_color_join(
+            source, sizeof(source), index, 1u, 0u, &out) ||
+        musa_dwg_ac1024_line_eed_raw_layer_color_join(
+            source, sizeof(source), index, 1u, 45u, NULL) ||
+        musa_dwg_ac1024_line_eed_raw_layer_color_join(
+            source, sizeof(source), index, 1u, 45u,
+            (MusaDwgAc1024LineEedRawLayerColorJoin*)(void*)source) ||
+        musa_dwg_ac1024_line_eed_raw_layer_color_join(
+            source, sizeof(source), index, 1u, 45u,
+            (MusaDwgAc1024LineEedRawLayerColorJoin*)(void*)index) ||
+        memcmp(&out, &saved, sizeof(out)))
+        return 0;
+    return 1;
+}
+
 int main(void) {
+    if (!test_eed_raw_layer_color_bridge_refuses_unproven_source()) return 35;
     _Alignas(MusaDwgAc1024LineFields) uint8_t record[64] = {0};
     if (!make_line(record)) return 1;
     uint8_t saved[37];

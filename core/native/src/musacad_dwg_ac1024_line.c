@@ -409,3 +409,83 @@ int musa_dwg_ac1024_line_eed_verified_probe(
     *out = next;
     return 1;
 }
+
+/* The common-data raw CMC index and LAYER state are authenticated
+ * separately and joined to the exact OT19->OT51 H target in one original
+ * caller-supplied AcDbObjects section. No scene or BYLAYER admission. */
+int musa_dwg_ac1024_line_eed_raw_layer_color_join(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024LineEedRawLayerColorJoin *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !canonical_line_handle || !record_count ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, recovered_index,
+                record_count * sizeof(*recovered_index)) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity line = {0};
+    MusaDwgAc1024LineEedJoinedEvidence graph = {0};
+    MusaDwgAc1024LineCommon color = {0};
+    MusaDwgAc1024LayerRawStateJoin layer = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle, &line) ||
+        line.raw_ot != 19u || !line.frame_crc16_verified ||
+        !line.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_line_eed_verified_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &graph) ||
+        !musa_line_common_probe_impl(
+            objects, object_bytes, line.record_offset, &color,
+            1, NULL, NULL) ||
+        !graph.graph.handles.layer_handle ||
+        !musa_dwg_ac1024_layer_eed_raw_state_join(
+            objects, object_bytes, recovered_index, record_count,
+            graph.graph.handles.layer_handle, &layer) ||
+        !graph.geometry.coordinates_decoded ||
+        graph.geometry.indexed_handle != canonical_line_handle ||
+        graph.graph.handles.entity_handle != canonical_line_handle ||
+        graph.graph.handles.entity_record_offset != line.record_offset ||
+        !graph.graph.handles.original_records_crc_verified ||
+        graph.graph.handles.entity_raw_ot != 19u ||
+        graph.graph.handles.entity_mode > 2u ||
+        graph.graph.handles.layer_handle != layer.layer_handle ||
+        graph.graph.handles.layer_record_offset != layer.layer_record_offset ||
+        graph.graph.eed.indexed_object_offset != line.record_offset ||
+        !graph.graph.eed.original_crc16_verified ||
+        color.indexed_handle != canonical_line_handle ||
+        !color.record_crc_verified ||
+        color.geometry_start_bit != graph.geometry.geometry_start_bit ||
+        graph.geometry.geometry_end_bit <= color.geometry_start_bit ||
+        graph.geometry.geometry_end_bit > color.data_end_bit ||
+        layer.layer_handle == canonical_line_handle ||
+        !layer.eed_flags_crc_verified ||
+        !layer.h_target_triplet_verified ||
+        !layer.byte_alignment_witness_verified ||
+        layer.full_h_tail_decoded ||
+        layer.layer_visibility_parity_verified ||
+        layer.bylayer_color_verified || layer.display_accepted)
+        return 0;
+    MusaDwgAc1024LineEedRawLayerColorJoin next = {0};
+    next.line_handle = canonical_line_handle;
+    next.line_record_offset = line.record_offset;
+    next.layer_handle = layer.layer_handle;
+    next.layer_record_offset = layer.layer_record_offset;
+    next.layer_raw_70_290_370 = layer.raw_70_290_370;
+    next.line_raw_color_index = color.color_index;
+    next.entity_mode = graph.graph.handles.entity_mode;
+    next.frozen_raw_bit = layer.frozen_bit;
+    next.on_raw_bit = layer.on_bit;
+    next.locked_raw_bit = layer.locked_bit;
+    next.line_has_explicit_rgb = color.has_rgb;
+    next.line_rgb_method = color.rgb_method;
+    next.line_has_color_reference = color.has_color_reference;
+    next.line_geometry_crc_verified = 1u;
+    next.layer_raw_state_crc_verified = 1u;
+    next.layer_h_targets_crc_verified = 1u;
+    *out = next;
+    return 1;
+}
