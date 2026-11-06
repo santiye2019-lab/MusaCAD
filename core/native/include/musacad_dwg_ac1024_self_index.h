@@ -446,6 +446,38 @@ int musa_dwg_ac1024_layer_eed_after_flags_bs_candidate_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerAfterFlagsBsCandidate *out);
 
+/* Read-only post-flags BS/BL/RC field-length HYPOTHESIS on an original
+ * CRC/self-H authenticated OT51. A parseable bit sequence is NOT proof
+ * that these are the drawing's CMC fields or its displayed colors.
+ * Refusal stage distinguishes truncated BL and RC without a fallback.
+ * Fail-atomic; no application entity, palette or viewport admission. */
+typedef struct MusaDwgAc1024LayerAfterFlagsTailCandidate {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t bs_end_bit;
+    size_t bl_end_bit;
+    size_t rc_end_bit;
+    uint16_t candidate_bs_value;
+    uint32_t candidate_bl_value;
+    uint8_t candidate_rc_value;
+    uint8_t original_crc_verified;
+    uint8_t cmc_identity_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LayerAfterFlagsTailCandidate;
+enum {
+    MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_OK = 0,
+    MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_ARGUMENT = 1,
+    MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BS = 2,
+    MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_FRAME = 3,
+    MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BL = 4,
+    MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_RC = 5
+};
+uint8_t musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerAfterFlagsTailCandidate *out);
+
 /* Original R2010 LAYER OT51 H stream, EED-bearing and XDictionary
  * present ONLY. A CRC-backed layer and its OT67 APPID targets are
  * mandatory. The first H4 is an OT50 LAYER_CONTROL soft-pointer; the
