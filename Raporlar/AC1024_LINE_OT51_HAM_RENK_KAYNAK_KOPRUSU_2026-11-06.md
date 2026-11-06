@@ -89,3 +89,65 @@ render tarafında kabul edilmeyecek. Parity bayrakları
 false ve display_accepted=0 kalır.
 LibreDWG ayrı CI host oracle olarak kalır. Orijinal DWG
 değiştirilmedi, PR #720 main'e birleştirilmedi ve APK üretilmedi.
+
+
+## 6 Kasım 2026 — katman CMC ham BS aday incelemesi
+
+**Kaynak çekirdek commit:** be2275f9c746ef6da515371856dc287415ec3c3e  
+**Başarılı gerçek DWG testi:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42225939094  
+**Orijinal kaynak çıktısı:** musacad-real-dwg-native-stage-diagnostic / musacad-real-layer-class-bridge.json  
+**Saat dilimi:** Europe/Istanbul (UTC+03:00).
+
+R2010 OT51 LAYER kaydındaki CRC/self-H doğrulamalı ham 70/290/370
+bitlerinden sonra CMC BS/BL/RC alanını çözmek amacıyla
+musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe oluşturuldu.
+Sıkı okuyucu beklediği BS=0/BL/RC eşleşmesini orijinal
+Karagümrük veri örneklerinde doğrulayamadı ve **14/14 örneği
+güvenli şekilde reddetti**; hiçbir dosya zarar görmedi.
+Refusal-stage C11 çıktıları ilk ret nedenini şöyle sınıflandırdı:
+
+| İlk katı CMC ret aşaması | Örnek |
+| --- | ---: |
+| BS renk indeksi sıfır yerine sıfır dışı | **13** |
+| BL/RGB okunamadı | **1** |
+| Kaynak CRC / nesne H / sınır / RC adı | **0** |
+
+Bu sonuçtan sonra sıkı CMC okuyucusunu gevşetmeden,
+kaynakça aynı OT51 veri bit konumundan başlayan, yalnızca
+**BS ham değerine** bakabilen ayrı bir C11 tanı yordamı eklendi:
+musa_dwg_ac1024_layer_eed_after_flags_bs_candidate_probe.
+Bu yordam BS'nin gerçekte CMC alanı olduğunu **kabul etmez**.
+Orijinal CI matrisi sonuçları:
+
+| Kaynak doğrulamalı, bayraklardan hemen sonraki BS aday değeri | Kayıt |
+| --- | ---: |
+| 0 | **1** |
+| 1–255 | **13** |
+| 256 | **0** |
+| 257–1023 | **0** |
+| 1024+ | **0** |
+| **Toplam** | **14/14** |
+
+BS aday taraması **0 ret**, önceki sıkı CMC sınır denetimi
+**14 ret** verdi. İki farklı tanı kesinlikle karıştırılmadı.
+**1–255, ACI aralığına denk gelir ama kaynak içindeki gerçek
+LAYER renginin bağımsız olarak kanıtlanmış olduğu anlamına
+gelmez.** ODA 5.4.1 R2004+ CMC açıklaması BS indeksini
+normalde sıfır olarak tarif ettiğinden, burada gerçek biçim
+farkı/alan sınırı henüz açık bir araştırma konusudur.
+Referans: https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+
+Korumalar: Kaynak R2010 renk adı TU kısmı, RGB yöntemi,
+BYLAYER/BYBLOCK/ACI gerçek renk kalıtımı, katman görünürlüğü,
+blok/viewport, piksel-render ve APK davranışı hâlâ
+doğrulanmadı. display_accepted=0, cmc_identity_verified=0,
+layer_cmc_prefix_not_render_color_parity=true ve
+line_layer_bylayer_rendering_parity=false tutuldu.
+Kabul edilen önceki **214/297** LINE→LAYER ham bağlantısı ve
+**128** LINE indeks 256 adayı değişmedi.
+
+**Sonraki adım:** 13 nonzero indeksin BL/RC uzunluk ve
+sınır tanısını, mümkünse bağımsız izole host/oracle kanıtıyla
+çapraz kontrol etmek. Tahmine dayalı katman rengi verme.
+LibreDWG yalnızca ayrı host CI oracle; MusaCAD özgün C11
+çalışma zamanına eklenmedi. PR #720 ana dala birleştirilmedi.
