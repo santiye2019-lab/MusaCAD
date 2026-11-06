@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1024_section_directory.h"
+#include "musacad_dwg_ac1018_lz.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -153,6 +154,10 @@ int musa_dwg_ac1024_directory_page_checksums(
         const uint8_t *rec=decoded+at;
         const uint32_t npage=read32(rec+8u);
         const uint32_t section_id=read32(rec+24u);
+        const uint32_t page_output_bytes=read32(rec+12u);
+        const uint32_t compression=read32(rec+20u);
+        const uint32_t encryption=read32(rec+28u);
+        const uint64_t section_logical_bytes=read64(rec);
         at+=96u;
         for(uint32_t j=0;j<npage;j++){
             const uint8_t *entry=decoded+at+(size_t)j*16u;
@@ -195,6 +200,23 @@ int musa_dwg_ac1024_directory_page_checksums(
             if(adler32(payload_crc,clear,sizeof clear)!=words[6])
                 continue;
             ++evidence.header_adler_verified;
+            /* Only checksum-authenticated original compressed DATA pages
+             * enter this read-only LZ diagnostic. Never publish decoded
+             * bytes, infer object identities, or admit an Android scene. */
+            if(compression!=2u||encryption!=0u||
+               !page_output_bytes||page_output_bytes>1048576u||
+               !section_logical_bytes||
+               (section_logical_bytes-1u)/page_output_bytes+1u!=npage||
+               logical!=(uint64_t)j*page_output_bytes)
+                continue;
+            ++evidence.strict_lz_eligible_pages;
+            MusaDwgAc1018LzDiagnostic diag={0};
+            if(musa_dwg_ac1018_lz_diagnose(
+                   file+pos+32u,packed,page_output_bytes,&diag)&&
+               diag.completed&&diag.input_consumed>0u&&
+               diag.input_consumed<=packed&&
+               diag.output_produced==page_output_bytes)
+                ++evidence.strict_lz_verified;
         }
         at+=(size_t)npage*16u;
     }
