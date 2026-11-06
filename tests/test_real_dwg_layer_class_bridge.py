@@ -36,6 +36,10 @@ def sample(n=2, *, material=True):
             "sampled_line_eed_layer_state_on": 0,
             "sampled_line_eed_layer_state_locked": 0,
             "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_raw_color_0": 0,
+            "sampled_line_eed_layer_state_raw_color_1_255": 0,
+            "sampled_line_eed_layer_state_raw_color_257": 0,
+            "sampled_line_eed_layer_state_raw_color_other": 0,
             "sampled_line_eed_layer_state_explicit_rgb": 0,
             "sampled_line_eed_layer_state_refused_flags": 0,
             "sampled_line_eed_layer_state_refused_h_triplet": 0,
@@ -223,6 +227,30 @@ class LayerClassBridgeTests(unittest.TestCase):
         h["sampled_line_eed_layer_state_refused"] = 1
         with self.assertRaises(EvidenceError):
             summarize(stage(item))
+
+    def test_disjoint_original_line_color_categories(self):
+        one = sample(2)
+        h = one["ac1024_compatibility_hypothesis"]
+        h["sampled_line_eed_join_verified"] = 4
+        h["sampled_line_eed_layer_state_attempts"] = 4
+        h["sampled_line_eed_layer_state_verified"] = 4
+        h["sampled_line_eed_layer_state_raw_color_0"] = 1
+        h["sampled_line_eed_layer_state_raw_color_1_255"] = 1
+        h["sampled_line_eed_layer_state_raw_color_256"] = 2
+        out = summarize(stage(one))
+        self.assertEqual(out["line_eed_join_raw_color_index_0_candidates"], 1)
+        self.assertEqual(out["line_eed_join_raw_color_index_1_255_candidates"], 1)
+        self.assertEqual(out["line_eed_join_raw_color_index_256_candidates"], 2)
+        self.assertTrue(out["line_eed_index_categories_are_source_only"])
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        for key in ("sampled_line_eed_layer_state_raw_color_0",
+                    "sampled_line_eed_layer_state_raw_color_257",
+                    "sampled_line_eed_layer_state_raw_color_other",
+                    "sampled_line_eed_layer_state_raw_color_256"):
+            wrong = copy.deepcopy(one)
+            wrong["ac1024_compatibility_hypothesis"][key] += 1
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(wrong))
 
     def test_real_corpus_minimum_coverage_gate(self):
         out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))

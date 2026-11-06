@@ -943,6 +943,22 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 > ll_verified):
             raise ValueError("unproven_source_local_line_layer_color_bridge")
 
+        # Complete and disjoint raw LINE index census, source-local only.
+        # Neither indexed 256 nor 0 nor a palette index proves pixels,
+        # viewport visibility, BYLAYER inheritance or CMC rendering.
+        raw_color_group = (
+            "sampled_line_eed_layer_state_raw_color_0",
+            "sampled_line_eed_layer_state_raw_color_1_255",
+            "sampled_line_eed_layer_state_raw_color_256",
+            "sampled_line_eed_layer_state_raw_color_257",
+            "sampled_line_eed_layer_state_raw_color_other",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in raw_color_group):
+            raise ValueError("missing_original_line_color_index_category")
+        if sum(hint[k] for k in raw_color_group) != ll_verified:
+            raise ValueError("non_disjoint_original_line_color_index_census")
+
         line_keys = (
             "sampled_line_attempts",
             "sampled_line_common_verified",

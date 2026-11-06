@@ -66,6 +66,11 @@ def summarize(stage: dict) -> dict:
         "line_eed_to_source_layer_state_verified": 0,
         "line_eed_to_source_layer_state_refused": 0,
         "line_eed_join_raw_color_index_256_candidates": 0,
+        "line_eed_join_raw_color_index_0_candidates": 0,
+        "line_eed_join_raw_color_index_1_255_candidates": 0,
+        "line_eed_join_raw_color_index_257_candidates": 0,
+        "line_eed_join_raw_color_index_other_candidates": 0,
+        "line_eed_index_categories_are_source_only": True,
         "line_eed_join_explicit_rgb_candidates": 0,
         "line_eed_refused_missing_layer_flags": 0,
         "line_eed_refused_h_target_triplet": 0,
@@ -113,6 +118,14 @@ def summarize(stage: dict) -> dict:
             h, "sampled_line_eed_layer_state_raw_color_256", 64)
         ll_rgb = _integer(
             h, "sampled_line_eed_layer_state_explicit_rgb", 64)
+        ll_bucket_keys = (
+            "sampled_line_eed_layer_state_raw_color_0",
+            "sampled_line_eed_layer_state_raw_color_1_255",
+            "sampled_line_eed_layer_state_raw_color_256",
+            "sampled_line_eed_layer_state_raw_color_257",
+            "sampled_line_eed_layer_state_raw_color_other",
+        )
+        ll_buckets = [_integer(h, key, 64) for key in ll_bucket_keys]
         raw_counts = [
             _integer(h, "sampled_line_eed_layer_state_" + k, 64)
             for k in ("frozen", "on", "locked")
@@ -125,12 +138,23 @@ def summarize(stage: dict) -> dict:
                 64, _integer(h, "sampled_line_eed_join_verified", 100000))
                 or ll_verified + ll_refused != ll_attempts or
                 sum(refusal_breakdown) != ll_refused or
-                max([ll_raw_256, ll_rgb] + raw_counts) > ll_verified):
+                max([ll_raw_256, ll_rgb] + raw_counts) > ll_verified or
+                sum(ll_buckets) != ll_verified or
+                ll_buckets[2] != ll_raw_256):
             raise EvidenceError("line_to_layer_raw_state_without_source_proof")
         aggregate["line_eed_to_source_layer_state_attempts"] += ll_attempts
         aggregate["line_eed_to_source_layer_state_verified"] += ll_verified
         aggregate["line_eed_to_source_layer_state_refused"] += ll_refused
         aggregate["line_eed_join_raw_color_index_256_candidates"] += ll_raw_256
+        for key, value in zip(
+            ("line_eed_join_raw_color_index_0_candidates",
+             "line_eed_join_raw_color_index_1_255_candidates",
+             "line_eed_join_raw_color_index_256_candidates",
+             "line_eed_join_raw_color_index_257_candidates",
+             "line_eed_join_raw_color_index_other_candidates"), ll_buckets
+        ):
+            if key != "line_eed_join_raw_color_index_256_candidates":
+                aggregate[key] += value
         aggregate["line_eed_join_explicit_rgb_candidates"] += ll_rgb
         for target, count in zip(
             ("line_eed_refused_missing_layer_flags",

@@ -267,6 +267,10 @@ def ac1024_probe_record():
             "sampled_line_eed_layer_state_on": 0,
             "sampled_line_eed_layer_state_locked": 0,
             "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_raw_color_0": 0,
+            "sampled_line_eed_layer_state_raw_color_1_255": 0,
+            "sampled_line_eed_layer_state_raw_color_257": 0,
+            "sampled_line_eed_layer_state_raw_color_other": 0,
             "sampled_line_eed_layer_state_explicit_rgb": 0,
             "sampled_line_eed_layer_state_refused_flags": 0,
             "sampled_line_eed_layer_state_refused_h_triplet": 0,
@@ -519,6 +523,19 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             fake["ac1024_compatibility_hypothesis"][key] = 1
             with self.subTest(field=key), self.assertRaises(ValueError):
                 validate_fake_result(fake)
+
+    def test_original_color_index_bucket_partition_is_fail_closed(self):
+        record = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(record), record)
+        for key in ("sampled_line_eed_layer_state_raw_color_0",
+                    "sampled_line_eed_layer_state_raw_color_1_255",
+                    "sampled_line_eed_layer_state_raw_color_256",
+                    "sampled_line_eed_layer_state_raw_color_257",
+                    "sampled_line_eed_layer_state_raw_color_other"):
+            bad = deepcopy(record)
+            bad["ac1024_compatibility_hypothesis"][key] = 1
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_fake_result(bad)
 
     def test_original_layer_type_triplet_cannot_be_fabricated(self):
         baseline = ac1024_probe_record()

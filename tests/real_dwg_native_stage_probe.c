@@ -491,6 +491,11 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_layer_state_on;
     size_t sampled_line_eed_layer_state_locked;
     size_t sampled_line_eed_layer_state_raw_color_256;
+    /* Mutually exclusive original index-only categories. RGB can overlap. */
+    size_t sampled_line_eed_layer_state_raw_color_0;
+    size_t sampled_line_eed_layer_state_raw_color_1_255;
+    size_t sampled_line_eed_layer_state_raw_color_257;
+    size_t sampled_line_eed_layer_state_raw_color_other;
     size_t sampled_line_eed_layer_state_explicit_rgb;
     size_t sampled_line_eed_layer_state_refused_flags;
     size_t sampled_line_eed_layer_state_refused_h_triplet;
@@ -2144,6 +2149,14 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                             ++hint.sampled_line_eed_layer_state_locked;
                                                                         if (raw_color.line_raw_color_index == 256u)
                                                                             ++hint.sampled_line_eed_layer_state_raw_color_256;
+                                                                        else if (raw_color.line_raw_color_index == 0u)
+                                                                            ++hint.sampled_line_eed_layer_state_raw_color_0;
+                                                                        else if (raw_color.line_raw_color_index <= 255u)
+                                                                            ++hint.sampled_line_eed_layer_state_raw_color_1_255;
+                                                                        else if (raw_color.line_raw_color_index == 257u)
+                                                                            ++hint.sampled_line_eed_layer_state_raw_color_257;
+                                                                        else
+                                                                            ++hint.sampled_line_eed_layer_state_raw_color_other;
                                                                         if (raw_color.line_has_explicit_rgb)
                                                                             ++hint.sampled_line_eed_layer_state_explicit_rgb;
                                                                     } else {
@@ -2809,6 +2822,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_layer_state_on\":%zu,"
                "\"sampled_line_eed_layer_state_locked\":%zu,"
                "\"sampled_line_eed_layer_state_raw_color_256\":%zu,"
+               "\"sampled_line_eed_layer_state_raw_color_0\":%zu,"
+               "\"sampled_line_eed_layer_state_raw_color_1_255\":%zu,"
+               "\"sampled_line_eed_layer_state_raw_color_257\":%zu,"
+               "\"sampled_line_eed_layer_state_raw_color_other\":%zu,"
                "\"sampled_line_eed_layer_state_explicit_rgb\":%zu,"
                "\"sampled_line_eed_layer_state_refused_flags\":%zu,"
                "\"sampled_line_eed_layer_state_refused_h_triplet\":%zu,"
@@ -3254,6 +3271,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_layer_state_on,
                hint->sampled_line_eed_layer_state_locked,
                hint->sampled_line_eed_layer_state_raw_color_256,
+               hint->sampled_line_eed_layer_state_raw_color_0,
+               hint->sampled_line_eed_layer_state_raw_color_1_255,
+               hint->sampled_line_eed_layer_state_raw_color_257,
+               hint->sampled_line_eed_layer_state_raw_color_other,
                hint->sampled_line_eed_layer_state_explicit_rgb,
                hint->sampled_line_eed_layer_state_refused_flags,
                hint->sampled_line_eed_layer_state_refused_h_triplet,
