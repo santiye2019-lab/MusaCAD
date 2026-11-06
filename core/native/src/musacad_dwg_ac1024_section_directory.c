@@ -224,3 +224,105 @@ int musa_dwg_ac1024_directory_page_checksums(
     *out=evidence;
     return 1;
 }
+
+
+/* This helper joins only independently source-verified, unencrypted
+ * AC1024 logical sections. It is not a scene or DWG object parser. */
+int musa_dwg_ac1024_directory_join_section(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes){
+    if(!file||!directory||!locations||!section_name||!output||
+       !out_bytes||file_bytes<6u||
+       memcmp(file,"AC1024",6u)!=0||
+       physical_count>SIZE_MAX/sizeof(*locations)||
+       overlap(file,file_bytes,output,capacity)||
+       overlap(directory,directory_bytes,output,capacity)||
+       overlap(locations,physical_count*sizeof(*locations),
+               output,capacity)||
+       overlap(file,file_bytes,out_bytes,sizeof(*out_bytes))||
+       overlap(directory,directory_bytes,out_bytes,sizeof(*out_bytes))||
+       overlap(locations,physical_count*sizeof(*locations),
+               out_bytes,sizeof(*out_bytes))||
+       overlap(output,capacity,out_bytes,sizeof(*out_bytes)))
+        return 0;
+    /* Never offer an arbitrary section extraction route to Android
+     * without separately verified record/graph semantics. */
+    if(strcmp(section_name,"AcDb:Handles")!=0 &&
+       strcmp(section_name,"AcDb:AcDbObjects")!=0)return 0;
+    MusaDwgAc1024DirectoryShape shape={0};
+    if(!musa_dwg_ac1024_directory_shape(
+           directory,directory_bytes,&shape)||
+       shape.duplicate_section_names)return 0;
+    MusaDwgAc1024PageChecksumEvidence crc={0};
+    if(!musa_dwg_ac1024_directory_page_checksums(
+           file,file_bytes,directory,directory_bytes,
+           locations,physical_count,&crc)||
+       crc.header_adler_verified!=crc.referenced_pages)return 0;
+    size_t at=20u,chosen_at=0u;
+    uint64_t logical_bytes=0u;
+    uint32_t npage=0u,page_bytes=0u;
+    int found=0;
+    for(uint32_t i=0u;i<shape.sections;i++){
+        const uint8_t *rec=directory+at;
+        const uint32_t count=read32(rec+8u);
+        const char *name=(const char*)(rec+32u);
+        if(strcmp(name,section_name)==0){
+            if(found)return 0;
+            found=1;
+            chosen_at=at+96u;
+            logical_bytes=read64(rec);
+            npage=count;
+            page_bytes=read32(rec+12u);
+            if(read32(rec+20u)!=2u||read32(rec+28u)!=0u||
+               !read32(rec+24u))return 0;
+        }
+        at+=96u+(size_t)count*16u;
+    }
+    if(!found||!npage||!page_bytes||page_bytes>1048576u||
+       !logical_bytes||logical_bytes>128u*1024u*1024u||
+       logical_bytes>capacity||
+       (logical_bytes-1u)/page_bytes+1u!=npage)return 0;
+    uint8_t *staged=(uint8_t*)malloc((size_t)logical_bytes);
+    uint8_t *block=(uint8_t*)malloc(page_bytes);
+    if(!staged||!block){free(staged);free(block);return 0;}
+    size_t covered=0u;
+    int ok=1;
+    for(uint32_t j=0u;j<npage;j++){
+        const uint8_t *entry=directory+chosen_at+(size_t)j*16u;
+        const uint32_t id=read32(entry);
+        const uint32_t packed=read32(entry+4u);
+        const uint64_t offset=read64(entry+8u);
+        if(offset!=(uint64_t)j*page_bytes){ok=0;break;}
+        size_t lo=0u,hi=physical_count;
+        while(lo<hi){
+            const size_t mid=lo+(hi-lo)/2u;
+            if(locations[mid].page_id<id)lo=mid+1u;
+            else hi=mid;
+        }
+        if(lo==physical_count||locations[lo].page_id!=id||
+           locations[lo].file_offset>file_bytes||
+           file_bytes-(size_t)locations[lo].file_offset<32u||
+           packed>file_bytes-(size_t)locations[lo].file_offset-32u){
+            ok=0;break;
+        }
+        const size_t pos=(size_t)locations[lo].file_offset;
+        size_t consumed=0u;
+        if(!musa_dwg_ac1018_lz_decode(
+                file+pos+32u,packed,block,page_bytes,&consumed)||
+           !consumed||consumed>packed){ok=0;break;}
+        const size_t remaining=(size_t)logical_bytes-covered;
+        const size_t take=remaining<page_bytes?remaining:page_bytes;
+        memcpy(staged+covered,block,take);
+        covered+=take;
+    }
+    if(covered!=(size_t)logical_bytes)ok=0;
+    if(ok){
+        memcpy(output,staged,(size_t)logical_bytes);
+        *out_bytes=(size_t)logical_bytes;
+    }
+    free(block);free(staged);
+    return ok;
+}
