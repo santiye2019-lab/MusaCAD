@@ -92,6 +92,24 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or not (result.get("ac1024_data_lz_verified") <=
                 result.get("ac1024_data_lz_eligible_pages") <=
                 result.get("ac1024_data_header_adler_verified"))
+        or type(result.get("ac1024_objects_join_verified")) is not bool
+        or type(result.get("ac1024_objects_join_logical_bytes")) is not int
+        or type(result.get("ac1024_objects_candidate_logical_bytes")) is not int
+        or type(result.get("ac1024_objects_join_inner_failure_stage")) is not int
+        or not (0 <= result["ac1024_objects_join_inner_failure_stage"] <= 15)
+        or not (0 <= result["ac1024_objects_candidate_logical_bytes"]
+                <= 128 * 1024 * 1024)
+        or not (0 <= result["ac1024_objects_join_logical_bytes"]
+                <= 64 * 1024 * 1024)
+        or (result["ac1024_objects_join_verified"] !=
+            (result["ac1024_objects_join_logical_bytes"] > 0))
+        or (result["ac1024_objects_join_verified"] and (
+            result["ac1024_objects_join_inner_failure_stage"] != 0
+            or result["signature"] != "AC1024"
+            or result["ac1024_objects_join_logical_bytes"] !=
+               result["ac1024_objects_candidate_logical_bytes"]
+            or result.get("ac1024_handles_join_verified") is not True
+            or result.get("geometry_verified") is not False))
         or type(result.get("ac1024_handles_join_inner_failure_stage")) is not int
         or not (0 <= result.get("ac1024_handles_join_inner_failure_stage") <= 15)
         or (result.get("ac1024_handles_join_verified") and
