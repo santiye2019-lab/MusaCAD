@@ -155,3 +155,45 @@ https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dw
 aracı; özgün MusaCAD C11 çekirdeğine veya mobil uygulamaya dahil
 edilmedi. DWG kaynakları değiştirilmedi. PR #720 main'e birleştirilmedi.
 
+
+
+## 6 Kasım 2026 — aynı kaynakta OT51 ham durum biti ve H bağlantısı
+
+**Saat dilimi:** Türkiye saati, UTC+03:00  
+**C11 kod commit'i:** d9b76968e3829b100ac01e4d820851d6450f36bb  
+**Başarılı gerçek DWG testi:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42216896504  
+**Kanıt arşivi:** musacad-real-dwg-native-stage-diagnostic / musacad-real-layer-class-bridge.json
+
+Yeni özgün C11 musa_dwg_ac1024_layer_eed_raw_state_join yordamı, aynı
+orijinal OT51 LAYER kaydında CRC16/self-H ile doğrulanmış kayıt kimliği,
+EED sonrası ham 70/290/370 bitleri, üç bağımsız OT80 → OT505 → OT57
+hedefini ve son 2/4 bitin bayt hizasını çapraz doğruluyor.
+
+**Gerçek Karagümrük kaynak sonucu:**
+
+- **23** DWG incelendi; bunların **10'u AC1024**.
+- **5** gerçek çizimde **14/14** özgün C11 kaynak-içi bit/H eşleşmesi.
+- **42/42** hedef nesne ayrı CRC/self-H kimliğinden geçti.
+- Ham frozen=1: **0** örnek, ham on=1: **0** örnek,
+  ham locked=1: **0** örnek, eşlenmemiş bit: **0** örnek.
+- Kaynak dosyalar değişmedi; katman adı, koordinat ve handle
+  değerleri rapora aktarılmadı.
+
+**KESİN SINIR:** Sıfır ham bit değerleri bütün katmanlar açık,
+görünür, kilitsiz veya doğru renkte çiziliyor anlamına gelmez.
+Bu yalnızca 14 örnekteki ham bit değerleridir. Viewport overrides,
+CMC/indexed/RGB renkler, BYLAYER/BYBLOCK kalıtımı, materyal veya
+linetype görselleştirmesi, LINE/INSERT katman bağları ve normal
+Android DWG render eşdeğerliği henüz doğrulanmış değildir.
+
+C11 kabul bayrakları hâlâ full_h_tail_decoded=0,
+layer_visibility_parity_verified=0, bylayer_color_verified=0,
+display_accepted=0. Son H bitlerinin dolgu olduğu kanıtlanmadı.
+
+**Sonraki teknik eşik:** Aynı özgün kaynakta doğrulanmış katman
+bitlerini gerçek çizim nesnesinin layer-handle bağına ve bağımsız CMC
+renk kaydına bağlayan bir kaynak ve görüntü eşdeğerlik kapısı.
+
+**Lisans ve çalışma zamanı:** LibreDWG yalnızca ayrı host CI
+referansıdır; MusaCAD'in özgün C11 runtime'ına ve APK'ya dahil
+edilmedi. PR #720 main dalına birleştirilmedi.
