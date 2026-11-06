@@ -15,6 +15,16 @@ def sample(n=2, *, material=True):
         "ac1024_compatibility_hypothesis": {
             "sampled_layer_eed_terminal_candidate_verified": n,
             "sampled_layer_eed_terminal_candidate_matched": 3*n,
+            "sampled_layer_eed_terminal_candidate_attempts": n,
+            "sampled_layer_eed_terminal_candidate_absolute": 3*n,
+            "sampled_layer_eed_terminal_candidate_unmatched": 0,
+            "sampled_layer_eed_terminal_fragment_attempts": n,
+            "sampled_layer_eed_terminal_fragment_verified": n,
+            "sampled_layer_eed_terminal_fragment_bits_2": n,
+            "sampled_layer_eed_terminal_fragment_bits_4": 0,
+            "sampled_layer_eed_terminal_fragment_zero": n,
+            "sampled_layer_eed_terminal_fragment_nonzero": 0,
+            "sampled_layer_eed_terminal_fragment_prefix_four_tokens": n,
             "sampled_layer_eed_terminal_candidate_ot80_placeholder": n,
             "sampled_layer_eed_terminal_candidate_ot57_ltype": n,
             "sampled_layer_eed_terminal_candidate_dynamic_class_unresolved": n,
@@ -51,6 +61,11 @@ class LayerClassBridgeTests(unittest.TestCase):
         self.assertEqual(out["layer_samples_local_ot505_material_class_proven"], 14)
         self.assertEqual(out["drawings_with_local_material_class_join"], 5)
         self.assertEqual(out["verified_raw_target_records"], 42)
+        self.assertTrue(out["fixed_placeholder_ot80_identity_confirmed"])
+        self.assertTrue(out["fixed_ltype_ot57_identity_confirmed"])
+        self.assertEqual(out["terminal_fragment_2_bit_samples"], 14)
+        self.assertEqual(out["terminal_fragment_undecoded_samples"], 14)
+        self.assertFalse(out["h_tail_fully_decoded"])
         self.assertFalse(out["material_property_link_semantics_proven"])
         self.assertFalse(out["ot57_semantics_proven"])
         self.assertFalse(out["layer_visibility_parity_proven"])
@@ -92,6 +107,37 @@ class LayerClassBridgeTests(unittest.TestCase):
             bad[field] = value
             with self.subTest(field=field), self.assertRaises(EvidenceError):
                 summarize(stage(bad))
+
+    def test_nonzero_terminal_fragment_is_not_painted_or_dismissed(self):
+        item = sample(2)
+        h = item["ac1024_compatibility_hypothesis"]
+        h["sampled_layer_eed_terminal_fragment_zero"] = 0
+        h["sampled_layer_eed_terminal_fragment_nonzero"] = 2
+        h["sampled_layer_eed_terminal_fragment_bits_2"] = 0
+        h["sampled_layer_eed_terminal_fragment_bits_4"] = 2
+        observed = summarize(stage(item))
+        self.assertEqual(observed["terminal_fragment_nonzero_samples"], 2)
+        self.assertEqual(observed["terminal_fragment_4_bit_samples"], 2)
+        self.assertEqual(observed["terminal_fragment_undecoded_samples"], 2)
+        self.assertFalse(observed["layer_visibility_parity_proven"])
+        self.assertFalse(observed["rendering_verified"])
+        self.assertFalse(observed["h_tail_fully_decoded"])
+
+    def test_corrupt_tail_shape_and_excess_target_counts_refused(self):
+        for field, value in (
+            ("sampled_layer_eed_terminal_fragment_verified", 0),
+            ("sampled_layer_eed_terminal_fragment_bits_2", 1),
+            ("sampled_layer_eed_terminal_fragment_zero", 3),
+            ("sampled_layer_eed_terminal_fragment_prefix_four_tokens", 0),
+            ("sampled_layer_eed_terminal_candidate_absolute", 7),
+            ("sampled_layer_eed_terminal_candidate_matched", 7),
+            ("sampled_layer_eed_terminal_candidate_ot80_placeholder", 3),
+            ("sampled_layer_eed_terminal_candidate_unmatched", 1),
+        ):
+            item = sample(2)
+            item["ac1024_compatibility_hypothesis"][field] = value
+            with self.subTest(field=field), self.assertRaises(EvidenceError):
+                summarize(stage(item))
 
     def test_missing_provenance_is_rejected(self):
         bad = sample()
