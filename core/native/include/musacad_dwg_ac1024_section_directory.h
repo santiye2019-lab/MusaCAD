@@ -57,6 +57,21 @@ int musa_dwg_ac1024_directory_page_checksums(
     const uint8_t *decoded,size_t decoded_bytes,
     const MusaDwgAc1018PageLocation *locations,size_t physical_count,
     MusaDwgAc1024PageChecksumEvidence *out);
+/* Diagnostic-only logical section join for original unencrypted R2010
+ * DATA pages. 'directory' and 'locations' MUST already come from the
+ * independently authenticated original AC1024 SYSTEM/physical map.
+ * This helper independently checks all source DATA page headers and dual
+ * Adler32, exact logical offsets/counts, then decodes each bounded LZ page
+ * into private scratch and copies the contiguous logical bytes atomically.
+ * It does not interpret CAD entities, ownership, layers or colors.
+ * Strictly allowed names: AcDb:Handles and AcDb:AcDbObjects.
+ * Output and out_bytes stay unchanged on any refusal; never modify file. */
+int musa_dwg_ac1024_directory_join_section(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes);
 #ifdef __cplusplus
 }
 #endif
