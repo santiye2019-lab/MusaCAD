@@ -914,6 +914,30 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 sum(hint[k] for k in cmc_refusal_keys) != cmc_r):
             raise ValueError("unproven_original_ot51_cmc_raw_census")
 
+        # A separate CRC-backed BS field follows raw LAYER flags.
+        # Numeric buckets are provisional; this is NOT accepted CMC color.
+        bs_keys = (
+            "sampled_layer_eed_cmc_postflags_bs_attempts",
+            "sampled_layer_eed_cmc_postflags_bs_verified",
+            "sampled_layer_eed_cmc_postflags_bs_refused",
+            "sampled_layer_eed_cmc_postflags_bs_value_0",
+            "sampled_layer_eed_cmc_postflags_bs_value_1_255",
+            "sampled_layer_eed_cmc_postflags_bs_value_256",
+            "sampled_layer_eed_cmc_postflags_bs_value_257_1023",
+            "sampled_layer_eed_cmc_postflags_bs_value_1024_plus",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0 for k in bs_keys):
+            raise ValueError("invalid_original_layer_postflags_bs_census")
+        ba, bv, br, b0, baci, b256, bmid, bhigh = (
+            hint[k] for k in bs_keys
+        )
+        if (ba != join_verified or bv + br != ba or
+                b0 + baci + b256 + bmid + bhigh != bv or
+                cmc_v > bv or cmc_v > b0 or
+                hint["sampled_layer_eed_cmc_refused_index_nonzero"]
+                    > baci + b256 + bmid + bhigh):
+            raise ValueError("unproven_original_postflags_bs_candidate")
+
         # Raw unresolved suffix is diagnostic only. Validate bit-pattern
         # masks against observed short fragments, never against CAD roles.
         mask2 = hint.get("sampled_layer_eed_terminal_fragment_2bit_pattern_mask")

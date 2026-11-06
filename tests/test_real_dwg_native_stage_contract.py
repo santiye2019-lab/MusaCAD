@@ -415,6 +415,14 @@ def ac1024_probe_record():
             "sampled_layer_eed_state_join_attempts": 0,
             "sampled_layer_eed_state_join_verified": 0,
             "sampled_layer_eed_cmc_attempts": 0,
+            "sampled_layer_eed_cmc_postflags_bs_attempts": 0,
+            "sampled_layer_eed_cmc_postflags_bs_verified": 0,
+            "sampled_layer_eed_cmc_postflags_bs_refused": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_0": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_1_255": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_256": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_257_1023": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_1024_plus": 0,
             "sampled_layer_eed_cmc_verified": 0,
             "sampled_layer_eed_cmc_refused": 0,
             "sampled_layer_eed_cmc_refused_preflight": 0,
@@ -534,6 +542,23 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             fake = deepcopy(baseline)
             fake["ac1024_compatibility_hypothesis"][key] = 1
             with self.subTest(field=key), self.assertRaises(ValueError):
+                validate_fake_result(fake)
+
+    def test_original_postflags_bs_candidate_never_claims_cmc_color(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for key in (
+            "sampled_layer_eed_cmc_postflags_bs_attempts",
+            "sampled_layer_eed_cmc_postflags_bs_verified",
+            "sampled_layer_eed_cmc_postflags_bs_value_0",
+            "sampled_layer_eed_cmc_postflags_bs_value_1_255",
+            "sampled_layer_eed_cmc_postflags_bs_value_256",
+            "sampled_layer_eed_cmc_postflags_bs_value_257_1023",
+            "sampled_layer_eed_cmc_postflags_bs_value_1024_plus",
+        ):
+            fake = deepcopy(original)
+            fake["ac1024_compatibility_hypothesis"][key] = 1
+            with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_fake_result(fake)
 
     def test_layer_cmc_counts_require_independent_original_prefix(self):

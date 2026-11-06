@@ -68,6 +68,15 @@ def summarize(stage: dict) -> dict:
         "line_eed_join_raw_color_index_256_candidates": 0,
         "line_eed_join_raw_256_with_original_cmc_prefix": 0,
         "layer_eed_cmc_raw_prefix_attempts": 0,
+        "layer_after_flags_bs_candidate_attempts": 0,
+        "layer_after_flags_bs_candidate_verified": 0,
+        "layer_after_flags_bs_candidate_refused": 0,
+        "layer_after_flags_bs_value_0": 0,
+        "layer_after_flags_bs_value_1_255": 0,
+        "layer_after_flags_bs_value_256": 0,
+        "layer_after_flags_bs_value_257_1023": 0,
+        "layer_after_flags_bs_value_1024_plus": 0,
+        "layer_after_flags_bs_is_not_verified_cmc": True,
         "layer_eed_cmc_raw_prefix_verified": 0,
         "layer_eed_cmc_raw_prefix_refused": 0,
         "layer_eed_cmc_refused_preflight": 0,
@@ -307,6 +316,33 @@ def summarize(stage: dict) -> dict:
         cmc_r = _integer(h, "sampled_layer_eed_cmc_refused", 2048)
         cmc_n = _integer(h, "sampled_layer_eed_cmc_named", 2048)
         cmc_b = _integer(h, "sampled_layer_eed_cmc_book_named", 2048)
+        bs_names = (
+            "attempts", "verified", "refused", "value_0",
+            "value_1_255", "value_256", "value_257_1023",
+            "value_1024_plus",
+        )
+        bs_values = [
+            _integer(h, "sampled_layer_eed_cmc_postflags_bs_" + k, 2048)
+            for k in bs_names
+        ]
+        ba, bv, br, b0, baci, b256, bmid, bhigh = bs_values
+        if (ba != raw_join_verified or bv + br != ba or
+                b0 + baci + b256 + bmid + bhigh != bv or
+                cmc_v > b0 or
+                _integer(h, "sampled_layer_eed_cmc_refused_index_nonzero", 2048)
+                    > baci + b256 + bmid + bhigh):
+            raise EvidenceError("unverified_original_postflags_bs_candidates")
+        for label, value in zip(
+            ("layer_after_flags_bs_candidate_attempts",
+             "layer_after_flags_bs_candidate_verified",
+             "layer_after_flags_bs_candidate_refused",
+             "layer_after_flags_bs_value_0",
+             "layer_after_flags_bs_value_1_255",
+             "layer_after_flags_bs_value_256",
+             "layer_after_flags_bs_value_257_1023",
+             "layer_after_flags_bs_value_1024_plus"), bs_values
+        ):
+            aggregate[label] += value
         cmc_refusal_suffixes = (
             "preflight", "index_nonzero", "bl", "rc", "rc_flags", "other"
         )

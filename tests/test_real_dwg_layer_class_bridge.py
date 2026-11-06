@@ -25,6 +25,14 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_state_join_attempts": n,
             "sampled_layer_eed_state_join_verified": n,
             "sampled_layer_eed_cmc_attempts": n,
+            "sampled_layer_eed_cmc_postflags_bs_attempts": n,
+            "sampled_layer_eed_cmc_postflags_bs_verified": n,
+            "sampled_layer_eed_cmc_postflags_bs_refused": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_0": n,
+            "sampled_layer_eed_cmc_postflags_bs_value_1_255": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_256": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_257_1023": 0,
+            "sampled_layer_eed_cmc_postflags_bs_value_1024_plus": 0,
             "sampled_layer_eed_cmc_verified": 0,
             "sampled_layer_eed_cmc_refused": n,
             "sampled_layer_eed_cmc_refused_preflight": n,
@@ -239,6 +247,19 @@ class LayerClassBridgeTests(unittest.TestCase):
         h["sampled_line_eed_layer_state_refused"] = 1
         with self.assertRaises(EvidenceError):
             summarize(stage(item))
+
+    def test_postflags_bs_candidate_is_not_verified_cmc(self):
+        baseline = sample(2)
+        out = summarize(stage(baseline))
+        self.assertEqual(out["layer_after_flags_bs_value_0"], 2)
+        self.assertTrue(out["layer_after_flags_bs_is_not_verified_cmc"])
+        for key in ("sampled_layer_eed_cmc_postflags_bs_attempts",
+                    "sampled_layer_eed_cmc_postflags_bs_value_0",
+                    "sampled_layer_eed_cmc_postflags_bs_value_256"):
+            broken = copy.deepcopy(baseline)
+            broken["ac1024_compatibility_hypothesis"][key] += 1
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(broken))
 
     def test_cmc_raw_prefix_is_diagnostic_not_bylayer_render(self):
         good = sample(2)
