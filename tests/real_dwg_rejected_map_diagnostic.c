@@ -103,6 +103,12 @@ int main(int argc, char **argv) {
     uint64_t physical_end = 256u;
     unsigned ordering_violations = 0u, invalid_spans = 0u;
     unsigned positive_order_violations = 0u, gap_order_violations = 0u;
+    /* Source page IDs are authenticated by the compressed physical map,
+     * but their claimed namespace may be inconsistent. Numeric evidence
+     * only; never emit actual source IDs or raw file content. */
+    size_t positive_id_duplicates = 0u, gap_id_duplicates = 0u;
+    size_t positive_gap_id_collisions = 0u, ids_above_admission_cap = 0u;
+    int page_id_namespace_audit_complete = 0;
     uint32_t previous_positive_id = 0u, previous_gap_id = 0u;
     int last_entry_is_map = 0, last_entry_is_gap = 0;
     int found_map = 0, found_section_map = 0, eof_header_copy = 0;
@@ -119,6 +125,11 @@ int main(int argc, char **argv) {
                 file + compressed_start, header.map_compressed_bytes,
                 plain, header.map_decoded_bytes, &map_consumed);
             if (decompressed) {
+                /* The first-party reader rejects IDs >1,048,576.
+                 * Bounded 1 MiB scratch classifies ID reuse without
+                 * quadratic scans on large untrusted CAD files. */
+                uint8_t *seen = modern ?
+                    calloc(UINT32_C(1048576)+1u,1u) : NULL;
                 size_t offset = 0u;
                 uint32_t last_id = 0u;
                 physical_scan_safe = 1;
@@ -134,6 +145,21 @@ int main(int argc, char **argv) {
                     }
                     const uint32_t id = gap ?
                         (uint32_t)(-(int64_t)(int32_t)raw) : raw;
+                    if (modern && seen) {
+                        if(id>UINT32_C(1048576)){
+                            ++ids_above_admission_cap;
+                        } else {
+                            const uint8_t mark=gap?2u:1u;
+                            const uint8_t prior=seen[id];
+                            if(prior&mark){
+                                if(gap)++gap_id_duplicates;
+                                else ++positive_id_duplicates;
+                            }else if(prior && !(prior&mark)){
+                                ++positive_gap_id_collisions;
+                            }
+                            seen[id]=(uint8_t)(prior|mark);
+                        }
+                    }
                     if (id <= last_id || !id) ordering_violations++;
                     if(gap) {
                         if (id <= previous_gap_id || !id) gap_order_violations++;
@@ -158,6 +184,10 @@ int main(int argc, char **argv) {
                     else ++positive;
                     offset += gap ? 24u : 8u;
                 }
+                page_id_namespace_audit_complete=
+                    modern && seen && physical_scan_safe &&
+                    offset==header.map_decoded_bytes;
+                free(seen);
             }
             free(plain);
         }
@@ -272,6 +302,11 @@ int main(int argc, char **argv) {
            "\"map_positive_records\":%zu,"
            "\"map_gap_records\":%zu,"
            "\"physical_scan_safe\":%s,"
+           "\"page_id_namespace_audit_complete\":%s,"
+           "\"page_id_duplicate_positive\":%zu,"
+           "\"page_id_duplicate_gap\":%zu,"
+           "\"page_id_cross_role_collisions\":%zu,"
+           "\"page_ids_above_admission_cap\":%zu,"
            "\"page_id_order_violations\":%u,"
            "\"positive_order_violations\":%u,"
            "\"gap_order_violations\":%u,"
@@ -318,6 +353,11 @@ int main(int argc, char **argv) {
            decompressed ? "true" : "false", map_consumed,
            map_entries, positive, gaps,
            physical_scan_safe ? "true" : "false",
+           page_id_namespace_audit_complete ? "true" : "false",
+           positive_id_duplicates,
+           gap_id_duplicates,
+           positive_gap_id_collisions,
+           ids_above_admission_cap,
            ordering_violations,
            positive_order_violations,gap_order_violations,
            last_entry_is_map ? "true" : "false",
