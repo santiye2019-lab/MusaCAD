@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from real_dwg_layer_class_bridge import EvidenceError, summarize
+from real_dwg_layer_class_bridge import EvidenceError, summarize, require_minimum_evidence
 
 
 def sample(n=2, *, material=True):
@@ -156,6 +156,21 @@ class LayerClassBridgeTests(unittest.TestCase):
             item["ac1024_compatibility_hypothesis"][field] = value
             with self.subTest(field=field), self.assertRaises(EvidenceError):
                 summarize(stage(item))
+
+    def test_real_corpus_minimum_coverage_gate(self):
+        out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))
+        require_minimum_evidence(out, 14, 5)
+        for native_min, drawings_min in ((15, 5), (14, 6), (1, 6)):
+            with self.subTest(native=native_min, drawings=drawings_min):
+                with self.assertRaises(EvidenceError):
+                    require_minimum_evidence(out, native_min, drawings_min)
+        for threshold in (-1, 2.5, True):
+            with self.subTest(threshold=threshold), self.assertRaises(EvidenceError):
+                require_minimum_evidence(out, threshold, 0)
+        only_fourteen = summarize(stage(sample(2), sample(4), sample(4),
+                                        sample(4, material=False)))
+        with self.assertRaises(EvidenceError):
+            require_minimum_evidence(only_fourteen, 14, 5)
 
     def test_pattern_without_original_suffix_is_rejected(self):
         for key, value in (
