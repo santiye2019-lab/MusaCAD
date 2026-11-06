@@ -1033,6 +1033,34 @@ static int test_layer_nonzero_eed_raw_flags(void) {
         memcmp(&tail, &saved_tail, sizeof(tail)))
         return 0;
     memcpy(source, pristine, sizeof(source));
+
+    /* Re-authenticated R2010 frames with a shorter DATA bit window.
+     * BS ends at bit 97, BL at 131, RC at 139; the handle stream start
+     * is payload bit 192 minus the source MC handle bit count. This
+     * proves strict BL and RC refusal, not any real CMC color. */
+    source[2] = 72u; /* handle starts bit 120: BL cannot fit */
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 42u, &tail) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BL ||
+        memcmp(&tail, &saved_tail, sizeof(tail)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
+    source[2] = 56u; /* handle starts bit 136: BL fits, RC cannot */
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 42u, &tail) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_RC ||
+        memcmp(&tail, &saved_tail, sizeof(tail)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
     if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
             source, sizeof(source), index, 1u, 42u) !=
             MUSA_DWG_LAYER_CMC_STAGE_OK ||
