@@ -131,7 +131,9 @@ jobs:
             -p 'test_real_dwg_layer_class_bridge.py' -v
           python3 tests/real_dwg_layer_class_bridge.py \
             --stage-report /tmp/musacad-real-native-stages.json \
-            --report /tmp/musacad-real-layer-class-bridge.json
+            --report /tmp/musacad-real-layer-class-bridge.json \
+            --min-native-triplets 14 \
+            --min-source-drawings 5
       - name: Compile read-only rejected map diagnostics
         run: |
           set -euo pipefail
