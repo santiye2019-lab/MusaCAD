@@ -169,6 +169,31 @@ def require_original_ac1024_handles_join(version: str, result: dict) -> None:
         raise ValueError("original_ac1024_handles_logical_join_not_verified")
 
 
+def require_original_ac1024_objects_join(version: str, result: dict) -> None:
+    """Original immutable R2010 corpus gate; reconstructed bytes, not geometry.
+
+    If any source-authenticated AcDb:AcDbObjects logical join regresses,
+    the matrix must fail rather than report merely physical-page acceptance.
+    """
+    if version != "AC1024":
+        return
+    if (
+        result.get("result") != "accepted"
+        or result.get("native_stage") != "ac1024_physical_page_locations"
+        or result.get("ac1024_objects_join_verified") is not True
+        or type(result.get("ac1024_objects_join_logical_bytes")) is not int
+        or not (0 < result["ac1024_objects_join_logical_bytes"]
+                <= 64 * 1024 * 1024)
+        or result.get("ac1024_objects_join_logical_bytes") !=
+           result.get("ac1024_objects_candidate_logical_bytes")
+        or result.get("ac1024_objects_join_inner_failure_stage") != 0
+        or result.get("ac1024_handles_join_verified") is not True
+        or result.get("geometry_verified") is not False
+        or result.get("rendering_verified") is not False
+    ):
+        raise ValueError("original_ac1024_objects_logical_join_not_verified")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, default=Path("."))
@@ -217,6 +242,7 @@ def main() -> int:
             elif observed["result"] == "accepted":
                 raise ValueError("unsupported_version_falsely_accepted")
             require_original_ac1024_handles_join(version, observed)
+            require_original_ac1024_objects_join(version, observed)
             record.update(observed)
             record["committed_sha256"] = expected_sha
             record["size_bytes"] = actual_size
