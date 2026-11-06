@@ -72,7 +72,7 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
         if((a<=b&&b-a<compressed_bytes)||
            (a>b&&a-b<sizeof(*diagnostic)))return 0;
         *diagnostic=(MusaDwgAc1018LzDiagnostic){
-            0u,0u,MUSA_DWG_AC1018_LZ_PHASE_ALLOC,0u};
+            .failure_phase=MUSA_DWG_AC1018_LZ_PHASE_ALLOC};
     }
     uint8_t *scratch=(uint8_t*)malloc(decompressed_bytes);
     if(!scratch)return 0;
@@ -138,8 +138,13 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
         if(back>=SIZE_MAX||back+1u>c.used)
             goto cleanup;
         phase=MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN;
-        if(count>c.limit-c.used)
+        if(count>c.limit-c.used){
+            if(diagnostic){
+                diagnostic->overflow_match_bytes=count;
+                diagnostic->overflow_available_bytes=c.limit-c.used;
+            }
             goto cleanup;
+        }
         ++back;
         for(size_t i=0u;i<count;i++){
             c.dst[c.used]=c.dst[c.used-back];++c.used;
