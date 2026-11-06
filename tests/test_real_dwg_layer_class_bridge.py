@@ -28,6 +28,10 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_terminal_fragment_zero": n,
             "sampled_layer_eed_terminal_fragment_nonzero": 0,
             "sampled_layer_eed_terminal_fragment_prefix_four_tokens": n,
+            "sampled_layer_eed_terminal_fragment_2bit_pattern_mask": 1 if n else 0,
+            "sampled_layer_eed_terminal_fragment_4bit_pattern_mask": 0,
+            "sampled_layer_eed_terminal_fragment_start_mod8_mask": 64 if n else 0,
+            "sampled_layer_eed_terminal_fragment_end_mod8_mask": 1 if n else 0,
             "sampled_layer_eed_terminal_candidate_ot80_placeholder": n,
             "sampled_layer_eed_terminal_candidate_ot57_ltype": n,
             "sampled_layer_eed_terminal_candidate_dynamic_class_unresolved": n,
@@ -69,6 +73,8 @@ class LayerClassBridgeTests(unittest.TestCase):
         self.assertTrue(out["fixed_ltype_ot57_identity_confirmed"])
         self.assertEqual(out["terminal_fragment_2_bit_samples"], 14)
         self.assertEqual(out["terminal_fragment_undecoded_samples"], 14)
+        self.assertEqual(out["terminal_fragment_2bit_pattern_values_seen"], [0])
+        self.assertEqual(out["terminal_fragment_4bit_pattern_values_seen"], [])
         self.assertFalse(out["h_tail_fully_decoded"])
         self.assertFalse(out["material_property_link_semantics_proven"])
         self.assertFalse(out["ot57_semantics_proven"])
@@ -121,6 +127,9 @@ class LayerClassBridgeTests(unittest.TestCase):
         h["sampled_layer_eed_terminal_triplet_nonzero_fragment"] = 2
         h["sampled_layer_eed_terminal_fragment_bits_2"] = 0
         h["sampled_layer_eed_terminal_fragment_bits_4"] = 2
+        h["sampled_layer_eed_terminal_fragment_2bit_pattern_mask"] = 0
+        h["sampled_layer_eed_terminal_fragment_4bit_pattern_mask"] = 1 << 5
+        h["sampled_layer_eed_terminal_fragment_start_mod8_mask"] = 1 << 4
         observed = summarize(stage(item))
         self.assertEqual(observed["terminal_fragment_nonzero_samples"], 2)
         self.assertEqual(observed["terminal_fragment_4_bit_samples"], 2)
@@ -147,6 +156,18 @@ class LayerClassBridgeTests(unittest.TestCase):
             item["ac1024_compatibility_hypothesis"][field] = value
             with self.subTest(field=field), self.assertRaises(EvidenceError):
                 summarize(stage(item))
+
+    def test_pattern_without_original_suffix_is_rejected(self):
+        for key, value in (
+            ("sampled_layer_eed_terminal_fragment_2bit_pattern_mask", 0),
+            ("sampled_layer_eed_terminal_fragment_4bit_pattern_mask", 2),
+            ("sampled_layer_eed_terminal_fragment_start_mod8_mask", 0),
+            ("sampled_layer_eed_terminal_fragment_end_mod8_mask", 0),
+        ):
+            invalid = sample(2)
+            invalid["ac1024_compatibility_hypothesis"][key] = value
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(invalid))
 
     def test_missing_provenance_is_rejected(self):
         bad = sample()
