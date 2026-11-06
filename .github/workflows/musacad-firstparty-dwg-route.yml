@@ -1,0 +1,25 @@
+name: MusaCAD multi-version DWG route candidate proof
+on:
+  pull_request:
+    paths:
+      - 'core/firstparty/dwg_route/**'
+      - '.github/workflows/musacad-firstparty-dwg-route.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-c11-routing:
+    name: DWG route candidate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure independent router
+        run: cmake -S core/firstparty/dwg_route -B build-dwg-route -DBUILD_TESTING=ON
+      - name: Compile
+        run: cmake --build build-dwg-route --config Release --parallel
+      - name: Test known, unknown and malformed routing states
+        run: ctest --test-dir build-dwg-route -C Release --output-on-failure
