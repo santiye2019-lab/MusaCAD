@@ -426,6 +426,26 @@ uint8_t musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_layer_handle);
 
+/* CRC-authenticated raw BS immediately AFTER original LAYER flags.
+ * This is NOT admitted as a genuine CMC index if the full CMC BS/BL/RC
+ * parser refuses; do not interpret it as ACI, BYLAYER or pixel color.
+ * A nonzero value remains source-only diagnostic evidence. */
+typedef struct MusaDwgAc1024LayerAfterFlagsBsCandidate {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t candidate_start_bit;
+    size_t candidate_end_bit;
+    uint16_t candidate_bs_value;
+    uint8_t original_crc_verified;
+    uint8_t cmc_identity_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LayerAfterFlagsBsCandidate;
+int musa_dwg_ac1024_layer_eed_after_flags_bs_candidate_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerAfterFlagsBsCandidate *out);
+
 /* Original R2010 LAYER OT51 H stream, EED-bearing and XDictionary
  * present ONLY. A CRC-backed layer and its OT67 APPID targets are
  * mandatory. The first H4 is an OT50 LAYER_CONTROL soft-pointer; the
