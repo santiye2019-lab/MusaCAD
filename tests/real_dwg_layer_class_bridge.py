@@ -58,6 +58,7 @@ def summarize(stage: dict) -> dict:
         "terminal_fragment_undecoded_samples": 0,
         "h_tail_fully_decoded": False,
         "verified_raw_target_records": 0,
+        "first_party_native_type_triplets_verified": 0,
         "material_property_link_semantics_proven": False,
         "ot80_semantics_proven": False,
         "ot57_semantics_proven": False,
@@ -140,15 +141,29 @@ def summarize(stage: dict) -> dict:
         strict = (ordinals == [n, n, n]
                   and consensus == [81, 506, 58]
                   and raw80 >= n and raw505 >= n and raw57 >= n)
+        native_attempts = _integer(
+            h, "sampled_layer_eed_terminal_triplet_attempts", 2048)
+        native_verified = _integer(
+            h, "sampled_layer_eed_terminal_triplet_verified", 2048)
+        native_nonzero = _integer(
+            h, "sampled_layer_eed_terminal_triplet_nonzero_fragment", 2048)
+        if (native_attempts != n or native_verified > n or
+                native_nonzero > native_verified or
+                native_nonzero > fragment_nonzero):
+            raise EvidenceError("contradictory_native_type_triplet_census")
         if not strict:
             aggregate["layer_samples_with_unresolved_target_class"] += n
             continue
+        if native_verified != n or native_nonzero != fragment_nonzero:
+            raise EvidenceError("native_type_triplet_not_proven")
+
 
         aggregate["layer_samples_with_three_crc_backed_targets"] += n
         aggregate["raw_ot80_target_records"] += n
         aggregate["raw_ot505_target_records"] += n
         aggregate["raw_ot57_target_records"] += n
         aggregate["verified_raw_target_records"] += 3*n
+        aggregate["first_party_native_type_triplets_verified"] += n
         # Fixed OT identities are from the portable first-party DWG type
         # registry: OT80=PLACEHOLDER, OT57=LTYPE. Those NAMES are proven;
         # the meaning of their position within the OT51 H tail is not.
