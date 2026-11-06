@@ -29,3 +29,41 @@ OT80 ve OT57 türü ile ilgili sayısal kayıtlar, referans sırası nedeniyle *
 4. Başarılı Android/iOS/macOS/Windows çekirdek kapıları ve final APK değerlendirmesi ancak tüm işlevsel kapsam doğrulandıktan sonra.
 
 **Birleştirme:** PR #720 açık kalır, main'e otomatik aktarım ve APK iddiası yoktur. LibreDWG yalnızca ayrı GitHub CI host oracle sürecindedir.
+
+
+## 6 Kasım 2026 — özgün C11 katman hedef üçlüsü doğrulaması
+
+**Saat dilimi:** Europe/Istanbul (UTC+03:00)  
+**Yeni test kod commit'i:** 45d9b7dd0206ae2c2bccbcb27e247574d0c33100  
+**Başarılı gerçek DWG kaynak testi:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42182888167  
+**CI çıktısı:** musacad-real-layer-class-bridge.json  
+**Bağımsız çekirdek:** core/native/src/musacad_dwg_ac1024_self_index.c
+
+Önceki yalnızca toplulaştırılmış sayımların ötesine geçildi. Yeni özgün C11
+musa_dwg_ac1024_layer_eed_tail_type_triplet_probe fonksiyonu, her bir gerçek
+OT51 LAYER kaydında dört tam H belirtecini ve ilk H5/0 boş belirtecini kontrol
+edip sonraki üç H hedefini kaynak CRC16/self-H ile yeniden doğruluyor:
+OT80 (sabit PLACEHOLDER), OT505 (bu kaynakta DXF MATERIAL olarak ayrı
+Classes bölümünden çözümlenmiş dinamik sınıf) ve OT57 (sabit LTYPE).
+
+**Gerçek kaynak sonucu:**
+- **14/14** gerçek katman kaydı, aynı kaynak içindeki C11 üçlü tip kanıtından geçti.
+- **42/42** hedef nesnesi, CRC / indeks / kendi H kimliği ve ham OT eşleşmesinden geçti.
+- **10** kayıtta 2 bit ve **4** kayıtta 4 bit bitmemiş H-kuyruk parçası kaldı.
+- Son parçaların **12**'si sıfır, **2**'si sıfır değildi; sıfır olanlara dolgu denmiyor.
+- Python kaynak matrisi ayrıca C11 üçlü kabul sayısını ve kayıtlardaki terminal
+  bit sayısını çapraz kontrol ediyor. Negatif sentetik testler tutarsız
+  toplamları, kayıp hedefleri, kaynak çakışmasını ve eksik parçaları reddediyor.
+
+**KESİN SINIR:** Bu bir veri kimliği ve ham H dizisi kanıtıdır. PLACEHOLDER,
+LTYPE ve MATERIAL isimleri, söz konusu H sırasının nihai CAD rolünü,
+malzeme atanmasını, çizgi tipi kalıtımını, CMC/BYLAYER rengini,
+layer açık/kapalı/donmuş durumunu, geometri ya da render eşdeğerliğini
+**kanıtlamaz**. C11 sonucunda h_tail_fully_decoded=0,
+target_roles_verified=0 ve display_accepted=0 korunur. Tam son H
+parçası çözülmeden hiçbir katman sahneye alınmaz.
+
+LibreDWG yalnızca CI'daki ayrı host referans aracıdır; uygulamanın
+özgün çekirdeğine eklenmedi. Kaynak DWG'ler değişmedi, PR #720
+main'e birleştirilmedi ve APK üretilmedi.
+
