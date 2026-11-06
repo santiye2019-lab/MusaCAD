@@ -41,6 +41,13 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_cmc_postflags_tail_refused_bl": 0,
             "sampled_layer_eed_cmc_postflags_tail_refused_rc": 0,
             "sampled_layer_eed_cmc_postflags_tail_refused_other": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bs_zero": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bl_zero": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_zero": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero": 0,
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits": 0,
             "sampled_layer_eed_cmc_verified": 0,
             "sampled_layer_eed_cmc_refused": n,
             "sampled_layer_eed_cmc_refused_preflight": n,
@@ -333,12 +340,46 @@ class LayerClassBridgeTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(EvidenceError):
                 summarize(stage(bad))
         base["sampled_layer_eed_cmc_postflags_tail_verified"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_verified_bs_zero"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_verified_bl_zero"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_verified_rc_zero"] = 1
         base["sampled_layer_eed_cmc_postflags_tail_refused"] = 1
         base["sampled_layer_eed_cmc_postflags_tail_refused_bl"] = 1
         out = summarize(stage(good))
         self.assertEqual(out["layer_after_flags_tail_candidate_refused_bl"], 1)
         self.assertEqual(out["layer_after_flags_tail_candidate_verified"], 1)
         self.assertFalse(out["layer_after_flags_tail_is_not_verified_cmc"] is False)
+
+    def test_postflags_source_categories_are_disjoint_and_not_colors(self):
+        fixture = sample(2)
+        h = fixture["ac1024_compatibility_hypothesis"]
+        # One CRC-backed BS=0, one BS=25; raw BL nonzero and raw RC
+        # with high bits remain mere DIAGNOSTICS, never display colors.
+        h["sampled_layer_eed_cmc_postflags_bs_value_0"] = 1
+        h["sampled_layer_eed_cmc_postflags_bs_value_1_255"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bs_zero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bl_zero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_rc_zero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero"] = 1
+        h["sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits"] = 1
+        out = summarize(stage(fixture))
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified_bs_nonzero"], 1)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified_bl_nonzero"], 1)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified_rc_reserved_bits"], 1)
+        self.assertTrue(out["layer_after_flags_tail_is_not_verified_cmc"])
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        for key in (
+            "sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero",
+            "sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero",
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero",
+            "sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits",
+        ):
+            bad = copy.deepcopy(fixture)
+            bad["ac1024_compatibility_hypothesis"][key] = 3
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
 
     def test_real_corpus_minimum_coverage_gate(self):
         out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))
