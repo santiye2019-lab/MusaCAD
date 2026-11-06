@@ -477,6 +477,12 @@ typedef struct MusaDwgAc1024LayerEedTerminalFragment {
     uint8_t prefix_h_code[4];
     uint8_t prefix_h_size[4];
     uint8_t terminal_fragment_all_zero;
+    /* Bit-order preserving raw 1..7-bit value of the unresolved suffix.
+     * Never interpret as padding/H opcode, CAD property or render support.
+     * Modulo-8 alignment ONLY: no absolute source offsets exported. */
+    uint8_t terminal_fragment_raw_pattern;
+    uint8_t terminal_fragment_start_mod8;
+    uint8_t terminal_fragment_end_mod8;
     uint8_t original_records_crc_verified;
     uint8_t display_accepted;
 } MusaDwgAc1024LayerEedTerminalFragment;
