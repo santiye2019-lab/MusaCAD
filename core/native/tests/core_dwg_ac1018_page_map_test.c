@@ -271,15 +271,18 @@ static void r2010_directory_original_page_link_test(void){
 static void r2010_data_page_crc_candidate_test(void){
     uint8_t decoded[132]={0},source[64]={0};
     le32(decoded,1u);
-    le32(decoded+20u,64u);
-    le32(decoded+28u,1u);
-    le32(decoded+44u,9u); /* R2010 section ID candidate */
+    le32(decoded+20u,4u);   /* section logical length */
+    le32(decoded+28u,1u);   /* one physical page */
+    le32(decoded+32u,4u);   /* declared logical page bytes */
+    le32(decoded+40u,2u);   /* source section LZ compression */
+    le32(decoded+44u,9u);   /* section id */
     memcpy(decoded+52u,"AcDb:Handles",13u);
     le32(decoded+116u,7u);
-    le32(decoded+120u,3u);
-    source[32u]=1u;source[33u]=2u;source[34u]=3u;
-    const uint32_t data_crc=checksum(0u,source+32u,3u);
-    uint32_t words[8]={UINT32_C(0x4163043b),9u,3u,3u,
+    le32(decoded+120u,6u);
+    const uint8_t compressed[]={1u,'A','B','C','D',0x11u};
+    memcpy(source+32u,compressed,sizeof compressed);
+    const uint32_t data_crc=checksum(0u,source+32u,sizeof compressed);
+    uint32_t words[8]={UINT32_C(0x4163043b),9u,6u,6u,
                        0u,0u,0u,data_crc};
     uint8_t raw[32];
     for(size_t k=0;k<8u;k++)le32(raw+k*4u,words[k]);
@@ -292,27 +295,47 @@ static void r2010_data_page_crc_candidate_test(void){
     assert(musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
     assert(e.referenced_pages==1u&&e.masked_headers_verified==1u&&
-           e.payload_adler_verified==1u&&e.header_adler_verified==1u);
+           e.payload_adler_verified==1u&&e.header_adler_verified==1u&&
+           e.strict_lz_eligible_pages==1u&&e.strict_lz_verified==1u);
     assert(memcmp(immutable,source,sizeof source)==0);
-    MusaDwgAc1024PageChecksumEvidence saved=e;
-    source[33u]^=1u; /* original payload must fail its Adler checksum */
+    source[33u]^=1u; /* source payload CRC corruption must refuse LZ */
     assert(musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
     assert(e.referenced_pages==1u&&e.masked_headers_verified==1u&&
-           !e.payload_adler_verified&&!e.header_adler_verified);
+           !e.payload_adler_verified&&!e.header_adler_verified&&
+           !e.strict_lz_eligible_pages&&!e.strict_lz_verified);
     memcpy(source,immutable,sizeof source);
     source[24u]^=1u; /* masked header checksum corrupted */
     assert(musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
     assert(e.masked_headers_verified==1u&&e.payload_adler_verified==1u&&
-           !e.header_adler_verified);
+           !e.header_adler_verified&&!e.strict_lz_verified);
     memcpy(source,immutable,sizeof source);
     source[0u]^=1u; /* wrong DATA page envelope magic */
     assert(musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
     assert(!e.masked_headers_verified&&!e.payload_adler_verified&&
-           !e.header_adler_verified);
+           !e.header_adler_verified&&!e.strict_lz_verified);
+    /* Authenticated checksums do not make malformed LZ valid. */
     memcpy(source,immutable,sizeof source);
+    source[32u]=0x11u; /* terminates with zero output instead of four */
+    words[7]=checksum(0u,source+32u,sizeof compressed);
+    words[6]=0u;
+    for(size_t k=0;k<8u;k++)le32(raw+k*4u,words[k]);
+    words[6]=checksum(words[7],raw,sizeof raw);
+    for(size_t k=0;k<8u;k++)
+        le32(source+k*4u,words[k]^UINT32_C(0x4164536b));
+    assert(musa_dwg_ac1024_directory_page_checksums(
+        source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
+    assert(e.header_adler_verified==1u&&e.strict_lz_eligible_pages==1u&&
+           !e.strict_lz_verified);
+    memcpy(source,immutable,sizeof source);
+    le32(decoded+40u,1u); /* uncompressed section: never claim LZ */
+    assert(musa_dwg_ac1024_directory_page_checksums(
+        source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
+    assert(e.header_adler_verified==1u&&
+           !e.strict_lz_eligible_pages&&!e.strict_lz_verified);
+    le32(decoded+40u,2u);
     loc[0].page_id=8u;
     assert(!musa_dwg_ac1024_directory_page_checksums(
         source,sizeof source,decoded,sizeof decoded,loc,1u,&e));
@@ -322,7 +345,6 @@ static void r2010_data_page_crc_candidate_test(void){
         source,sizeof source,decoded,sizeof decoded,loc,1u,
         (MusaDwgAc1024PageChecksumEvidence*)(void*)(source+4u)));
     assert(memcmp(source,immutable,sizeof source)==0);
-    (void)saved;
 }
 int main(void){
     uint8_t file[380];fixture(file);
