@@ -59,5 +59,53 @@ class NativeDwgStageProbeTest(unittest.TestCase):
         self.assertEqual(record["native_stage"], "invalid_signature")
 
 
+
+class NativeStageContractTest(unittest.TestCase):
+    """Do not report index-only AC1018 as verified record coverage."""
+
+    def run_mocked_stage(self, signature: str, stage: str,
+                         status: str = "accepted") -> dict:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from real_dwg_native_stage_matrix import run_probe
+
+        record = {
+            "signature": signature,
+            "result": status,
+            "native_stage": stage,
+            "evidence_count": 3,
+            "geometry_verified": False,
+            "rendering_verified": False,
+            "source_modified": False,
+        }
+        fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
+        with patch("real_dwg_native_stage_matrix.subprocess.run",
+                   return_value=fake) as subprocess_mock:
+            result = run_probe(Path("/mock/probe"), Path("/mock/test.dwg"), 1)
+            subprocess_mock.assert_called_once()
+        return result
+
+    def test_ac1018_index_only_acceptance_is_refused(self):
+        with self.assertRaisesRegex(
+                ValueError, "ac1018_index_only_is_not_full_record_acceptance"):
+            self.run_mocked_stage("AC1018", "ac1018_crc_backed_handle_index")
+
+    def test_ac1018_full_record_audit_acceptance_is_allowed(self):
+        record = self.run_mocked_stage(
+            "AC1018", "ac1018_record_ranges_and_crcs")
+        self.assertEqual(record["evidence_count"], 3)
+
+    def test_ac1018_early_rejection_remains_diagnostic(self):
+        record = self.run_mocked_stage(
+            "AC1018", "ac1018_crc_backed_handle_index", "rejected")
+        self.assertEqual(record["result"], "rejected")
+
+    def test_other_existing_stage_contract_is_not_changed(self):
+        record = self.run_mocked_stage(
+            "AC1032", "ac1032_crc_backed_handle_index")
+        self.assertEqual(record["native_stage"],
+                         "ac1032_crc_backed_handle_index")
+
+
 if __name__ == "__main__":
     unittest.main()
