@@ -84,6 +84,13 @@ def summarize(stage: dict) -> dict:
         "layer_after_flags_tail_candidate_refused_bl": 0,
         "layer_after_flags_tail_candidate_refused_rc": 0,
         "layer_after_flags_tail_candidate_refused_other": 0,
+        "layer_after_flags_tail_candidate_verified_bs_zero": 0,
+        "layer_after_flags_tail_candidate_verified_bs_nonzero": 0,
+        "layer_after_flags_tail_candidate_verified_bl_zero": 0,
+        "layer_after_flags_tail_candidate_verified_bl_nonzero": 0,
+        "layer_after_flags_tail_candidate_verified_rc_zero": 0,
+        "layer_after_flags_tail_candidate_verified_rc_nonzero": 0,
+        "layer_after_flags_tail_candidate_verified_rc_reserved_bits": 0,
         "layer_after_flags_tail_is_not_verified_cmc": True,
         "layer_after_flags_bs_is_not_verified_cmc": True,
         "layer_eed_cmc_raw_prefix_verified": 0,
@@ -366,7 +373,29 @@ def summarize(stage: dict) -> dict:
                 tbs > br or
                 max(tbs, tf, tbl, trc, to) > ta):
             raise EvidenceError("unproven_source_local_postflags_tail_hypothesis")
+        # The candidate BS/BL/RC values are ONLY source-local bit observations;
+        # partitions can corroborate field-window plausibility, never color.
+        tail_partitions = [
+            _integer(h, "sampled_layer_eed_cmc_postflags_tail_" + key, 2048)
+            for key in (
+                "verified_bs_zero", "verified_bs_nonzero",
+                "verified_bl_zero", "verified_bl_nonzero",
+                "verified_rc_zero", "verified_rc_nonzero",
+                "verified_rc_reserved_bits",
+            )
+        ]
+        zbs, nbs, zbl, nbl, zrc, nrc, reserved_rc = tail_partitions
+        if (zbs + nbs != tv or zbl + nbl != tv or zrc + nrc != tv or
+                zbs > b0 or nbs > baci + b256 + bmid + bhigh or
+                reserved_rc > nrc):
+            raise EvidenceError("unproven_postflags_tail_field_categories")
         for suffix, value in zip(tail_suffixes, tail_values):
+            aggregate["layer_after_flags_tail_candidate_" + suffix] += value
+        for suffix, value in zip(
+                ("verified_bs_zero", "verified_bs_nonzero",
+                 "verified_bl_zero", "verified_bl_nonzero",
+                 "verified_rc_zero", "verified_rc_nonzero",
+                 "verified_rc_reserved_bits"), tail_partitions):
             aggregate["layer_after_flags_tail_candidate_" + suffix] += value
         cmc_refusal_suffixes = (
             "preflight", "index_nonzero", "bl", "rc", "rc_flags", "other"
