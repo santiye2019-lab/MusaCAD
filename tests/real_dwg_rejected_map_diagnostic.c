@@ -169,6 +169,12 @@ int main(int argc, char **argv) {
     int system_adler_ok=0, system_lz_ok=0;
     int system_lz_trace_attempted=0;
     MusaDwgAc1018LzDiagnostic system_lz_trace={0};
+    /* A diagnostic-only alternate output budget MUST NOT be promoted
+     * to accepted DWG content; the authenticated advertised size remains
+     * the sole admission limit for all production decoders. */
+    int system_lz_alt_attempted=0, system_lz_alt_completed=0;
+    size_t system_lz_alt_extra=0u;
+    MusaDwgAc1018LzDiagnostic system_lz_alt_trace={0};
     uint32_t system_kind=0u,system_codec=0u,system_expanded=0u;
     uint32_t system_section_count=0u;
     if(locations_ok && native_pages && native_pages <= 131072u) {
@@ -217,6 +223,30 @@ int main(int argc, char **argv) {
                     if(system_lz_ok)
                         system_lz_ok=musa_dwg_ac1018_lz_decode(
                             sys+20u,packed,buf,system_expanded,&used);
+                    if(legacy && !system_lz_ok &&
+                       system_lz_trace.failure_phase==
+                           MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN &&
+                       system_lz_trace.overflow_match_bytes >
+                           system_lz_trace.overflow_available_bytes) {
+                        const size_t delta=
+                            system_lz_trace.overflow_match_bytes -
+                            system_lz_trace.overflow_available_bytes;
+                        /* Read-only hypothesis: does the exact same strict
+                         * grammar terminate if the declared output budget
+                         * were higher by precisely the failing match delta?
+                         * Never mutate the real header or production open
+                         * gate. Refuse unbounded candidate expansions. */
+                        if(delta<=256u &&
+                           system_expanded<=MUSA_DIAG_MAX_MAP-delta) {
+                            system_lz_alt_attempted=1;
+                            system_lz_alt_extra=delta;
+                            system_lz_alt_completed=
+                                musa_dwg_ac1018_lz_diagnose(
+                                    sys+20u,packed,
+                                    (size_t)system_expanded+delta,
+                                    &system_lz_alt_trace);
+                        }
+                    }
                     if(system_lz_ok && system_expanded>=4u)
                         system_section_count=read32(buf);
                     free(buf);
@@ -260,6 +290,12 @@ int main(int argc, char **argv) {
            "\"system_lz_output_produced\":%zu,"
            "\"system_lz_overflow_match_bytes\":%zu,"
            "\"system_lz_overflow_available_bytes\":%zu,"
+           "\"system_lz_alt_attempted\":%s,"
+           "\"system_lz_alt_extra_bytes\":%zu,"
+           "\"system_lz_alt_completed\":%s,"
+           "\"system_lz_alt_failure_phase\":%u,"
+           "\"system_lz_alt_input_consumed\":%zu,"
+           "\"system_lz_alt_output_produced\":%zu,"
            "\"system_descriptor_count\":%u,"
            "\"system_kind_code\":%u,"
            "\"system_codec\":%u,"
@@ -291,6 +327,12 @@ int main(int argc, char **argv) {
            system_lz_trace.output_produced,
            system_lz_trace.overflow_match_bytes,
            system_lz_trace.overflow_available_bytes,
+           system_lz_alt_attempted ? "true" : "false",
+           system_lz_alt_extra,
+           system_lz_alt_completed ? "true" : "false",
+           (unsigned)system_lz_alt_trace.failure_phase,
+           system_lz_alt_trace.input_consumed,
+           system_lz_alt_trace.output_produced,
            system_section_count,system_kind,system_codec,
            system_expanded);
     free(file);

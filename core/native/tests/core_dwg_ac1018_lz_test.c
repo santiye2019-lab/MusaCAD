@@ -89,6 +89,23 @@ static void trace(void){
            diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN&&
            diag.overflow_match_bytes==3u&&
            diag.overflow_available_bytes==2u);
+    /* A larger budget may satisfy the exact synthetic LZ stream, but the
+     * real source's authenticated advertised output size is authoritative:
+     * production must reject the 6-byte budget without partial output. */
+    MusaDwgAc1018LzDiagnostic alt={0};
+    assert(musa_dwg_ac1018_lz_diagnose(
+        overrun,sizeof(overrun),7u,&alt));
+    assert(alt.completed==1u&&
+           alt.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_NONE&&
+           alt.input_consumed==sizeof(overrun)&&
+           alt.output_produced==7u);
+    uint8_t refused[6]={'S','A','F','E','!','!'};
+    const uint8_t saved[6]={'S','A','F','E','!','!'};
+    size_t refused_used=999u;
+    assert(!musa_dwg_ac1018_lz_decode(
+        overrun,sizeof(overrun),refused,6u,&refused_used));
+    assert(memcmp(refused,saved,sizeof refused)==0 &&
+           refused_used==999u);
     /* Never write diagnostic fields into original source bytes. */
     uint8_t alias[32]={1,'A','B','C','D',0x11};
     uint8_t before[32];memcpy(before,alias,sizeof alias);
