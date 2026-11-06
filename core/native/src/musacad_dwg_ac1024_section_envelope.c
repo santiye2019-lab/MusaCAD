@@ -1,0 +1,86 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include "musacad_dwg_ac1024_section_envelope.h"
+#include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1018_lz.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#define MUSA_AC1024_MAX_PHYSICAL 65536u
+#define MUSA_AC1024_MAX_SECTION_BYTES 1048576u
+static uint32_t read32(const uint8_t *p){
+    return (uint32_t)p[0]|((uint32_t)p[1]<<8u)|
+           ((uint32_t)p[2]<<16u)|((uint32_t)p[3]<<24u);
+}
+static uint32_t adler(uint32_t seed,const uint8_t *p,size_t n){
+    uint64_t lo=seed&65535u,hi=seed>>16u;
+    for(size_t at=0u;at<n;){
+        const size_t take=n-at<5552u?n-at:5552u;
+        for(size_t i=0u;i<take;i++){lo+=p[at+i];hi+=lo;}
+        lo%=65521u;hi%=65521u;at+=take;
+    }
+    return ((uint32_t)hi<<16u)|(uint32_t)lo;
+}
+static int overlap(const void *a,size_t na,const void *b,size_t nb){
+    if(!a||!b||!na||!nb)return 0;
+    const uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
+    return x<=y?y-x<na:x-y<nb;
+}
+int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
+    MusaDwgAc1024SectionEnvelopeEvidence *out){
+    if(!file||!out||overlap(file,n,out,sizeof(*out)))return 0;
+    MusaDwgAc1018FileMapHeader header={0};
+    if(!musa_dwg_ac1024_page_map_header(file,n,&header)||
+       !header.page_count||header.page_count>MUSA_AC1024_MAX_PHYSICAL)
+        return 0;
+    size_t count=0u;
+    if(!musa_dwg_ac1024_page_locations(file,n,NULL,0u,&count)||
+       count!=header.page_count)return 0;
+    MusaDwgAc1018PageLocation *pages=
+        (MusaDwgAc1018PageLocation*)calloc(count,sizeof(*pages));
+    if(!pages)return 0;
+    int ok=0;
+    if(!musa_dwg_ac1024_page_locations(
+           file,n,pages,count,&count)||count!=header.page_count)
+        goto done;
+    for(size_t i=0u;i<count;i++){
+        if(pages[i].page_id!=header.section_map_id)continue;
+        if(pages[i].file_offset>n||
+           pages[i].file_span_bytes<20u||
+           n-(size_t)pages[i].file_offset<20u)break;
+        const size_t pos=(size_t)pages[i].file_offset;
+        const uint8_t *page=file+pos;
+        const uint32_t kind=read32(page),expanded=read32(page+4u),
+                       packed=read32(page+8u),codec=read32(page+12u),
+                       stored=read32(page+16u);
+        if(kind!=UINT32_C(0x4163003b)||codec!=2u||
+           expanded<4u||expanded>MUSA_AC1024_MAX_SECTION_BYTES||
+           !packed||packed>MUSA_AC1024_MAX_SECTION_BYTES||
+           packed>pages[i].file_span_bytes-20u||
+           packed>n-pos-20u)break;
+        uint8_t clean[20];memcpy(clean,page,20u);
+        memset(clean+16u,0,4u);
+        if(adler(adler(0u,clean,20u),page+20u,packed)!=stored)break;
+        MusaDwgAc1024SectionEnvelopeEvidence e={0};
+        e.section_map_page_id=header.section_map_id;
+        e.compressed_bytes=packed;
+        e.declared_expanded_bytes=expanded;
+        e.original_physical_offset=pages[i].file_offset;
+        e.adler_verified=1u;
+        uint8_t *decoded=(uint8_t*)malloc(expanded);
+        if(!decoded)break;
+        size_t consumed=0u;
+        if(musa_dwg_ac1018_lz_decode(page+20u,packed,decoded,expanded,
+                                     &consumed)&&consumed<=packed){
+            e.strict_lz_completed=1u;
+            e.declared_section_count_candidate=read32(decoded);
+        }
+        free(decoded);
+        *out=e;
+        ok=1;
+        break;
+    }
+done:
+    free(pages);
+    return ok;
+}

@@ -55,6 +55,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or result.get("geometry_verified") is not False
         or result.get("rendering_verified") is not False
         or result.get("source_modified") is not False
+        or type(result.get("ac1024_section_map_crc_verified")) is not bool
+        or type(result.get("ac1024_section_map_lz_completed")) is not bool
+        or (result.get("ac1024_section_map_lz_completed")
+            and not result.get("ac1024_section_map_crc_verified"))
     ):
         raise ValueError("invalid_native_probe_contract")
     if result["result"] == "accepted":

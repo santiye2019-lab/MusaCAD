@@ -77,6 +77,8 @@ class NativeStageContractTest(unittest.TestCase):
             "geometry_verified": False,
             "rendering_verified": False,
             "source_modified": False,
+            "ac1024_section_map_crc_verified": False,
+            "ac1024_section_map_lz_completed": False,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
