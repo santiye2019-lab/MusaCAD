@@ -109,3 +109,49 @@ kanıtı ve 5 kaynak DWG** aranıyor. Daha az kanıt üretildiğinde, yanlışl�
 yeşil rapor verilmesi yerine CI başarısız olacak.
 Bu yeni asgari eşik için son commitin test sonucu, önceki
 4731479 kaynak çalışmasından ayrı izlenmelidir.
+
+
+## 6 Kasım 2026 — C11 orijinal handle-kuyruk bayt hizası kanıtı
+
+**Saat dilimi:** Europe/Istanbul (UTC+03:00)  
+**Kanıtlanan kod commit'i:** 9de2a34eb9e09fd437b0865777fada946a185a8d  
+**Başarılı gerçek DWG Actions:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42208768753  
+**Rapor çıktısı:** musacad-real-layer-class-bridge.json
+
+Özgün C11 çekirdeğine musa_dwg_ac1024_layer_eed_tail_alignment_witness
+eklendi. Bu yordam aynı orijinal kaynak DWG'nin CRC/self-H doğrulamalı
+OT51 kayıtlarında önce sabit OT80 PLACEHOLDER, çizim-yerel OT505
+ve sabit OT57 LTYPE ham tür üçlüsünü tekrar denetler. Daha sonra
+son 2 veya 4 bitlik H-kuyruk parçasının ham değerini ve
+bayt-içi başlangıç/bitiş hizasını kontrol eder. Fazladan tam bir H
+belirteci için 8 bit bulunmadığını kaydeder, fakat son bitlerin
+mutlaka dolgu olduğunu kabul etmez.
+
+Gerçek kaynak derlemesinden doğrulanmış sonuç:
+- **23** kaynak DWG incelendi; **10** AC1024, bunların **5** dosyasında
+  aşağıdaki 14 kaydın orijinal C11 kanıtı elde edildi.
+- **14/14** CRC/self-H doğrulamalı OT80 → OT505 → OT57 üçlüsü.
+- **14/14** yeni **C11 bayt hizası tanığı** başarıyla doğrulandı.
+- **42/42** hedef nesne orijinal kayıt kimliğiyle eşleşti.
+- Son parça uzunluğu **10 kez 2 bit**, **4 kez 4 bit**.
+- Ham değerler 2-bit: **0 ve 3**; 4-bit: **0**;
+  toplam **12 sıfır**, **2 sıfır olmayan** parça.
+- Bütün 14 örneğin bitişi **mod8=0**, başlangıcı mod8=4/6.
+- Sözleşme testleri bozuk sayıları, eksik kaynak kimliğini,
+  uyuşmayan C11/Python sonuçlarını ve test kapsama kaybını reddeder.
+
+**Kabul sınırı:** byte_alignment_compatible=1 yalnızca R2010
+biçimiyle uyumlu kısmi fiziksel gözlemdir.
+padding_proven=0, target_roles_verified=0, display_accepted=0
+ve h_tail_fully_decoded=false korunur. Bu test katmanların gerçek
+açık/kapalı/donmuş durumunu, CMC/BYLAYER rengini, görünürlük/render
+eşdeğerliğini veya normal Android DWG açılışını kanıtlamaz.
+
+**Biçim referansı:** ODA Open Design Specification for .dwg files
+5.4.1 (20.4.54 LAYER; ortak nesne/varlık bayt tamamlama bilgisi).
+https://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+
+**İzole test ilkesi:** LibreDWG yalnızca ayrı GitHub CI host referans
+aracı; özgün MusaCAD C11 çekirdeğine veya mobil uygulamaya dahil
+edilmedi. DWG kaynakları değiştirilmedi. PR #720 main'e birleştirilmedi.
+
