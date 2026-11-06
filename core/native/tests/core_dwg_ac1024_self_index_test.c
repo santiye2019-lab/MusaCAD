@@ -1014,6 +1014,34 @@ static int test_layer_nonzero_eed_raw_flags(void) {
         tail.cmc_identity_verified || tail.display_accepted)
         return 0;
     const MusaDwgAc1024LayerAfterFlagsTailCandidate saved_tail = tail;
+
+    /* A fully CRC-backed synthetic nonzero BS/BL/RC sequence is still
+     * only an untrusted *field-window hypothesis*, not a genuine CMC. */
+    set_bits(p, 79u, 2u, 1u); /* BS 8-bit candidate */
+    set_bits(p, 81u, 8u, 25u);
+    set_bits(p, 89u, 2u, 1u); /* BL 8-bit candidate */
+    set_bits(p, 91u, 8u, 7u);
+    set_bits(p, 99u, 8u, 0x80u); /* RC high bit: NOT a color name */
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    MusaDwgAc1024LayerAfterFlagsTailCandidate nonzero = {0};
+    if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 42u, &nonzero) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_OK ||
+        nonzero.bs_end_bit != 89u || nonzero.bl_end_bit != 99u ||
+        nonzero.rc_end_bit != 107u ||
+        nonzero.candidate_bs_value != 25u ||
+        nonzero.candidate_bl_value != 7u ||
+        nonzero.candidate_rc_value != 0x80u ||
+        !nonzero.original_crc_verified ||
+        nonzero.cmc_identity_verified || nonzero.display_accepted ||
+        musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
+            source, sizeof(source), index, 1u, 42u) !=
+            MUSA_DWG_LAYER_CMC_STAGE_INDEX_NONZERO)
+        return 0;
+    memcpy(source, pristine, sizeof(source));
     if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
             source, sizeof(source), index, 1u, 42u,
             (MusaDwgAc1024LayerAfterFlagsTailCandidate *)(void *)source) !=
