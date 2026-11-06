@@ -492,6 +492,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_layer_state_locked;
     size_t sampled_line_eed_layer_state_raw_color_256;
     size_t sampled_line_eed_layer_state_explicit_rgb;
+    size_t sampled_line_eed_layer_state_refused_flags;
+    size_t sampled_line_eed_layer_state_refused_h_triplet;
+    size_t sampled_line_eed_layer_state_refused_alignment;
+    size_t sampled_line_eed_layer_state_refused_other;
     /* Independent CRC/authenticated APPID OT67 target references from
      * the original EED frames; never an application-semantics claim. */
     size_t sampled_line_eed_appid_attempts;
@@ -2144,6 +2148,32 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                             ++hint.sampled_line_eed_layer_state_explicit_rgb;
                                                                     } else {
                                                                         ++hint.sampled_line_eed_layer_state_refused;
+                                                                        /* Ordered refusal: source-local LINE H is
+                                                                         * already authenticated by joined above.
+                                                                         * Missing LAYER EED is unsupported, NOT
+                                                                         * evidence of a corrupt DWG. */
+                                                                        MusaDwgAc1024LayerRawFlagsEvidence layer_flags = {0};
+                                                                        MusaDwgAc1024LayerTailTypeTriplet layer_triplet = {0};
+                                                                        MusaDwgAc1024LayerTailAlignmentWitness layer_alignment = {0};
+                                                                        const uint64_t local_layer =
+                                                                            joined.graph.handles.layer_handle;
+                                                                        if (!musa_dwg_ac1024_layer_eed_raw_flags_probe(
+                                                                                objects, nb, recovered, legacy_count,
+                                                                                local_layer, &layer_flags) ||
+                                                                            !layer_flags.original_record_crc_verified)
+                                                                            ++hint.sampled_line_eed_layer_state_refused_flags;
+                                                                        else if (!musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+                                                                                objects, nb, recovered, legacy_count,
+                                                                                local_layer, &layer_triplet) ||
+                                                                            !layer_triplet.original_records_crc_verified)
+                                                                            ++hint.sampled_line_eed_layer_state_refused_h_triplet;
+                                                                        else if (!musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+                                                                                objects, nb, recovered, legacy_count,
+                                                                                local_layer, &layer_alignment) ||
+                                                                            !layer_alignment.source_crc_verified)
+                                                                            ++hint.sampled_line_eed_layer_state_refused_alignment;
+                                                                        else
+                                                                            ++hint.sampled_line_eed_layer_state_refused_other;
                                                                     }
                                                                 }
                                                                 if (joined.graph.handles.entity_mode == 0u)
@@ -2780,6 +2810,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_layer_state_locked\":%zu,"
                "\"sampled_line_eed_layer_state_raw_color_256\":%zu,"
                "\"sampled_line_eed_layer_state_explicit_rgb\":%zu,"
+               "\"sampled_line_eed_layer_state_refused_flags\":%zu,"
+               "\"sampled_line_eed_layer_state_refused_h_triplet\":%zu,"
+               "\"sampled_line_eed_layer_state_refused_alignment\":%zu,"
+               "\"sampled_line_eed_layer_state_refused_other\":%zu,"
                "\"sampled_line_eed_appid_attempts\":%zu,"
                "\"sampled_line_eed_appid_verified\":%zu,"
                "\"sampled_line_eed_appid_refused\":%zu,"
@@ -3221,6 +3255,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_layer_state_locked,
                hint->sampled_line_eed_layer_state_raw_color_256,
                hint->sampled_line_eed_layer_state_explicit_rgb,
+               hint->sampled_line_eed_layer_state_refused_flags,
+               hint->sampled_line_eed_layer_state_refused_h_triplet,
+               hint->sampled_line_eed_layer_state_refused_alignment,
+               hint->sampled_line_eed_layer_state_refused_other,
                hint->sampled_line_eed_appid_attempts,
                hint->sampled_line_eed_appid_verified,
                hint->sampled_line_eed_appid_refused,

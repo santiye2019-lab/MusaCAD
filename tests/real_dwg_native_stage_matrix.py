@@ -920,18 +920,25 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_line_eed_layer_state_locked",
             "sampled_line_eed_layer_state_raw_color_256",
             "sampled_line_eed_layer_state_explicit_rgb",
+            "sampled_line_eed_layer_state_refused_flags",
+            "sampled_line_eed_layer_state_refused_h_triplet",
+            "sampled_line_eed_layer_state_refused_alignment",
+            "sampled_line_eed_layer_state_refused_other",
         )
         if any(type(hint.get(k)) is not int or hint[k] < 0
                for k in line_layer_keys):
             raise ValueError("invalid_source_local_line_layer_color_counts")
         (ll_attempts, ll_verified, ll_refused, ll_frozen,
-         ll_on, ll_locked, ll_256, ll_rgb) = (
+         ll_on, ll_locked, ll_256, ll_rgb, ll_bad_flags,
+         ll_bad_triplet, ll_bad_alignment, ll_bad_other) = (
              hint[k] for k in line_layer_keys
         )
         line_eed_verified = hint.get("sampled_line_eed_join_verified")
         if (type(line_eed_verified) is not int or line_eed_verified < 0 or
                 ll_attempts != min(64, line_eed_verified) or
                 ll_verified + ll_refused != ll_attempts or
+                ll_bad_flags + ll_bad_triplet +
+                ll_bad_alignment + ll_bad_other != ll_refused or
                 max(ll_frozen, ll_on, ll_locked, ll_256, ll_rgb)
                 > ll_verified):
             raise ValueError("unproven_source_local_line_layer_color_bridge")

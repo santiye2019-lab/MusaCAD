@@ -268,6 +268,10 @@ def ac1024_probe_record():
             "sampled_line_eed_layer_state_locked": 0,
             "sampled_line_eed_layer_state_raw_color_256": 0,
             "sampled_line_eed_layer_state_explicit_rgb": 0,
+            "sampled_line_eed_layer_state_refused_flags": 0,
+            "sampled_line_eed_layer_state_refused_h_triplet": 0,
+            "sampled_line_eed_layer_state_refused_alignment": 0,
+            "sampled_line_eed_layer_state_refused_other": 0,
             "sampled_line_eed_appid_attempts": 0,
             "sampled_line_eed_appid_verified": 0,
             "sampled_line_eed_appid_refused": 0,
@@ -506,6 +510,10 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_line_eed_layer_state_locked",
             "sampled_line_eed_layer_state_raw_color_256",
             "sampled_line_eed_layer_state_explicit_rgb",
+            "sampled_line_eed_layer_state_refused_flags",
+            "sampled_line_eed_layer_state_refused_h_triplet",
+            "sampled_line_eed_layer_state_refused_alignment",
+            "sampled_line_eed_layer_state_refused_other",
         ):
             fake = deepcopy(baseline)
             fake["ac1024_compatibility_hypothesis"][key] = 1

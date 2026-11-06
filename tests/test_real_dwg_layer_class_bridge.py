@@ -37,6 +37,10 @@ def sample(n=2, *, material=True):
             "sampled_line_eed_layer_state_locked": 0,
             "sampled_line_eed_layer_state_raw_color_256": 0,
             "sampled_line_eed_layer_state_explicit_rgb": 0,
+            "sampled_line_eed_layer_state_refused_flags": 0,
+            "sampled_line_eed_layer_state_refused_h_triplet": 0,
+            "sampled_line_eed_layer_state_refused_alignment": 0,
+            "sampled_line_eed_layer_state_refused_other": 0,
             "sampled_layer_eed_flags_verified": n,
             "sampled_layer_eed_flags_frozen_bit": 0,
             "sampled_layer_eed_flags_on_bit": 0,
@@ -206,12 +210,16 @@ class LayerClassBridgeTests(unittest.TestCase):
         h["sampled_line_eed_layer_state_attempts"] = 3
         h["sampled_line_eed_layer_state_verified"] = 1
         h["sampled_line_eed_layer_state_refused"] = 2
+        h["sampled_line_eed_layer_state_refused_flags"] = 1
+        h["sampled_line_eed_layer_state_refused_h_triplet"] = 1
         h["sampled_line_eed_layer_state_raw_color_256"] = 1
         out = summarize(stage(item))
         self.assertEqual(out["line_eed_to_source_layer_state_verified"], 1)
         self.assertEqual(out["line_eed_to_source_layer_state_refused"], 2)
         self.assertEqual(out["line_eed_join_raw_color_index_256_candidates"], 1)
         self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        self.assertEqual(out["line_eed_refused_missing_layer_flags"], 1)
+        self.assertEqual(out["line_eed_refused_h_target_triplet"], 1)
         h["sampled_line_eed_layer_state_refused"] = 1
         with self.assertRaises(EvidenceError):
             summarize(stage(item))

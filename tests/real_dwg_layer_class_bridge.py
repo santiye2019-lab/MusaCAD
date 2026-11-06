@@ -67,6 +67,10 @@ def summarize(stage: dict) -> dict:
         "line_eed_to_source_layer_state_refused": 0,
         "line_eed_join_raw_color_index_256_candidates": 0,
         "line_eed_join_explicit_rgb_candidates": 0,
+        "line_eed_refused_missing_layer_flags": 0,
+        "line_eed_refused_h_target_triplet": 0,
+        "line_eed_refused_byte_alignment": 0,
+        "line_eed_refused_other": 0,
         "line_layer_bylayer_rendering_parity": False,
         "first_party_native_type_triplets_verified": 0,
         "first_party_native_byte_alignment_witnesses": 0,
@@ -113,9 +117,14 @@ def summarize(stage: dict) -> dict:
             _integer(h, "sampled_line_eed_layer_state_" + k, 64)
             for k in ("frozen", "on", "locked")
         ]
+        refusal_breakdown = [
+            _integer(h, "sampled_line_eed_layer_state_refused_" + suffix, 64)
+            for suffix in ("flags", "h_triplet", "alignment", "other")
+        ]
         if (ll_attempts != min(
                 64, _integer(h, "sampled_line_eed_join_verified", 100000))
                 or ll_verified + ll_refused != ll_attempts or
+                sum(refusal_breakdown) != ll_refused or
                 max([ll_raw_256, ll_rgb] + raw_counts) > ll_verified):
             raise EvidenceError("line_to_layer_raw_state_without_source_proof")
         aggregate["line_eed_to_source_layer_state_attempts"] += ll_attempts
@@ -123,6 +132,13 @@ def summarize(stage: dict) -> dict:
         aggregate["line_eed_to_source_layer_state_refused"] += ll_refused
         aggregate["line_eed_join_raw_color_index_256_candidates"] += ll_raw_256
         aggregate["line_eed_join_explicit_rgb_candidates"] += ll_rgb
+        for target, count in zip(
+            ("line_eed_refused_missing_layer_flags",
+             "line_eed_refused_h_target_triplet",
+             "line_eed_refused_byte_alignment",
+             "line_eed_refused_other"), refusal_breakdown
+        ):
+            aggregate[target] += count
         n = _integer(h, "sampled_layer_eed_terminal_candidate_verified", 2048)
         raw80 = _integer(h, "sampled_layer_eed_terminal_candidate_ot80_placeholder", 8192)
         raw57 = _integer(h, "sampled_layer_eed_terminal_candidate_ot57_ltype", 8192)
