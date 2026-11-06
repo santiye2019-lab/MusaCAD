@@ -242,6 +242,14 @@ int main(int argc, char **argv) {
                         ac1024_handles_reason=7;
                     else if(envelope.source_handles_logical_offset_mismatch_pages)
                         ac1024_handles_reason=12;
+                    else if(envelope.source_handles_candidate_page_bytes>1048576u)
+                        ac1024_handles_reason=13;
+                    else if(envelope.source_handles_lz_eligible_pages<
+                            envelope.source_handles_candidate_pages)
+                        ac1024_handles_reason=14;
+                    else if(envelope.source_handles_lz_verified_pages<
+                            envelope.source_handles_candidate_pages)
+                        ac1024_handles_reason=15;
                     else if(!envelope.source_handles_candidate_page_bytes){
                         const uint32_t logical=
                             envelope.source_handles_candidate_logical_bytes;
