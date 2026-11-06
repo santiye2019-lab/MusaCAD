@@ -15,6 +15,8 @@ on:
       - 'tests/real_dwg_native_stage_matrix.py'
       - 'tests/real_dwg_classes_corpus_evidence.py'
       - 'tests/test_real_dwg_classes_corpus_evidence.py'
+      - 'tests/real_dwg_layer_class_bridge.py'
+      - 'tests/test_real_dwg_layer_class_bridge.py'
       - 'tests/test_real_dwg_native_stage_probe.py'
       - 'tests/real_dwg_lfs_corpus_audit.py'
       - '.github/workflows/real-dwg-native-stages.yml'
@@ -32,6 +34,8 @@ on:
       - 'tests/real_dwg_native_stage_matrix.py'
       - 'tests/real_dwg_classes_corpus_evidence.py'
       - 'tests/test_real_dwg_classes_corpus_evidence.py'
+      - 'tests/real_dwg_layer_class_bridge.py'
+      - 'tests/test_real_dwg_layer_class_bridge.py'
       - 'tests/test_real_dwg_native_stage_probe.py'
       - 'tests/real_dwg_lfs_corpus_audit.py'
       - '.github/workflows/real-dwg-native-stages.yml'
@@ -120,6 +124,14 @@ jobs:
           python3 tests/real_dwg_classes_corpus_evidence.py \
             --stage-report /tmp/musacad-real-native-stages.json \
             --report /tmp/musacad-real-classes-numeric-census.json
+      - name: Verify original OT51 target types link to per-drawing MATERIAL class
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests \
+            -p 'test_real_dwg_layer_class_bridge.py' -v
+          python3 tests/real_dwg_layer_class_bridge.py \
+            --stage-report /tmp/musacad-real-native-stages.json \
+            --report /tmp/musacad-real-layer-class-bridge.json
       - name: Compile read-only rejected map diagnostics
         run: |
           set -euo pipefail
@@ -148,6 +160,7 @@ jobs:
           path: |
             /tmp/musacad-real-native-stages.json
             /tmp/musacad-real-classes-numeric-census.json
+            /tmp/musacad-real-layer-class-bridge.json
             /tmp/musacad-real-rejected-map-triage.json
           if-no-files-found: ignore
           retention-days: 14
