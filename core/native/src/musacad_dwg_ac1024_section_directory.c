@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 #define MAX_SECTION_BYTES 1048576u
 #define MAX_SECTIONS 256u
 #define MAX_REFERENCES 65536u
@@ -158,6 +159,10 @@ int musa_dwg_ac1024_directory_page_checksums(
         const uint32_t compression=read32(rec+20u);
         const uint32_t encryption=read32(rec+28u);
         const uint64_t section_logical_bytes=read64(rec);
+        const int handles_section=
+            strcmp((const char*)(rec+32u),"AcDb:Handles")==0;
+        if(handles_section)
+            evidence.handles_page_references=npage;
         at+=96u;
         for(uint32_t j=0;j<npage;j++){
             const uint8_t *entry=decoded+at+(size_t)j*16u;
@@ -210,17 +215,195 @@ int musa_dwg_ac1024_directory_page_checksums(
                logical!=(uint64_t)j*page_output_bytes)
                 continue;
             ++evidence.strict_lz_eligible_pages;
+            if(handles_section)++evidence.handles_strict_lz_eligible;
             MusaDwgAc1018LzDiagnostic diag={0};
             if(musa_dwg_ac1018_lz_diagnose(
                    file+pos+32u,packed,page_output_bytes,&diag)&&
                diag.completed&&diag.input_consumed>0u&&
                diag.input_consumed<=packed&&
-               diag.output_produced==page_output_bytes)
+               diag.output_produced==page_output_bytes){
                 ++evidence.strict_lz_verified;
+                if(handles_section)++evidence.handles_strict_lz_verified;
+            }
         }
         at+=(size_t)npage*16u;
     }
     if(at!=decoded_bytes)return 0;
     *out=evidence;
     return 1;
+}
+
+
+/* This helper joins only independently source-verified, unencrypted
+ * AC1024 logical sections. It is not a scene or DWG object parser. */
+static int join_section_inner(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes,
+    uint32_t *stage){
+    if(stage)*stage=0u;
+    if(!file||!directory||!locations||!section_name||!output||
+       !out_bytes||file_bytes<6u||
+       memcmp(file,"AC1024",6u)!=0||
+       physical_count>SIZE_MAX/sizeof(*locations)||
+       overlap(file,file_bytes,output,capacity)||
+       overlap(directory,directory_bytes,output,capacity)||
+       overlap(locations,physical_count*sizeof(*locations),
+               output,capacity)||
+       overlap(file,file_bytes,out_bytes,sizeof(*out_bytes))||
+       overlap(directory,directory_bytes,out_bytes,sizeof(*out_bytes))||
+       overlap(locations,physical_count*sizeof(*locations),
+               out_bytes,sizeof(*out_bytes))||
+       overlap(output,capacity,out_bytes,sizeof(*out_bytes))){
+        if(stage)*stage=1u;
+        return 0;
+    }
+    /* Never offer an arbitrary section extraction route to Android
+     * without separately verified record/graph semantics. */
+    if(strcmp(section_name,"AcDb:Handles")!=0 &&
+       strcmp(section_name,"AcDb:AcDbObjects")!=0){
+        if(stage)*stage=2u;
+        return 0;
+    }
+    MusaDwgAc1024DirectoryShape shape={0};
+    if(!musa_dwg_ac1024_directory_shape(
+           directory,directory_bytes,&shape)||
+       shape.duplicate_section_names){
+        if(stage)*stage=3u;
+        return 0;
+    }
+    MusaDwgAc1024PageChecksumEvidence crc={0};
+    if(!musa_dwg_ac1024_directory_page_checksums(
+           file,file_bytes,directory,directory_bytes,
+           locations,physical_count,&crc)||
+       crc.header_adler_verified!=crc.referenced_pages){
+        if(stage)*stage=4u;
+        return 0;
+    }
+    size_t at=20u,chosen_at=0u;
+    uint64_t logical_bytes=0u;
+    uint32_t npage=0u,page_bytes=0u;
+    int found=0;
+    for(uint32_t i=0u;i<shape.sections;i++){
+        const uint8_t *rec=directory+at;
+        const uint32_t count=read32(rec+8u);
+        const char *name=(const char*)(rec+32u);
+        if(strcmp(name,section_name)==0){
+            if(found){if(stage)*stage=5u;return 0;}
+            found=1;
+            chosen_at=at+96u;
+            logical_bytes=read64(rec);
+            npage=count;
+            page_bytes=read32(rec+12u);
+            /* The authenticated R2004-family section directory may
+             * declare page size zero for the conventional 0x7400 DATA
+             * logical block. This candidate is only accepted when every
+             * source logical offset, declared section span, checksum and
+             * strict original LZ stream independently agree. */
+            if(!page_bytes)page_bytes=29696u;
+            if(read32(rec+20u)!=2u||read32(rec+28u)!=0u||
+               !read32(rec+24u)){
+                if(stage)*stage=6u;
+                return 0;
+            }
+        }
+        at+=96u+(size_t)count*16u;
+    }
+    if(!found||!npage){if(stage)*stage=7u;return 0;}
+    if(!page_bytes||page_bytes>1048576u){if(stage)*stage=8u;return 0;}
+    if(!logical_bytes||logical_bytes>128u*1024u*1024u||
+       logical_bytes>capacity){if(stage)*stage=9u;return 0;}
+    if((logical_bytes-1u)/page_bytes+1u!=npage){
+        if(stage)*stage=10u;
+        return 0;
+    }
+    uint8_t *staged=(uint8_t*)malloc((size_t)logical_bytes);
+    uint8_t *block=(uint8_t*)malloc(page_bytes);
+    if(!staged||!block){
+        free(staged);free(block);
+        if(stage)*stage=11u;
+        return 0;
+    }
+    size_t covered=0u;
+    int ok=1;
+    for(uint32_t j=0u;j<npage;j++){
+        const uint8_t *entry=directory+chosen_at+(size_t)j*16u;
+        const uint32_t id=read32(entry);
+        const uint32_t packed=read32(entry+4u);
+        const uint64_t offset=read64(entry+8u);
+        if(offset!=(uint64_t)j*page_bytes){
+            if(stage)*stage=12u;
+            ok=0;break;
+        }
+        size_t lo=0u,hi=physical_count;
+        while(lo<hi){
+            const size_t mid=lo+(hi-lo)/2u;
+            if(locations[mid].page_id<id)lo=mid+1u;
+            else hi=mid;
+        }
+        if(lo==physical_count||locations[lo].page_id!=id||
+           locations[lo].file_offset>file_bytes||
+           file_bytes-(size_t)locations[lo].file_offset<32u||
+           packed>file_bytes-(size_t)locations[lo].file_offset-32u){
+            if(stage)*stage=13u;
+            ok=0;break;
+        }
+        const size_t pos=(size_t)locations[lo].file_offset;
+        size_t consumed=0u;
+        if(!musa_dwg_ac1018_lz_decode(
+                file+pos+32u,packed,block,page_bytes,&consumed)||
+           !consumed||consumed>packed){
+            if(stage)*stage=14u;
+            ok=0;break;
+        }
+        const size_t remaining=(size_t)logical_bytes-covered;
+        const size_t take=remaining<page_bytes?remaining:page_bytes;
+        memcpy(staged+covered,block,take);
+        covered+=take;
+    }
+    if(covered!=(size_t)logical_bytes){
+        if(stage&&!*stage)*stage=15u;
+        ok=0;
+    }
+    if(ok){
+        memcpy(output,staged,(size_t)logical_bytes);
+        *out_bytes=(size_t)logical_bytes;
+    }
+    free(block);free(staged);
+    return ok;
+}
+
+int musa_dwg_ac1024_directory_join_section(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes){
+    return join_section_inner(file,file_bytes,directory,directory_bytes,
+                              locations,physical_count,section_name,
+                              output,capacity,out_bytes,NULL);
+}
+int musa_dwg_ac1024_directory_join_section_diagnose(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes,
+    uint32_t *reason){
+    if(!reason||physical_count>SIZE_MAX/sizeof(*locations)||
+       overlap(reason,sizeof(*reason),file,file_bytes)||
+       overlap(reason,sizeof(*reason),directory,directory_bytes)||
+       overlap(reason,sizeof(*reason),locations,
+               physical_count*sizeof(*locations))||
+       overlap(reason,sizeof(*reason),output,capacity)||
+       overlap(reason,sizeof(*reason),out_bytes,sizeof(*out_bytes)))
+        return 0;
+    uint32_t stage=0u;
+    const int ok=join_section_inner(file,file_bytes,directory,directory_bytes,
+                                    locations,physical_count,section_name,
+                                    output,capacity,out_bytes,&stage);
+    *reason=stage;
+    return ok;
 }

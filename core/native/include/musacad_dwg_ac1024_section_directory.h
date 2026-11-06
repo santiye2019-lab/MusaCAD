@@ -48,6 +48,10 @@ typedef struct MusaDwgAc1024PageChecksumEvidence {
      * This is read-only diagnostic; neither count implies CAD semantics. */
     uint32_t strict_lz_eligible_pages;
     uint32_t strict_lz_verified;
+    /* Only aggregate counters for source-named Handles pages. */
+    uint32_t handles_page_references;
+    uint32_t handles_strict_lz_eligible;
+    uint32_t handles_strict_lz_verified;
 } MusaDwgAc1024PageChecksumEvidence;
 /* The source must have already passed original AC1024 physical map and
  * section-map Adler32/strict LZ; caller supplies original authenticated
@@ -57,6 +61,32 @@ int musa_dwg_ac1024_directory_page_checksums(
     const uint8_t *decoded,size_t decoded_bytes,
     const MusaDwgAc1018PageLocation *locations,size_t physical_count,
     MusaDwgAc1024PageChecksumEvidence *out);
+/* Diagnostic-only logical section join for original unencrypted R2010
+ * DATA pages. 'directory' and 'locations' MUST already come from the
+ * independently authenticated original AC1024 SYSTEM/physical map.
+ * This helper independently checks all source DATA page headers and dual
+ * Adler32, exact logical offsets/counts, then decodes each bounded LZ page
+ * into private scratch and copies the contiguous logical bytes atomically.
+ * It does not interpret CAD entities, ownership, layers or colors.
+ * Strictly allowed names: AcDb:Handles and AcDb:AcDbObjects.
+ * Output and out_bytes stay unchanged on any refusal; never modify file. */
+int musa_dwg_ac1024_directory_join_section(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes);
+/* Diagnostic entry point: identical fail-atomic function, but returns a
+ * bounded refusal stage in reason (0 on success; 1..15 on refusal).
+ * No handles, raw bytes, coordinates or source names are reported.
+ * reason must not alias any source/input/output range. */
+int musa_dwg_ac1024_directory_join_section_diagnose(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *directory,size_t directory_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    const char *section_name,
+    uint8_t *output,size_t capacity,size_t *out_bytes,
+    uint32_t *reason);
 #ifdef __cplusplus
 }
 #endif

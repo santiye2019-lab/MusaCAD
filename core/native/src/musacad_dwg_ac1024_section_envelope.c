@@ -78,6 +78,10 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
             MusaDwgAc1024DirectoryShape shape={0};
             if(musa_dwg_ac1024_directory_shape(decoded,expanded,&shape)){
                 e.directory_shape_candidate=1u;
+                e.source_handles_name_candidates=
+                    shape.handles_name_candidates;
+                e.source_directory_duplicate_names=
+                    shape.duplicate_section_names;
                 e.directory_sections_candidate=shape.sections;
                 e.directory_referenced_pages_candidate=
                     shape.referenced_pages;
@@ -100,6 +104,71 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                             crc.strict_lz_eligible_pages;
                         e.source_data_lz_verified=
                             crc.strict_lz_verified;
+                        e.source_handles_lz_eligible_pages=
+                            crc.handles_strict_lz_eligible;
+                        e.source_handles_lz_verified_pages=
+                            crc.handles_strict_lz_verified;
+                        /* Only complete, original-source verified pages
+                         * may be joined. Diagnostic-only: never emit the
+                         * resulting Handles bytes or claim ownership/paint.
+                         * Bound additional report-stage memory to 16 MiB. */
+                        if(crc.header_adler_verified==crc.referenced_pages){
+                            size_t pos=20u;
+                            for(uint32_t si=0u;si<shape.sections;si++){
+                                const uint8_t *rec=decoded+pos;
+                                const uint32_t section_page_count=read32(rec+8u);
+                                const uint64_t logical=
+                                    (uint64_t)read32(rec)|
+                                    ((uint64_t)read32(rec+4u)<<32u);
+                                if(strcmp((const char*)(rec+32u),
+                                          "AcDb:Handles")==0){
+                                    e.source_handles_candidate_pages=section_page_count;
+                                    e.source_handles_candidate_logical_bytes=
+                                        (uint32_t)logical;
+                                    e.source_handles_candidate_page_bytes=
+                                        read32(rec+12u);
+                                    e.source_handles_candidate_compression=
+                                        read32(rec+20u);
+                                    e.source_handles_candidate_encryption=
+                                        read32(rec+28u);
+                                    uint32_t span=read32(rec+12u);
+                                    if(!span)span=29696u;
+                                    for(uint32_t pj=0u;pj<section_page_count;pj++){
+                                        const uint8_t *link=
+                                            decoded+pos+96u+(size_t)pj*16u;
+                                        const uint64_t off=
+                                            (uint64_t)read32(link+8u)|
+                                            ((uint64_t)read32(link+12u)<<32u);
+                                        if(off!=(uint64_t)pj*span)
+                                            ++e.source_handles_logical_offset_mismatch_pages;
+                                    }
+                                }
+                                if(strcmp((const char*)(rec+32u),
+                                          "AcDb:Handles")==0&&
+                                   logical>0u&&logical<=16u*1024u*1024u){
+                                    uint8_t *joined=(uint8_t*)malloc(
+                                        (size_t)logical);
+                                    if(joined){
+                                        size_t written=0u;
+                                        uint32_t stage=0u;
+                                        const int joined_ok=
+                                            musa_dwg_ac1024_directory_join_section_diagnose(
+                                                file,n,decoded,expanded,
+                                                pages,count,"AcDb:Handles",
+                                                joined,(size_t)logical,
+                                                &written,&stage);
+                                        e.source_handles_join_inner_failure_stage=stage;
+                                        if(joined_ok&&written==logical){
+                                            e.source_handles_logical_join_verified=1u;
+                                            e.source_handles_logical_bytes=
+                                                (uint32_t)written;
+                                        }
+                                        free(joined);
+                                    }
+                                }
+                                pos+=96u+(size_t)section_page_count*16u;
+                            }
+                        }
                     }
                 }
             }
