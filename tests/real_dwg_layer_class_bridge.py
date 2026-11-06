@@ -64,6 +64,12 @@ def summarize(stage: dict) -> dict:
         "verified_raw_target_records": 0,
         "first_party_native_type_triplets_verified": 0,
         "first_party_native_byte_alignment_witnesses": 0,
+        "first_party_source_local_raw_state_joins": 0,
+        "raw_state_frozen_bit_samples": 0,
+        "raw_state_on_bit_samples": 0,
+        "raw_state_locked_bit_samples": 0,
+        "raw_state_unmapped_bit_samples": 0,
+        "raw_flags_are_not_visibility_or_color_parity": True,
         "byte_alignment_supports_padding_hypothesis_only": True,
         "material_property_link_semantics_proven": False,
         "ot80_semantics_proven": False,
@@ -206,6 +212,32 @@ def summarize(stage: dict) -> dict:
         if (alignment_attempts != n or alignment_verified != n or
                 alignment_nonzero != fragment_nonzero):
             raise EvidenceError("original_native_byte_alignment_not_proven")
+        raw_join_attempts = _integer(
+            h, "sampled_layer_eed_state_join_attempts", 2048)
+        raw_join_verified = _integer(
+            h, "sampled_layer_eed_state_join_verified", 2048)
+        raw_join_frozen = _integer(
+            h, "sampled_layer_eed_state_join_frozen", 2048)
+        raw_join_on = _integer(
+            h, "sampled_layer_eed_state_join_on", 2048)
+        raw_join_locked = _integer(
+            h, "sampled_layer_eed_state_join_locked", 2048)
+        raw_join_unmapped = _integer(
+            h, "sampled_layer_eed_state_join_unmapped", 2048)
+        if (raw_join_attempts != n or raw_join_verified != n or
+                max(raw_join_frozen, raw_join_on, raw_join_locked,
+                    raw_join_unmapped) > raw_join_verified or
+                raw_join_verified > _integer(
+                    h, "sampled_layer_eed_flags_verified", 2048) or
+                raw_join_frozen > _integer(
+                    h, "sampled_layer_eed_flags_frozen_bit", 2048) or
+                raw_join_on > _integer(
+                    h, "sampled_layer_eed_flags_on_bit", 2048) or
+                raw_join_locked > _integer(
+                    h, "sampled_layer_eed_flags_locked_bit", 2048) or
+                raw_join_unmapped > _integer(
+                    h, "sampled_layer_eed_flags_unmapped_bits", 2048)):
+            raise EvidenceError("unproven_original_raw_flags_state_join")
 
 
         aggregate["layer_samples_with_three_crc_backed_targets"] += n
@@ -215,6 +247,11 @@ def summarize(stage: dict) -> dict:
         aggregate["verified_raw_target_records"] += 3*n
         aggregate["first_party_native_type_triplets_verified"] += n
         aggregate["first_party_native_byte_alignment_witnesses"] += n
+        aggregate["first_party_source_local_raw_state_joins"] += n
+        aggregate["raw_state_frozen_bit_samples"] += raw_join_frozen
+        aggregate["raw_state_on_bit_samples"] += raw_join_on
+        aggregate["raw_state_locked_bit_samples"] += raw_join_locked
+        aggregate["raw_state_unmapped_bit_samples"] += raw_join_unmapped
         # Fixed OT identities are from the portable first-party DWG type
         # registry: OT80=PLACEHOLDER, OT57=LTYPE. Those NAMES are proven;
         # the meaning of their position within the OT51 H tail is not.

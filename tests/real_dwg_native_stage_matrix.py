@@ -857,6 +857,32 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 alignment_nonzero > triplet_nonzero):
             raise ValueError("alignment_witness_without_native_triplet")
 
+        raw_join_keys = (
+            "sampled_layer_eed_state_join_attempts",
+            "sampled_layer_eed_state_join_verified",
+            "sampled_layer_eed_state_join_frozen",
+            "sampled_layer_eed_state_join_on",
+            "sampled_layer_eed_state_join_locked",
+            "sampled_layer_eed_state_join_unmapped",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in raw_join_keys):
+            raise ValueError("invalid_ac1024_same_record_raw_state_join")
+        (join_attempts, join_verified, join_frozen,
+         join_on, join_locked, join_unmapped) = (
+             hint[k] for k in raw_join_keys
+         )
+        if (join_attempts != alignment_verified or
+                join_verified > join_attempts or
+                max(join_frozen, join_on, join_locked, join_unmapped)
+                > join_verified or
+                join_verified > hint.get("sampled_layer_eed_flags_verified", -1) or
+                join_frozen > hint.get("sampled_layer_eed_flags_frozen_bit", -1) or
+                join_on > hint.get("sampled_layer_eed_flags_on_bit", -1) or
+                join_locked > hint.get("sampled_layer_eed_flags_locked_bit", -1) or
+                join_unmapped > hint.get("sampled_layer_eed_flags_unmapped_bits", -1)):
+            raise ValueError("unproven_ac1024_same_record_raw_flags_join")
+
         # Raw unresolved suffix is diagnostic only. Validate bit-pattern
         # masks against observed short fragments, never against CAD roles.
         mask2 = hint.get("sampled_layer_eed_terminal_fragment_2bit_pattern_mask")

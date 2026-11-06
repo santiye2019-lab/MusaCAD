@@ -634,6 +634,13 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_alignment_attempts;
     size_t sampled_layer_eed_terminal_alignment_verified;
     size_t sampled_layer_eed_terminal_alignment_nonzero;
+    /* Same-original OT51 numeric frozen/on/locked bits + H target graph. */
+    size_t sampled_layer_eed_state_join_attempts;
+    size_t sampled_layer_eed_state_join_verified;
+    size_t sampled_layer_eed_state_join_frozen;
+    size_t sampled_layer_eed_state_join_on;
+    size_t sampled_layer_eed_state_join_locked;
+    size_t sampled_layer_eed_state_join_unmapped;
     size_t sampled_layer_eed_terminal_candidate_refused;
     size_t sampled_layer_eed_terminal_candidate_prefix_tokens;
     size_t sampled_layer_eed_terminal_candidate_absolute;
@@ -1682,6 +1689,33 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                         ++hint.sampled_layer_eed_terminal_alignment_verified;
                                                                         if (alignment.terminal_nonzero)
                                                                             ++hint.sampled_layer_eed_terminal_alignment_nonzero;
+                                                                        ++hint.sampled_layer_eed_state_join_attempts;
+                                                                        MusaDwgAc1024LayerRawStateJoin raw_state = {0};
+                                                                        if (musa_dwg_ac1024_layer_eed_raw_state_join(
+                                                                                objects, nb, recovered, legacy_count,
+                                                                                recovered[k].embedded_absolute_handle,
+                                                                                &raw_state) &&
+                                                                            raw_state.eed_flags_crc_verified &&
+                                                                            raw_state.h_target_triplet_verified &&
+                                                                            raw_state.byte_alignment_witness_verified &&
+                                                                            !raw_state.full_h_tail_decoded &&
+                                                                            !raw_state.layer_visibility_parity_verified &&
+                                                                            !raw_state.bylayer_color_verified &&
+                                                                            !raw_state.display_accepted &&
+                                                                            raw_state.layer_handle ==
+                                                                                recovered[k].embedded_absolute_handle &&
+                                                                            raw_state.layer_record_offset ==
+                                                                                recovered[k].record_offset) {
+                                                                            ++hint.sampled_layer_eed_state_join_verified;
+                                                                            if (raw_state.frozen_bit)
+                                                                                ++hint.sampled_layer_eed_state_join_frozen;
+                                                                            if (raw_state.on_bit)
+                                                                                ++hint.sampled_layer_eed_state_join_on;
+                                                                            if (raw_state.locked_bit)
+                                                                                ++hint.sampled_layer_eed_state_join_locked;
+                                                                            if (raw_state.unmapped_bits)
+                                                                                ++hint.sampled_layer_eed_state_join_unmapped;
+                                                                        }
                                                                     }
                                                                 }
                                                                 hint.sampled_layer_eed_terminal_candidate_prefix_tokens +=
@@ -2832,6 +2866,12 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_alignment_attempts\":%zu,"
                "\"sampled_layer_eed_terminal_alignment_verified\":%zu,"
                "\"sampled_layer_eed_terminal_alignment_nonzero\":%zu,"
+               "\"sampled_layer_eed_state_join_attempts\":%zu,"
+               "\"sampled_layer_eed_state_join_verified\":%zu,"
+               "\"sampled_layer_eed_state_join_frozen\":%zu,"
+               "\"sampled_layer_eed_state_join_on\":%zu,"
+               "\"sampled_layer_eed_state_join_locked\":%zu,"
+               "\"sampled_layer_eed_state_join_unmapped\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_refused\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_prefix_tokens\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_absolute\":%zu,"
@@ -3259,6 +3299,12 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_alignment_attempts,
                hint->sampled_layer_eed_terminal_alignment_verified,
                hint->sampled_layer_eed_terminal_alignment_nonzero,
+               hint->sampled_layer_eed_state_join_attempts,
+               hint->sampled_layer_eed_state_join_verified,
+               hint->sampled_layer_eed_state_join_frozen,
+               hint->sampled_layer_eed_state_join_on,
+               hint->sampled_layer_eed_state_join_locked,
+               hint->sampled_layer_eed_state_join_unmapped,
                hint->sampled_layer_eed_terminal_candidate_refused,
                hint->sampled_layer_eed_terminal_candidate_prefix_tokens,
                hint->sampled_layer_eed_terminal_candidate_absolute,

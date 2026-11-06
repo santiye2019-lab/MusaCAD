@@ -1587,6 +1587,22 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     MusaDwgAc1024LayerTailTypeTriplet triplet = {0};
     triplet.layer_handle = UINT64_C(999);
     const MusaDwgAc1024LayerTailTypeTriplet saved_triplet = triplet;
+    MusaDwgAc1024LayerRawStateJoin rawjoin = {0};
+    rawjoin.layer_handle = UINT64_C(987);
+    const MusaDwgAc1024LayerRawStateJoin saved_rawjoin = rawjoin;
+    if (musa_dwg_ac1024_layer_eed_raw_state_join(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, &rawjoin) ||
+        musa_dwg_ac1024_layer_eed_raw_state_join(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u,
+            (MusaDwgAc1024LayerRawStateJoin *)(void *)with_fragment) ||
+        musa_dwg_ac1024_layer_eed_raw_state_join(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 0u, &rawjoin) ||
+        memcmp(&rawjoin, &saved_rawjoin, sizeof(rawjoin)))
+        return 0;
+
     MusaDwgAc1024LayerTailAlignmentWitness alignment = {0};
     alignment.terminal_raw_value = 127u;
     const MusaDwgAc1024LayerTailAlignmentWitness saved_alignment = alignment;

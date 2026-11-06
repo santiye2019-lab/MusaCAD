@@ -586,6 +586,35 @@ int musa_dwg_ac1024_layer_eed_tail_alignment_witness(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerTailAlignmentWitness *out);
 
+/* Same-original-record link between an EED-bearing LAYER's CRC-backed
+ * numeric DATA flags and the three authenticated H-target objects plus
+ * unresolved terminal byte-alignment evidence. Not a visibility decision:
+ * CMC, viewport overrides, full H tail and paint are NOT validated.
+ * Source and returned structures must not overlap; fail-atomic. */
+typedef struct MusaDwgAc1024LayerRawStateJoin {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    uint16_t raw_70_290_370;
+    uint16_t unmapped_bits;
+    uint8_t frozen_bit;
+    uint8_t on_bit;
+    uint8_t frozen_new_viewports_bit;
+    uint8_t locked_bit;
+    uint8_t plotting_bit;
+    uint8_t lineweight_field;
+    uint8_t eed_flags_crc_verified;
+    uint8_t h_target_triplet_verified;
+    uint8_t byte_alignment_witness_verified;
+    uint8_t full_h_tail_decoded; /* ALWAYS zero */
+    uint8_t layer_visibility_parity_verified; /* ALWAYS zero */
+    uint8_t bylayer_color_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LayerRawStateJoin;
+int musa_dwg_ac1024_layer_eed_raw_state_join(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerRawStateJoin *out);
+
 /* First refusal from exactly the same strict tail-shape parser.
  * Diagnosis records only a stage, never source bytes or H values. */
 enum {

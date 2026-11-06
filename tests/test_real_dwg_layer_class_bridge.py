@@ -22,6 +22,17 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_terminal_alignment_attempts": n,
             "sampled_layer_eed_terminal_alignment_verified": n,
             "sampled_layer_eed_terminal_alignment_nonzero": 0,
+            "sampled_layer_eed_state_join_attempts": n,
+            "sampled_layer_eed_state_join_verified": n,
+            "sampled_layer_eed_state_join_frozen": 0,
+            "sampled_layer_eed_state_join_on": 0,
+            "sampled_layer_eed_state_join_locked": 0,
+            "sampled_layer_eed_state_join_unmapped": 0,
+            "sampled_layer_eed_flags_verified": n,
+            "sampled_layer_eed_flags_frozen_bit": 0,
+            "sampled_layer_eed_flags_on_bit": 0,
+            "sampled_layer_eed_flags_locked_bit": 0,
+            "sampled_layer_eed_flags_unmapped_bits": 0,
             "sampled_layer_eed_terminal_candidate_absolute": 3*n,
             "sampled_layer_eed_terminal_candidate_unmatched": 0,
             "sampled_layer_eed_terminal_fragment_attempts": n,
@@ -73,6 +84,11 @@ class LayerClassBridgeTests(unittest.TestCase):
         self.assertEqual(out["verified_raw_target_records"], 42)
         self.assertEqual(out["first_party_native_type_triplets_verified"], 14)
         self.assertEqual(out["first_party_native_byte_alignment_witnesses"], 14)
+        self.assertEqual(out["first_party_source_local_raw_state_joins"], 14)
+        self.assertEqual(out["raw_state_frozen_bit_samples"], 0)
+        self.assertEqual(out["raw_state_on_bit_samples"], 0)
+        self.assertEqual(out["raw_state_locked_bit_samples"], 0)
+        self.assertFalse(out["layer_visibility_parity_proven"])
         self.assertTrue(out["byte_alignment_supports_padding_hypothesis_only"])
         self.assertTrue(out["fixed_placeholder_ot80_identity_confirmed"])
         self.assertTrue(out["fixed_ltype_ot57_identity_confirmed"])
@@ -162,6 +178,12 @@ class LayerClassBridgeTests(unittest.TestCase):
             ("sampled_layer_eed_terminal_alignment_attempts", 1),
             ("sampled_layer_eed_terminal_alignment_verified", 1),
             ("sampled_layer_eed_terminal_alignment_nonzero", 1),
+            ("sampled_layer_eed_state_join_attempts", 1),
+            ("sampled_layer_eed_state_join_verified", 1),
+            ("sampled_layer_eed_state_join_frozen", 1),
+            ("sampled_layer_eed_state_join_on", 1),
+            ("sampled_layer_eed_state_join_locked", 1),
+            ("sampled_layer_eed_state_join_unmapped", 1),
         ):
             item = sample(2)
             item["ac1024_compatibility_hypothesis"][field] = value

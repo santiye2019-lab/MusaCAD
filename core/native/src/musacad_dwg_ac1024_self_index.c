@@ -1868,3 +1868,83 @@ int musa_dwg_ac1024_layer_eed_tail_alignment_witness(
     *out = next;
     return 1;
 }
+
+/* Does not upgrade raw frozen/on/locked bits to visibility or colors. */
+int musa_dwg_ac1024_layer_eed_raw_state_join(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerRawStateJoin *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !canonical_layer_handle || !record_count ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity record = {0};
+    MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
+    MusaDwgAc1024LayerTailTypeTriplet triplet = {0};
+    MusaDwgAc1024LayerTailAlignmentWitness alignment = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_layer_handle, &record) ||
+        record.raw_ot != 51u || !record.frame_crc16_verified ||
+        !record.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &flags) ||
+        !musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &triplet) ||
+        !musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &alignment) ||
+        flags.layer_handle != canonical_layer_handle ||
+        flags.layer_record_offset != record.record_offset ||
+        triplet.layer_handle != canonical_layer_handle ||
+        triplet.layer_record_offset != record.record_offset ||
+        flags.raw_flags_end_bit <= flags.raw_flags_start_bit ||
+        !flags.original_record_crc_verified || flags.display_accepted ||
+        flags.xdictionary_missing != 0u ||
+        !triplet.original_records_crc_verified ||
+        triplet.h_tail_fully_decoded || triplet.target_roles_verified ||
+        triplet.display_accepted ||
+        triplet.target_raw_ot[0] != 80u ||
+        triplet.target_raw_ot[1] != 505u ||
+        triplet.target_raw_ot[2] != 57u ||
+        !alignment.source_crc_verified ||
+        !alignment.byte_alignment_compatible ||
+        alignment.padding_proven || alignment.target_roles_verified ||
+        alignment.display_accepted ||
+        alignment.complete_additional_h_header_available ||
+        (flags.raw_values_70_290_370 & (uint16_t)~UINT16_C(0x03ff)) !=
+            flags.unmapped_bits ||
+        flags.frozen_bit != ((flags.raw_values_70_290_370 >> 0u) & 1u) ||
+        flags.on_bit != ((flags.raw_values_70_290_370 >> 1u) & 1u) ||
+        flags.frozen_new_viewports_bit !=
+            ((flags.raw_values_70_290_370 >> 2u) & 1u) ||
+        flags.locked_bit != ((flags.raw_values_70_290_370 >> 3u) & 1u) ||
+        flags.plotting_bit != ((flags.raw_values_70_290_370 >> 4u) & 1u) ||
+        flags.lineweight_field !=
+            ((flags.raw_values_70_290_370 >> 5u) & 31u))
+        return 0;
+    MusaDwgAc1024LayerRawStateJoin next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = record.record_offset;
+    next.raw_70_290_370 = flags.raw_values_70_290_370;
+    next.unmapped_bits = flags.unmapped_bits;
+    next.frozen_bit = flags.frozen_bit;
+    next.on_bit = flags.on_bit;
+    next.frozen_new_viewports_bit = flags.frozen_new_viewports_bit;
+    next.locked_bit = flags.locked_bit;
+    next.plotting_bit = flags.plotting_bit;
+    next.lineweight_field = flags.lineweight_field;
+    next.eed_flags_crc_verified = 1u;
+    next.h_target_triplet_verified = 1u;
+    next.byte_alignment_witness_verified = 1u;
+    /* Remaining booleans intentionally remain ZERO. */
+    *out = next;
+    return 1;
+}

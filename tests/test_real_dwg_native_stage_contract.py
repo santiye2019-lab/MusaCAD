@@ -395,6 +395,12 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_alignment_attempts": 0,
             "sampled_layer_eed_terminal_alignment_verified": 0,
             "sampled_layer_eed_terminal_alignment_nonzero": 0,
+            "sampled_layer_eed_state_join_attempts": 0,
+            "sampled_layer_eed_state_join_verified": 0,
+            "sampled_layer_eed_state_join_frozen": 0,
+            "sampled_layer_eed_state_join_on": 0,
+            "sampled_layer_eed_state_join_locked": 0,
+            "sampled_layer_eed_state_join_unmapped": 0,
             "sampled_layer_eed_terminal_candidate_refused": 0,
             "sampled_layer_eed_terminal_candidate_prefix_tokens": 0,
             "sampled_layer_eed_terminal_candidate_absolute": 0,
@@ -490,6 +496,12 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_layer_eed_terminal_alignment_attempts",
             "sampled_layer_eed_terminal_alignment_verified",
             "sampled_layer_eed_terminal_alignment_nonzero",
+            "sampled_layer_eed_state_join_attempts",
+            "sampled_layer_eed_state_join_verified",
+            "sampled_layer_eed_state_join_frozen",
+            "sampled_layer_eed_state_join_on",
+            "sampled_layer_eed_state_join_locked",
+            "sampled_layer_eed_state_join_unmapped",
         ):
             fake = deepcopy(baseline)
             fake["ac1024_compatibility_hypothesis"][key] = 1
