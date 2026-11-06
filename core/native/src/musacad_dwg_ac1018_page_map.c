@@ -66,6 +66,13 @@ int musa_dwg_ac1018_page_map_header(
     const uint8_t *file,size_t n,MusaDwgAc1018FileMapHeader *out){
     return shared_page_map_header(file,n,"AC1018",out);
 }
+/* R2010 reuses only the R2004-family protected physical header and page
+ * layout, with an original AC1024 signature. This is NOT an AC1018 geometry
+ * fallback nor proof of logical AcDb section/page CRC semantics. */
+int musa_dwg_ac1024_page_map_header(
+    const uint8_t *file,size_t n,MusaDwgAc1018FileMapHeader *out){
+    return shared_page_map_header(file,n,"AC1024",out);
+}
 /* AC1032 is a different OBJECT schema but retains the documented R2004
  * family encrypted HEADER/page-location structural organization. The
  * original AC1018 body readers are deliberately NEVER called here. */
@@ -157,8 +164,33 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                 }
                 verified_secondary_header=3;
             }
+            /* Genuine original R2010 terminal proof: the exact empty
+             * 20-byte SYSTEM marker is followed by a byte-for-byte copy
+             * of the 108-byte encrypted header at EOF. The last physical
+             * allocation ends 64 bytes into that copy (44 remain).
+             * This is a physical-map-only gate, NOT entity admission. */
+            if(available>size&&available-size==44u&&
+               memcmp(required_signature,"AC1024",6u)==0){
+                static const uint8_t empty[20]={
+                    0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+                    0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+                };
+                const uint64_t body_end=h.page_map_offset+20u+
+                                         (uint64_t)h.map_compressed_bytes;
+                const uint64_t end=pos+(uint64_t)size;
+                if(n<128u||body_end>(uint64_t)n-128u||
+                   body_end+20u!=(uint64_t)n-108u||
+                   end!=(uint64_t)n-44u||
+                   end-((uint64_t)n-108u)!=64u||
+                   memcmp(file+(size_t)body_end,empty,sizeof(empty))!=0||
+                   memcmp(file+n-108u,file+0x80u,0x6cu)!=0){
+                    valid=0;break;
+                }
+                verified_secondary_header=4;
+            }
             if(available>size&&available-size!=106u&&
-               available-size!=107u&&available-size!=108u){
+               available-size!=107u&&available-size!=108u&&
+               verified_secondary_header!=4){
                 /* A genuine R2018 file can store a SECOND copy of the
                  * authenticated 108-byte encrypted file header at EOF,
                  * preceded by exactly two zero alignment bytes.
@@ -230,7 +262,8 @@ static int shared_page_locations(const uint8_t *file,size_t n,
         !((verified_secondary_header==1&&n-(size_t)pos==110u)||
           (verified_secondary_header==2&&
            (n-(size_t)pos==106u||n-(size_t)pos==107u))||
-          (verified_secondary_header==3&&n-(size_t)pos==108u)))){
+          (verified_secondary_header==3&&n-(size_t)pos==108u)||
+           (verified_secondary_header==4&&n-(size_t)pos==44u)))){
         free(plain);return 0;
     }
     /* AC1032 physical page records are ordered by physical FILE location,
@@ -325,6 +358,10 @@ static int shared_page_locations(const uint8_t *file,size_t n,
 int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t n,
     MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *count){
     return shared_page_locations(file,n,"AC1018",entries,capacity,count);
+}
+int musa_dwg_ac1024_page_locations(const uint8_t *file,size_t n,
+    MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *count){
+    return shared_page_locations(file,n,"AC1024",entries,capacity,count);
 }
 int musa_dwg_ac1032_page_locations(const uint8_t *file,size_t n,
     MusaDwgAc1032PageLocation *entries,size_t capacity,size_t *count){

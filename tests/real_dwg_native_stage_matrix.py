@@ -30,6 +30,8 @@ KNOWN_STAGES = {
     "ac1018_crc_backed_handle_index",
     "ac1018_native_scene_open",
     "ac1018_record_ranges_and_crcs",
+    "ac1024_page_map_header",
+    "ac1024_physical_page_locations",
     "ac1032_page_map_header",
     "ac1032_physical_page_locations",
     "ac1032_crc_backed_handle_index",
@@ -64,6 +66,9 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         if (result.get("signature") == "AC1018"
                 and result["native_stage"] != "ac1018_record_ranges_and_crcs"):
             raise ValueError("ac1018_index_only_is_not_full_record_acceptance")
+        if (result.get("signature") == "AC1024"
+                and result["native_stage"] != "ac1024_physical_page_locations"):
+            raise ValueError("ac1024_header_only_is_not_map_acceptance")
     return result
 
 
@@ -109,7 +114,7 @@ def main() -> int:
             stage = observed["native_stage"]
             if stage.startswith("ac") and not stage.startswith(version.lower()):
                 raise ValueError("mismatched_native_format_stage")
-            if version in ("AC1015", "AC1018", "AC1032"):
+            if version in ("AC1015", "AC1018", "AC1024", "AC1032"):
                 if observed["result"] == "not_covered_by_this_native_probe":
                     raise ValueError("expected_native_probe_not_invoked")
             elif observed["result"] == "accepted":

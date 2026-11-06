@@ -29,6 +29,15 @@ int musa_dwg_ac1018_page_map_header(const uint8_t *file,size_t file_size,
  * Separate per-data-page authentication remains required. */
 int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t file_size,
     MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *out_count);
+/* Original R2010 / AC1024 protected physical map only. Never rewrite
+ * a source signature as AC1018; reject mismatched signatures fail-closed.
+ * Does NOT admit logical section content or renderable source entities.
+ * Both readers preserve source and caller output on refusal. */
+int musa_dwg_ac1024_page_map_header(
+    const uint8_t *file,size_t file_size,MusaDwgAc1018FileMapHeader *out);
+int musa_dwg_ac1024_page_locations(
+    const uint8_t *file,size_t file_size,MusaDwgAc1018PageLocation *entries,
+    size_t capacity,size_t *out_count);
 #ifdef __cplusplus
 }
 #endif

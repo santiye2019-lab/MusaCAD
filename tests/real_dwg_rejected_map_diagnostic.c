@@ -56,8 +56,9 @@ int main(int argc, char **argv) {
     size_t n = 0u;
     if (!load_readonly(argv[1], &file, &n)) return 2;
     const int modern = memcmp(file, "AC1032", 6u) == 0;
+    const int r2010 = memcmp(file, "AC1024", 6u) == 0;
     const int legacy = memcmp(file, "AC1018", 6u) == 0;
-    if (!modern && !legacy) {
+    if (!modern && !legacy && !r2010) {
         free(file);
         puts("{\"diagnostic\":\"unsupported_signature\"}");
         return 0;
@@ -66,6 +67,7 @@ int main(int argc, char **argv) {
     MusaDwgAc1018FileMapHeader header = {0};
     const int header_ok = modern ?
         musa_dwg_ac1032_page_map_header(file, n, &header) :
+        r2010 ? musa_dwg_ac1024_page_map_header(file, n, &header) :
         musa_dwg_ac1018_page_map_header(file, n, &header);
     if (!header_ok) {
         free(file);
@@ -76,10 +78,13 @@ int main(int argc, char **argv) {
     size_t native_pages = 0u;
     const int locations_ok = modern ?
         musa_dwg_ac1032_page_locations(file, n, NULL, 0u, &native_pages) :
+        r2010 ? musa_dwg_ac1024_page_locations(
+            file, n, NULL, 0u, &native_pages) :
         musa_dwg_ac1018_page_locations(file, n, NULL, 0u, &native_pages);
 
     int objects_ok = 0, handles_ok = 0;
-    if (locations_ok) {
+    /* R2010 logical section semantics remain unauthenticated. */
+    if (locations_ok && !r2010) {
         MusaDwgAc1018SectionDescriptor desc = {0};
         size_t pages = 0u;
         objects_ok = modern ?
@@ -128,7 +133,7 @@ int main(int argc, char **argv) {
                 /* The first-party reader rejects IDs >1,048,576.
                  * Bounded 1 MiB scratch classifies ID reuse without
                  * quadratic scans on large untrusted CAD files. */
-                uint8_t *seen = modern ?
+                uint8_t *seen = (modern || r2010) ?
                     calloc(UINT32_C(1048576)+1u,1u) : NULL;
                 size_t offset = 0u;
                 uint32_t last_id = 0u;
@@ -145,7 +150,7 @@ int main(int argc, char **argv) {
                     }
                     const uint32_t id = gap ?
                         (uint32_t)(-(int64_t)(int32_t)raw) : raw;
-                    if (modern && seen) {
+                    if ((modern || r2010) && seen) {
                         if(id>UINT32_C(1048576)){
                             ++ids_above_admission_cap;
                         } else {
@@ -185,7 +190,7 @@ int main(int argc, char **argv) {
                     offset += gap ? 24u : 8u;
                 }
                 page_id_namespace_audit_complete=
-                    modern && seen && physical_scan_safe &&
+                    (modern || r2010) && seen && physical_scan_safe &&
                     offset==header.map_decoded_bytes;
                 free(seen);
             }
@@ -194,6 +199,33 @@ int main(int argc, char **argv) {
     }
     if (n >= 108u)
         eof_header_copy = memcmp(file + n - 108u, file + 0x80u, 108u) == 0;
+
+    /* Diagnostic only: map allocation vs actual source EOF header copy.
+     * No guessed footer, geometry or source-byte content is exported. */
+    size_t r2010_mapped_eof_header_overlap_bytes = 0u;
+    long long r2010_map_body_vs_eof_header_start = 0LL;
+    int r2010_empty_system_marker_after_map_body = 0;
+    if (r2010 && n >= 108u && eof_header_copy) {
+        const uint64_t copy_start=(uint64_t)n-108u;
+        const uint64_t body_end=header.page_map_offset+20u+
+                                (uint64_t)header.map_compressed_bytes;
+        if (physical_end>copy_start && physical_end<=(uint64_t)n)
+            r2010_mapped_eof_header_overlap_bytes=
+                (size_t)(physical_end-copy_start);
+        if (body_end<=(uint64_t)n) {
+            r2010_map_body_vs_eof_header_start=
+                (long long)((int64_t)body_end-(int64_t)copy_start);
+            if ((uint64_t)n-body_end>=20u) {
+                static const uint8_t empty_system[20]={
+                    0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+                    0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+                };
+                r2010_empty_system_marker_after_map_body=
+                    memcmp(file+(size_t)body_end,empty_system,
+                           sizeof(empty_system))==0;
+            }
+        }
+    }
 
     int system_found=0, system_envelope_ok=0;
     int system_adler_ok=0, system_lz_ok=0;
@@ -208,7 +240,8 @@ int main(int argc, char **argv) {
     MusaDwgAc1018LzDiagnostic system_lz_alt_trace={0};
     uint32_t system_kind=0u,system_codec=0u,system_expanded=0u;
     uint32_t system_section_count=0u;
-    if(locations_ok && native_pages && native_pages <= 131072u) {
+    if(!r2010 && locations_ok && native_pages &&
+       native_pages <= 131072u) {
         MusaDwgAc1018PageLocation *pages=
             calloc(native_pages,sizeof(*pages));
         if(pages) {
@@ -316,6 +349,9 @@ int main(int argc, char **argv) {
            "\"contains_page_map_id\":%s,"
            "\"contains_section_map_id\":%s,"
            "\"physical_end_vs_file_end\":%lld,"
+           "\"r2010_mapped_eof_header_overlap_bytes\":%zu,"
+           "\"r2010_map_body_vs_eof_header_start\":%lld,"
+           "\"r2010_empty_system_marker_after_map_body\":%s,"
            "\"eof_header_copy\":%s,"
            "\"system_section_map_found\":%s,"
            "\"system_envelope_ok\":%s,"
@@ -346,7 +382,8 @@ int main(int argc, char **argv) {
            "\"system_uncompressed_bytes\":%u,"
            "\"geometry_verified\":false,"
            "\"mutates_source\":false}\n",
-           modern ? "AC1032" : "AC1018", header.page_count,
+           modern ? "AC1032" : r2010 ? "AC1024" : "AC1018",
+           header.page_count,
            locations_ok ? "true" : "false",
            objects_ok ? "true" : "false",
            handles_ok ? "true" : "false",
@@ -365,6 +402,9 @@ int main(int argc, char **argv) {
            found_map ? "true" : "false",
            found_section_map ? "true" : "false",
            (long long)((int64_t)physical_end - (int64_t)n),
+           r2010_mapped_eof_header_overlap_bytes,
+           r2010_map_body_vs_eof_header_start,
+           r2010_empty_system_marker_after_map_body ? "true" : "false",
            eof_header_copy ? "true" : "false",
            system_found ? "true" : "false",
            system_envelope_ok ? "true" : "false",

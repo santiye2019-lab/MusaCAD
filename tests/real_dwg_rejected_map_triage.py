@@ -56,10 +56,10 @@ def run() -> int:
                 raise ValueError("native_diagnostic_signature_disagreement")
             if triage.get("native_locations_ok") is True and (
                 item.get("native_stage") ==
-                "ac1032_physical_page_locations"
+                ("ac1032_physical_page_locations", "ac1024_physical_page_locations")
             ):
                 raise ValueError("diagnostic_contradicts_native_stage")
-            if (triage.get("version") == "AC1032" and
+            if (triage.get("version") in ("AC1032", "AC1024") and
                     triage.get("map_lz_ok") is True and
                     triage.get("page_id_namespace_audit_complete") is True):
                 counts = ("page_id_duplicate_positive",
