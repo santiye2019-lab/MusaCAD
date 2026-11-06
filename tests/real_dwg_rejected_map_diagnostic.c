@@ -258,6 +258,8 @@ int main(int argc, char **argv) {
            "\"system_lz_failure_phase\":%u,"
            "\"system_lz_input_consumed\":%zu,"
            "\"system_lz_output_produced\":%zu,"
+           "\"system_lz_overflow_match_bytes\":%zu,"
+           "\"system_lz_overflow_available_bytes\":%zu,"
            "\"system_descriptor_count\":%u,"
            "\"system_kind_code\":%u,"
            "\"system_codec\":%u,"
@@ -287,6 +289,8 @@ int main(int argc, char **argv) {
            (unsigned)system_lz_trace.failure_phase,
            system_lz_trace.input_consumed,
            system_lz_trace.output_produced,
+           system_lz_trace.overflow_match_bytes,
+           system_lz_trace.overflow_available_bytes,
            system_section_count,system_kind,system_codec,
            system_expanded);
     free(file);
