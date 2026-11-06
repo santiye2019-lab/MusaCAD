@@ -1376,6 +1376,11 @@ static int musa_layer_eed_tail_shape_impl(
                     memcpy(next.prefix_h_code, prefix_codes, sizeof(prefix_codes));
                     memcpy(next.prefix_h_size, prefix_sizes, sizeof(prefix_sizes));
                     next.terminal_fragment_all_zero = (uint8_t)(raw == 0u);
+                    next.terminal_fragment_raw_pattern = (uint8_t)raw;
+                    next.terminal_fragment_start_mod8 =
+                        (uint8_t)(bits.bit_pos & 7u);
+                    next.terminal_fragment_end_mod8 =
+                        (uint8_t)(bits.bit_end & 7u);
                     next.original_records_crc_verified = 1u;
                     next.display_accepted = 0u;
                     *fragment = next;
