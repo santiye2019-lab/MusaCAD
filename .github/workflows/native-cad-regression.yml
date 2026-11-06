@@ -1,0 +1,96 @@
+name: Native CAD regression (Linux + Android build guard)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/android.yml'
+      - '.github/workflows/native-cad-regression.yml'
+      - 'app/src/main/cpp/**'
+      - 'app/build.gradle'
+      - 'tools/test_native_build_contract.py'
+      - 'tools/native-dxf-regression.py'
+      - 'NATIVE_BUILD.md'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/android.yml'
+      - '.github/workflows/native-cad-regression.yml'
+      - 'app/src/main/cpp/**'
+      - 'app/build.gradle'
+      - 'tools/test_native_build_contract.py'
+      - 'tools/native-dxf-regression.py'
+      - 'NATIVE_BUILD.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: musacad-native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cmake-android-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify host versus Android CMake options and APK release gate
+        run: python3 -m unittest discover -s tools -p 'test_native_build_contract.py' -v
+
+  linux-dwg:
+    needs: cmake-android-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [ Debug, Release ]
+    env:
+      BUILD_TYPE: ${{ matrix.build_type }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned LibreDWG source
+        uses: actions/checkout@v4
+        with:
+          repository: LibreDWG/libredwg
+          ref: 34f02f54b9aacb5708c1d3d2070efb3e4b2d8c43
+          path: third_party/libredwg
+      - name: Configure Linux-native CAD host
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S app/src/main/cpp -B "$RUNNER_TEMP/musacad-native-$BUILD_TYPE" \
+            -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+          grep -q '^ANDROID:UNINITIALIZED=OFF' "$RUNNER_TEMP/musacad-native-$BUILD_TYPE/CMakeCache.txt" 2>/dev/null || \
+            ! grep -Eq '^ANDROID(:[^=]+)?=ON$' "$RUNNER_TEMP/musacad-native-$BUILD_TYPE/CMakeCache.txt"
+      - name: Build native host converter
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build "$RUNNER_TEMP/musacad-native-$BUILD_TYPE" --parallel 2
+          test -x "$RUNNER_TEMP/musacad-native-$BUILD_TYPE/musacad_dwg_convert"
+      - name: Verify first-frame AutoCAD color semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -I app/src/main/cpp \
+            tests/native_color_test.c -o "$RUNNER_TEMP/native-color-test"
+          "$RUNNER_TEMP/native-color-test"
+      - name: Regress DXF export and embedded OLE objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          converter="$RUNNER_TEMP/musacad-native-$BUILD_TYPE/musacad_dwg_convert"
+          "$converter" third_party/libredwg/test/test-data/example_2013.dwg \
+            "$RUNNER_TEMP/musa-standard.dxf"
+          python3 tools/native-dxf-regression.py "$RUNNER_TEMP/musa-standard.dxf"
+          "$converter" third_party/libredwg/test/test-data/2000/TS1.dwg \
+            "$RUNNER_TEMP/musa-ole.dxf"
+          python3 tools/native-dxf-regression.py --ole "$RUNNER_TEMP/musa-ole.dxf"
+          printf 'not a DWG\n' > "$RUNNER_TEMP/invalid.dwg"
+          if "$converter" "$RUNNER_TEMP/invalid.dwg" "$RUNNER_TEMP/invalid.dxf"; then
+            echo '::error::Invalid DWG was incorrectly accepted'
+            exit 1
+          fi
