@@ -16,6 +16,9 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_terminal_candidate_verified": n,
             "sampled_layer_eed_terminal_candidate_matched": 3*n,
             "sampled_layer_eed_terminal_candidate_attempts": n,
+            "sampled_layer_eed_terminal_triplet_attempts": n,
+            "sampled_layer_eed_terminal_triplet_verified": n,
+            "sampled_layer_eed_terminal_triplet_nonzero_fragment": 0,
             "sampled_layer_eed_terminal_candidate_absolute": 3*n,
             "sampled_layer_eed_terminal_candidate_unmatched": 0,
             "sampled_layer_eed_terminal_fragment_attempts": n,
@@ -61,6 +64,7 @@ class LayerClassBridgeTests(unittest.TestCase):
         self.assertEqual(out["layer_samples_local_ot505_material_class_proven"], 14)
         self.assertEqual(out["drawings_with_local_material_class_join"], 5)
         self.assertEqual(out["verified_raw_target_records"], 42)
+        self.assertEqual(out["first_party_native_type_triplets_verified"], 14)
         self.assertTrue(out["fixed_placeholder_ot80_identity_confirmed"])
         self.assertTrue(out["fixed_ltype_ot57_identity_confirmed"])
         self.assertEqual(out["terminal_fragment_2_bit_samples"], 14)
@@ -80,6 +84,7 @@ class LayerClassBridgeTests(unittest.TestCase):
         bad = sample(4)
         h = bad["ac1024_compatibility_hypothesis"]
         h["sampled_layer_eed_terminal_candidate_ordinal_3_raw_ot_consensus"] = 57
+        h["sampled_layer_eed_terminal_triplet_verified"] = 0
         out = summarize(stage(bad))
         self.assertEqual(out["layer_samples_with_three_crc_backed_targets"], 0)
         self.assertEqual(out["layer_samples_with_unresolved_target_class"], 4)
@@ -113,6 +118,7 @@ class LayerClassBridgeTests(unittest.TestCase):
         h = item["ac1024_compatibility_hypothesis"]
         h["sampled_layer_eed_terminal_fragment_zero"] = 0
         h["sampled_layer_eed_terminal_fragment_nonzero"] = 2
+        h["sampled_layer_eed_terminal_triplet_nonzero_fragment"] = 2
         h["sampled_layer_eed_terminal_fragment_bits_2"] = 0
         h["sampled_layer_eed_terminal_fragment_bits_4"] = 2
         observed = summarize(stage(item))
@@ -133,6 +139,9 @@ class LayerClassBridgeTests(unittest.TestCase):
             ("sampled_layer_eed_terminal_candidate_matched", 7),
             ("sampled_layer_eed_terminal_candidate_ot80_placeholder", 3),
             ("sampled_layer_eed_terminal_candidate_unmatched", 1),
+            ("sampled_layer_eed_terminal_triplet_attempts", 1),
+            ("sampled_layer_eed_terminal_triplet_verified", 1),
+            ("sampled_layer_eed_terminal_triplet_nonzero_fragment", 1),
         ):
             item = sample(2)
             item["ac1024_compatibility_hypothesis"][field] = value
