@@ -415,6 +415,58 @@ static void r2010_original_logical_section_join_test(void){
     assert(memcmp(out,"ZZZZ",4u)==0&&bytes==999u);
 }
 
+
+static void r2010_zero_page_size_source_lz_join_test(void){
+    uint8_t source[4096]={0},directory[132]={0};
+    uint8_t joined[29696]={0};
+    memcpy(source,"AC1024",6u);
+    le32(directory,1u);                /* exactly one named section */
+    le32(directory+20u,29696u);        /* exact logical byte count */
+    le32(directory+28u,1u);            /* one page */
+    /* directory+32: zero declared page span; strict 0x7400 hypothesis */
+    le32(directory+40u,2u);            /* compressed, not encrypted */
+    le32(directory+44u,9u);
+    memcpy(directory+52u,"AcDb:Handles",13u);
+    le32(directory+116u,7u);
+    size_t at=96u;
+    source[at++]=1u;
+    memcpy(source+at,"ABCD",4u);at+=4u;
+    /* Long-run backreferences to the four already decoded bytes.
+     * 899*33 + 25 + first four bytes = exactly 29,696. */
+    for(unsigned i=0u;i<899u;i++){
+        source[at++]=0x3fu;source[at++]=12u;source[at++]=0u;
+    }
+    source[at++]=0x37u;source[at++]=12u;source[at++]=0u;
+    source[at++]=0x11u;
+    const uint32_t packed=(uint32_t)(at-96u);
+    le32(directory+120u,packed);
+    const uint32_t payload_crc=checksum(0u,source+96u,packed);
+    uint32_t words[8]={UINT32_C(0x4163043b),9u,packed,packed,
+                       0u,0u,0u,payload_crc};
+    uint8_t clear[32]={0};
+    for(size_t k=0u;k<8u;k++)le32(clear+4u*k,words[k]);
+    words[6]=checksum(payload_crc,clear,32u);
+    const uint32_t mask=UINT32_C(0x4164536b)^64u;
+    for(size_t k=0u;k<8u;k++)
+        le32(source+64u+4u*k,words[k]^mask);
+    uint8_t immutable[4096];memcpy(immutable,source,sizeof source);
+    MusaDwgAc1018PageLocation loc[1]={{7u,4096u-64u,64u}};
+    size_t produced=123u;
+    assert(musa_dwg_ac1024_directory_join_section(
+        source,sizeof source,directory,sizeof directory,loc,1u,
+        "AcDb:Handles",joined,sizeof joined,&produced));
+    assert(produced==29696u);
+    for(size_t i=0u;i<sizeof joined;i++)
+        assert(joined[i]=="ABCD"[i%4u]);
+    assert(memcmp(immutable,source,sizeof source)==0);
+    /* Authenticated DATA checksum corruption cannot publish partial data. */
+    source[98u]^=1u;produced=123u;memset(joined,0xa5,sizeof joined);
+    assert(!musa_dwg_ac1024_directory_join_section(
+        source,sizeof source,directory,sizeof directory,loc,1u,
+        "AcDb:Handles",joined,sizeof joined,&produced));
+    assert(produced==123u&&joined[0]==0xa5&&joined[sizeof joined-1u]==0xa5);
+}
+
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -455,5 +507,6 @@ int main(void){
     r2010_directory_original_page_link_test();
     r2010_data_page_crc_candidate_test();
     r2010_original_logical_section_join_test();
+    r2010_zero_page_size_source_lz_join_test();
     return 0;
 }
