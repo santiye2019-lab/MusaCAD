@@ -34,6 +34,14 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
      * This is NOT a handle index, owner graph or scene-open acceptance. */
     uint8_t source_handles_logical_join_verified;
     uint32_t source_handles_logical_bytes;
+    /* Aggregate reason-only metadata; never expose handle values or names. */
+    uint32_t source_handles_name_candidates;
+    uint32_t source_handles_candidate_pages;
+    uint32_t source_handles_candidate_logical_bytes;
+    uint32_t source_handles_candidate_page_bytes;
+    uint32_t source_handles_candidate_compression;
+    uint32_t source_handles_candidate_encryption;
+    uint8_t source_directory_duplicate_names;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately
