@@ -91,6 +91,7 @@ class NativeStageContractTest(unittest.TestCase):
             "ac1024_handles_join_verified": False,
             "ac1024_handles_join_logical_bytes": 0,
             "ac1024_handles_join_probe_reason": 0,
+            "ac1024_handles_join_inner_failure_stage": 0,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
