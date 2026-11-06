@@ -150,11 +150,15 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                         (size_t)logical);
                                     if(joined){
                                         size_t written=0u;
-                                        if(musa_dwg_ac1024_directory_join_section(
-                                               file,n,decoded,expanded,
-                                               pages,count,"AcDb:Handles",
-                                               joined,(size_t)logical,
-                                               &written)&&written==logical){
+                                        uint32_t stage=0u;
+                                        const int joined_ok=
+                                            musa_dwg_ac1024_directory_join_section_diagnose(
+                                                file,n,decoded,expanded,
+                                                pages,count,"AcDb:Handles",
+                                                joined,(size_t)logical,
+                                                &written,&stage);
+                                        e.source_handles_join_inner_failure_stage=stage;
+                                        if(joined_ok&&written==logical){
                                             e.source_handles_logical_join_verified=1u;
                                             e.source_handles_logical_bytes=
                                                 (uint32_t)written;
