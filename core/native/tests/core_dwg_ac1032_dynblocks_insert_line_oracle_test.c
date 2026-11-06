@@ -1621,6 +1621,79 @@ static int original(const char *filename){
             for(unsigned k=0u;ok&&k<4u;k++)
                 if(m->values[k]!=original_circles.bounds[i][k])ok=0;
         }
+        /* Each genuine mixed primitive must independently rejoin its
+         * original OT49 owner, OT51 Unicode layer and raw numeric flags.
+         * No inherited color, layer visibility or paint is asserted. */
+        for(size_t i=0u;ok&&i<mixed_count;i++){
+            MusaDwgAc1032MixedSourceLayerEvidence evidence={0};
+            MusaDwgAc1032LayerName original_name={0};
+            MusaDwgAc1032LayerFlagsEvidence original_flags={0};
+            ok=musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                   scene,&mixed[i],&evidence)&&
+               evidence.original_owner_layer_and_geometry_verified&&
+               !evidence.final_visibility_color_and_paint_accepted&&
+               evidence.entity_type==mixed[i].entity_type&&
+               evidence.entity_handle==mixed[i].entity_handle&&
+               evidence.block_header_handle==mixed[i].block_header_handle&&
+               evidence.insert_handle==mixed[i].insert_handle&&
+               evidence.layer_handle==mixed[i].layer_handle&&
+               musa_dwg_ac1032_scene_index_read_layer_name(
+                   scene,mixed[i].layer_handle,&original_name)&&
+               musa_dwg_ac1032_scene_index_read_layer_flags_evidence(
+                   scene,mixed[i].layer_handle,&original_flags)&&
+               evidence.layer_name.original_record_crc_verified&&
+               evidence.raw_layer_flags.source_crc_verified&&
+               original_name.original_record_crc_verified&&
+               original_flags.source_crc_verified&&
+               evidence.layer_name.indexed_handle==mixed[i].layer_handle&&
+               evidence.raw_layer_flags.indexed_handle==mixed[i].layer_handle&&
+               evidence.layer_name.utf8_bytes==original_name.utf8_bytes&&
+               evidence.layer_name.utf16_code_units==
+                   original_name.utf16_code_units&&
+               evidence.layer_name.utf8_bytes>0u&&
+               !memcmp(evidence.layer_name.utf8,original_name.utf8,
+                       (size_t)evidence.layer_name.utf8_bytes+1u)&&
+               evidence.raw_layer_flags.raw_values_70_290_370==
+                   original_flags.raw_values_70_290_370&&
+               evidence.raw_layer_flags.xref_index_plus_one==
+                   original_flags.xref_index_plus_one;
+        }
+        if(ok){
+            MusaDwgAc1032MixedSourceLayerEvidence denied_layer;
+            memset(&denied_layer,0xa5,sizeof(denied_layer));
+            MusaDwgAc1032MixedSourceLayerEvidence saved_layer;
+            memcpy(&saved_layer,&denied_layer,sizeof(saved_layer));
+            MusaDwgAc1032MixedSourceItem corrupt=mixed[0];
+            corrupt.values[0]+=1.0;
+            ok=!musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                   scene,&corrupt,&denied_layer)&&
+               !memcmp(&denied_layer,&saved_layer,sizeof(denied_layer));
+            corrupt=mixed[0];
+            corrupt.layer_handle=0u;
+            ok=ok&&!musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                      scene,&corrupt,&denied_layer)&&
+               !memcmp(&denied_layer,&saved_layer,sizeof(denied_layer));
+            corrupt=mixed[0];
+            corrupt.entity_type=18u;
+            ok=ok&&!musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                      scene,&corrupt,&denied_layer)&&
+               !memcmp(&denied_layer,&saved_layer,sizeof(denied_layer));
+            corrupt=mixed[0];
+            corrupt.final_visibility_color_and_paint_accepted=1u;
+            ok=ok&&!musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                      scene,&corrupt,&denied_layer)&&
+               !memcmp(&denied_layer,&saved_layer,sizeof(denied_layer));
+            corrupt=mixed[nline];
+            corrupt.values[2]+=1.0;
+            ok=ok&&!musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                      scene,&corrupt,&denied_layer)&&
+               !memcmp(&denied_layer,&saved_layer,sizeof(denied_layer));
+            ok=ok&&!musa_dwg_ac1032_scene_index_mixed_source_layer_evidence(
+                      NULL,&mixed[0],&denied_layer)&&
+               !memcmp(&denied_layer,&saved_layer,sizeof(denied_layer));
+            if(!ok)fprintf(stderr,
+                "FAIL original mixed source OT51 layer evidence or atomicity\\n");
+        }
         MusaDwgAc1032MixedSourceItem denied[
             MUSACAD_AC1032_OT49_CHILD_LIMIT*2u];
         memset(denied,0xa5,sizeof(denied));
