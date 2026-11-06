@@ -22,6 +22,8 @@ import java.util.*;
 public final class MusaAiCloudService {
     private static final int TIMEOUT_MS=90000;
     private static final int MAX_RESPONSE_BYTES=512*1024;
+    // Keep a margin below the Worker 4 MiB request cap for proxies and headers.
+    private static final int MAX_REQUEST_BYTES=3*1024*1024;
     private static final class OversizedResponseException extends IOException {}
 
     public enum Status { OK, NOT_CONFIGURED, ACCESS_REQUIRED, NETWORK_ERROR, QUOTA_EXHAUSTED, MODEL_TIMEOUT, UPSTREAM_UNAVAILABLE, DENIED, INVALID_RESPONSE }
@@ -148,6 +150,9 @@ public final class MusaAiCloudService {
         boolean allowEditProposals=MusaAiCloudPolicy.allowEditProposals(rawPrompt);
 
         HttpsURLConnection connection=null;
+        final String traceId=UUID.randomUUID().toString();
+        String phase="bağlantı kurulumu";
+        int requestBytes=0;
         try{
             connection=(HttpsURLConnection)new URL(endpoint).openConnection();
             connection.setConnectTimeout(TIMEOUT_MS);connection.setReadTimeout(TIMEOUT_MS);
@@ -156,6 +161,8 @@ public final class MusaAiCloudService {
             connection.setRequestProperty("Authorization","Bearer "+session.token);
             connection.setRequestProperty("Content-Type","application/json; charset=utf-8");
             connection.setRequestProperty("Accept","application/json");
+            // Non-sensitive correlation identifier for Cloudflare Worker logs.
+            connection.setRequestProperty("X-MusaCAD-Request-ID",traceId);
 
             JSONObject body=new JSONObject();
             body.put("prompt",prompt);
@@ -185,10 +192,17 @@ public final class MusaAiCloudService {
             body.put("client",client);
 
             byte[] bytes=body.toString().getBytes(StandardCharsets.UTF_8);
-            connection.setFixedLengthStreamingMode(bytes.length);
+            requestBytes=bytes.length;
+            if(requestBytes>MAX_REQUEST_BYTES)return new Result(Status.INVALID_RESPONSE,"",
+                "Görsel/CAD isteği güvenli aktarım sınırını aştı (HTTP 413, yerel kontrol): "+
+                ((requestBytes+1023)/1024)+" KB. Daha küçük görsel grupları kullanılmalı.",null,false);
+            connection.setFixedLengthStreamingMode(requestBytes);
+            phase="görsel/CAD yüklemesi";
             try(OutputStream out=connection.getOutputStream()){out.write(bytes);}
 
+            phase="sunucu yanıtını bekleme";
             int code=connection.getResponseCode();
+            phase="sunucu yanıtını okuma";
             if(code>=300&&code<400)return new Result(Status.DENIED,"","Gandalf AI sunucusu yönlendirme döndürdü",null,false);
             // HTTP errors can be HTML or empty. Recognize request-size errors
             // before JSON parsing so an oversized visual sweep is actionable.
@@ -256,7 +270,8 @@ public final class MusaAiCloudService {
         }catch(SocketTimeoutException e){
             return new Result(Status.MODEL_TIMEOUT,"",
                 "Gandalf model/görsel yanıtı "+(TIMEOUT_MS/1000)+
-                " saniyelik sınırı aştı. Sunucu veya model gecikmesi olabilir; görsel analiz tamamlanmadı.",null,false);
+                " saniyelik sınırı aştı ("+phase+"). İstek: "+((requestBytes+1023)/1024)+
+                " KB; izleme kodu: "+traceId+". Görsel analiz tamamlanmadı.",null,false);
         }catch(OversizedResponseException e){
             return new Result(Status.INVALID_RESPONSE,"",
                 "Gandalf AI sunucu yanıtı "+(MAX_RESPONSE_BYTES/1024)+
@@ -272,7 +287,9 @@ public final class MusaAiCloudService {
                 "Gandalf AI sunucusu TCP bağlantısını kabul etmedi. Worker adresi ve sunucu erişimi kontrol edilmeli.",null,false);
         }catch(SocketException e){
             return new Result(Status.NETWORK_ERROR,"",
-                "Gandalf AI bağlantısı sunucu/ağ tarafından sıfırlandı veya kesildi. Görsel istek boyutunu ve sunucu günlüklerini kontrol edin.",null,false);
+                "Gandalf AI bağlantısı "+phase+" aşamasında sıfırlandı veya kesildi. İstek: "+
+                ((requestBytes+1023)/1024)+" KB; izleme kodu: "+traceId+
+                ". Sunucu günlüklerinde bu kodu arayın; görsel grup analiz edilmedi.",null,false);
         }catch(IOException e){
             return new Result(Status.NETWORK_ERROR,"",
                 "Gandalf AI veri gönderme/alma sırasında G/Ç hatası oluştu. Sunucu günlükleri ve ağ bağlantısı kontrol edilmeli.",null,false);
