@@ -66,6 +66,13 @@ int musa_dwg_ac1018_page_map_header(
     const uint8_t *file,size_t n,MusaDwgAc1018FileMapHeader *out){
     return shared_page_map_header(file,n,"AC1018",out);
 }
+/* R2010 reuses only the R2004-family protected physical header and page
+ * layout, with an original AC1024 signature. This is NOT an AC1018 geometry
+ * fallback nor proof of logical AcDb section/page CRC semantics. */
+int musa_dwg_ac1024_page_map_header(
+    const uint8_t *file,size_t n,MusaDwgAc1018FileMapHeader *out){
+    return shared_page_map_header(file,n,"AC1024",out);
+}
 /* AC1032 is a different OBJECT schema but retains the documented R2004
  * family encrypted HEADER/page-location structural organization. The
  * original AC1018 body readers are deliberately NEVER called here. */
@@ -325,6 +332,10 @@ static int shared_page_locations(const uint8_t *file,size_t n,
 int musa_dwg_ac1018_page_locations(const uint8_t *file,size_t n,
     MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *count){
     return shared_page_locations(file,n,"AC1018",entries,capacity,count);
+}
+int musa_dwg_ac1024_page_locations(const uint8_t *file,size_t n,
+    MusaDwgAc1018PageLocation *entries,size_t capacity,size_t *count){
+    return shared_page_locations(file,n,"AC1024",entries,capacity,count);
 }
 int musa_dwg_ac1032_page_locations(const uint8_t *file,size_t n,
     MusaDwgAc1032PageLocation *entries,size_t capacity,size_t *count){

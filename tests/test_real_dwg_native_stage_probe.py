@@ -43,10 +43,10 @@ class NativeDwgStageProbeTest(unittest.TestCase):
         self.assertEqual(record["result"], "rejected")
         self.assertEqual(record["native_stage"], "ac1032_page_map_header")
 
-    def test_r2010_version_is_not_falsely_accepted_as_r2004(self):
+    def test_r2010_fake_container_does_not_pass_protected_page_map(self):
         record = self.probe(b"AC1024" + bytes(506))
-        self.assertEqual(record["result"], "not_covered_by_this_native_probe")
-        self.assertEqual(record["native_stage"], "signature_only")
+        self.assertEqual(record["result"], "rejected")
+        self.assertEqual(record["native_stage"], "ac1024_page_map_header")
 
     def test_r2013_version_is_not_falsely_accepted_as_r2018(self):
         record = self.probe(b"AC1027" + bytes(506))
@@ -99,6 +99,16 @@ class NativeStageContractTest(unittest.TestCase):
         record = self.run_mocked_stage(
             "AC1018", "ac1018_crc_backed_handle_index", "rejected")
         self.assertEqual(record["result"], "rejected")
+
+    def test_ac1024_header_only_acceptance_is_refused(self):
+        with self.assertRaisesRegex(
+                ValueError, "ac1024_header_only_is_not_map_acceptance"):
+            self.run_mocked_stage("AC1024", "ac1024_page_map_header")
+
+    def test_ac1024_original_map_stage_is_allowed(self):
+        record = self.run_mocked_stage(
+            "AC1024", "ac1024_physical_page_locations")
+        self.assertEqual(record["evidence_count"], 3)
 
     def test_other_existing_stage_contract_is_not_changed(self):
         record = self.run_mocked_stage(

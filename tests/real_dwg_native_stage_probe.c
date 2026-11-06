@@ -141,6 +141,23 @@ int main(int argc, char **argv) {
             }
             musa_dwg_ac1018_scene_close(scene);
         }
+
+    } else if (format == MUSA_DWG_2010) {
+        /* First-party R2010 original protected physical map stage ONLY.
+         * Do not reuse R2004 object/scene/entity semantics. */
+        MusaDwgAc1018FileMapHeader header = {0};
+        size_t locations = 0u;
+        result = "rejected";
+        if (!musa_dwg_ac1024_page_map_header(file,bytes,&header)) {
+            stage = "ac1024_page_map_header";
+        } else if (!musa_dwg_ac1024_page_locations(
+                       file,bytes,NULL,0u,&locations) || !locations) {
+            stage = "ac1024_physical_page_locations";
+        } else {
+            result = "accepted";
+            stage = "ac1024_physical_page_locations";
+            count = locations;
+        }
     } else if (format == MUSA_DWG_2018_2026) {
         MusaDwgAc1032FileMapHeader header = {0};
         size_t locations = 0u;

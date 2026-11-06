@@ -194,6 +194,32 @@ int main(int argc, char **argv) {
     }
     if (n >= 108u)
         eof_header_copy = memcmp(file + n - 108u, file + 0x80u, 108u) == 0;
+    /* Diagnostic only: map allocation vs actual source EOF header copy.
+     * No guessed footer, geometry or source-byte content is exported. */
+    size_t r2010_mapped_eof_header_overlap_bytes = 0u;
+    long long r2010_map_body_vs_eof_header_start = 0LL;
+    int r2010_empty_system_marker_after_map_body = 0;
+    if (r2010 && n >= 108u && eof_header_copy) {
+        const uint64_t copy_start=(uint64_t)n-108u;
+        const uint64_t body_end=header.page_map_offset+20u+
+                                (uint64_t)header.map_compressed_bytes;
+        if (physical_end>copy_start && physical_end<=(uint64_t)n)
+            r2010_mapped_eof_header_overlap_bytes=
+                (size_t)(physical_end-copy_start);
+        if (body_end<=(uint64_t)n) {
+            r2010_map_body_vs_eof_header_start=
+                (long long)((int64_t)body_end-(int64_t)copy_start);
+            if ((uint64_t)n-body_end>=20u) {
+                static const uint8_t empty_system[20]={
+                    0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+                    0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+                };
+                r2010_empty_system_marker_after_map_body=
+                    memcmp(file+(size_t)body_end,empty_system,
+                           sizeof(empty_system))==0;
+            }
+        }
+    }
 
     int system_found=0, system_envelope_ok=0;
     int system_adler_ok=0, system_lz_ok=0;
@@ -316,6 +342,9 @@ int main(int argc, char **argv) {
            "\"contains_page_map_id\":%s,"
            "\"contains_section_map_id\":%s,"
            "\"physical_end_vs_file_end\":%lld,"
+           "\"r2010_mapped_eof_header_overlap_bytes\":%zu,"
+           "\"r2010_map_body_vs_eof_header_start\":%lld,"
+           "\"r2010_empty_system_marker_after_map_body\":%s,"
            "\"eof_header_copy\":%s,"
            "\"system_section_map_found\":%s,"
            "\"system_envelope_ok\":%s,"
@@ -365,6 +394,9 @@ int main(int argc, char **argv) {
            found_map ? "true" : "false",
            found_section_map ? "true" : "false",
            (long long)((int64_t)physical_end - (int64_t)n),
+           r2010_mapped_eof_header_overlap_bytes,
+           r2010_map_body_vs_eof_header_start,
+           r2010_empty_system_marker_after_map_body ? "true" : "false",
            eof_header_copy ? "true" : "false",
            system_found ? "true" : "false",
            system_envelope_ok ? "true" : "false",

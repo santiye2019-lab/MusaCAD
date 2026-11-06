@@ -42,6 +42,51 @@ static void fixture(uint8_t file[380]){
     le32(file+pos+16u,checksum(
         checksum(0u,file+pos,20u),packed,18u));
 }
+
+/* Synthetic R2010 physical-map shared-structure proof. Real AC1024 page
+ * auth and the logical DWG section still require independent evidence. */
+static void ac1024_page_map_test(void){
+    uint8_t file[380];
+    fixture(file);
+    memcpy(file,"AC1024",6u);
+    uint8_t source_before[380];memcpy(source_before,file,sizeof(file));
+    MusaDwgAc1018FileMapHeader header={0};
+    size_t count=111u;
+    assert(musa_dwg_ac1024_page_map_header(file,sizeof(file),&header));
+    assert(header.page_count==2u&&header.page_map_id==2u&&
+           header.section_map_id==1u);
+    assert(musa_dwg_ac1024_page_locations(
+        file,sizeof(file),NULL,0u,&count)&&count==2u);
+    MusaDwgAc1018PageLocation rows[2]={{0}};
+    assert(musa_dwg_ac1024_page_locations(
+        file,sizeof(file),rows,2u,&count));
+    assert(rows[0].file_offset==256u&&rows[0].file_span_bytes==64u&&
+           rows[1].file_offset==320u&&rows[1].file_span_bytes==64u);
+    assert(memcmp(source_before,file,sizeof(file))==0);
+    /* A R2010 source is NEVER silently interpreted as R2004. */
+    assert(!musa_dwg_ac1018_page_map_header(
+        file,sizeof(file),&header));
+    assert(!musa_dwg_ac1018_page_locations(
+        file,sizeof(file),NULL,0u,&count));
+    MusaDwgAc1018PageLocation saved[2];memcpy(saved,rows,sizeof rows);
+    const size_t saved_count=count;
+    assert(!musa_dwg_ac1024_page_locations(
+        file,sizeof(file),rows,1u,&count));
+    assert(count==saved_count&&memcmp(rows,saved,sizeof rows)==0);
+    file[320u+20u+9u]^=1u; /* corrupt original map checksum */
+    assert(!musa_dwg_ac1024_page_locations(
+        file,sizeof(file),rows,2u,&count));
+    assert(count==saved_count&&memcmp(rows,saved,sizeof rows)==0);
+    memcpy(file,source_before,sizeof(file));
+    file[0x80u]^=1u; /* corrupt original encrypted map header */
+    assert(!musa_dwg_ac1024_page_map_header(file,sizeof(file),&header));
+    memcpy(file,source_before,sizeof(file));
+    file[0u]='X';
+    assert(!musa_dwg_ac1024_page_map_header(file,sizeof(file),&header));
+    assert(!musa_dwg_ac1024_page_locations(
+        file,sizeof(file),rows,2u,&count));
+    assert(count==saved_count&&memcmp(rows,saved,sizeof rows)==0);
+}
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -75,5 +120,6 @@ int main(void){
     fixture(file);
     assert(!musa_dwg_ac1018_page_locations(file,337u,entries,2u,&n));
     assert(n==n_before&&memcmp(before,entries,sizeof(before))==0);
+    ac1024_page_map_test();
     return 0;
 }
