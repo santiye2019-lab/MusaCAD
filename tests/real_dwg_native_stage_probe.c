@@ -660,6 +660,12 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_cmc_attempts;
     size_t sampled_layer_eed_cmc_verified;
     size_t sampled_layer_eed_cmc_refused;
+    size_t sampled_layer_eed_cmc_refused_preflight;
+    size_t sampled_layer_eed_cmc_refused_index_nonzero;
+    size_t sampled_layer_eed_cmc_refused_bl;
+    size_t sampled_layer_eed_cmc_refused_rc;
+    size_t sampled_layer_eed_cmc_refused_rc_flags;
+    size_t sampled_layer_eed_cmc_refused_other;
     size_t sampled_layer_eed_cmc_named;
     size_t sampled_layer_eed_cmc_book_named;
     size_t sampled_layer_eed_state_join_frozen;
@@ -1752,6 +1758,23 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                                     ++hint.sampled_layer_eed_cmc_book_named;
                                                                             } else {
                                                                                 ++hint.sampled_layer_eed_cmc_refused;
+                                                                                const uint8_t cmc_stage =
+                                                                                    musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
+                                                                                        objects, nb, recovered, legacy_count,
+                                                                                        recovered[k].embedded_absolute_handle);
+                                                                                if (cmc_stage >= MUSA_DWG_LAYER_CMC_STAGE_ARGUMENT &&
+                                                                                    cmc_stage <= MUSA_DWG_LAYER_CMC_STAGE_BS)
+                                                                                    ++hint.sampled_layer_eed_cmc_refused_preflight;
+                                                                                else if (cmc_stage == MUSA_DWG_LAYER_CMC_STAGE_INDEX_NONZERO)
+                                                                                    ++hint.sampled_layer_eed_cmc_refused_index_nonzero;
+                                                                                else if (cmc_stage == MUSA_DWG_LAYER_CMC_STAGE_BL)
+                                                                                    ++hint.sampled_layer_eed_cmc_refused_bl;
+                                                                                else if (cmc_stage == MUSA_DWG_LAYER_CMC_STAGE_RC)
+                                                                                    ++hint.sampled_layer_eed_cmc_refused_rc;
+                                                                                else if (cmc_stage == MUSA_DWG_LAYER_CMC_STAGE_RC_UNSUPPORTED)
+                                                                                    ++hint.sampled_layer_eed_cmc_refused_rc_flags;
+                                                                                else
+                                                                                    ++hint.sampled_layer_eed_cmc_refused_other;
                                                                             }
                                                                             if (raw_state.frozen_bit)
                                                                                 ++hint.sampled_layer_eed_state_join_frozen;
@@ -3012,6 +3035,12 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_cmc_attempts\":%zu,"
                "\"sampled_layer_eed_cmc_verified\":%zu,"
                "\"sampled_layer_eed_cmc_refused\":%zu,"
+               "\"sampled_layer_eed_cmc_refused_preflight\":%zu,"
+               "\"sampled_layer_eed_cmc_refused_index_nonzero\":%zu,"
+               "\"sampled_layer_eed_cmc_refused_bl\":%zu,"
+               "\"sampled_layer_eed_cmc_refused_rc\":%zu,"
+               "\"sampled_layer_eed_cmc_refused_rc_flags\":%zu,"
+               "\"sampled_layer_eed_cmc_refused_other\":%zu,"
                "\"sampled_layer_eed_cmc_named\":%zu,"
                "\"sampled_layer_eed_cmc_book_named\":%zu,"
                "\"sampled_layer_eed_state_join_frozen\":%zu,"
@@ -3467,6 +3496,12 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_cmc_attempts,
                hint->sampled_layer_eed_cmc_verified,
                hint->sampled_layer_eed_cmc_refused,
+               hint->sampled_layer_eed_cmc_refused_preflight,
+               hint->sampled_layer_eed_cmc_refused_index_nonzero,
+               hint->sampled_layer_eed_cmc_refused_bl,
+               hint->sampled_layer_eed_cmc_refused_rc,
+               hint->sampled_layer_eed_cmc_refused_rc_flags,
+               hint->sampled_layer_eed_cmc_refused_other,
                hint->sampled_layer_eed_cmc_named,
                hint->sampled_layer_eed_cmc_book_named,
                hint->sampled_layer_eed_state_join_frozen,
