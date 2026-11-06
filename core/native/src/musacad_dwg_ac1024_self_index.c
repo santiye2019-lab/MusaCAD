@@ -1948,3 +1948,82 @@ int musa_dwg_ac1024_layer_eed_raw_state_join(
     *out = next;
     return 1;
 }
+
+
+/* Source-local R2010 layer CMC raw prefix, after verified numeric flags.
+ * Neither named color string nor actual displayed color is inferred. */
+int musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerCmcRawPrefix *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity found = {0};
+    MusaDwgAc1024LayerRawFlagsEvidence flags = {0};
+    MusaDwgAc1024EedChainEvidence eed = {0};
+    MusaDwgAc1024SelfPrefix self = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_layer_handle, &found) ||
+        found.raw_ot != 51u || !found.frame_crc16_verified ||
+        !found.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_layer_eed_raw_flags_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &flags) ||
+        !musa_dwg_ac1024_record_eed_chain_probe(
+            objects, object_bytes, found.record_offset, &eed) ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, found.record_offset, &self) ||
+        flags.layer_handle != canonical_layer_handle ||
+        flags.layer_record_offset != found.record_offset ||
+        !flags.original_record_crc_verified || flags.display_accepted ||
+        eed.indexed_object_offset != found.record_offset ||
+        eed.embedded_absolute_handle != canonical_layer_handle ||
+        eed.raw_ot != 51u || !eed.original_crc16_verified ||
+        !eed.eed_boundaries_verified || eed.application_count == 0u ||
+        self.indexed_object_offset != found.record_offset ||
+        self.embedded_absolute_handle != canonical_layer_handle ||
+        self.raw_ot != 51u || !self.frame_crc16_verified ||
+        eed.payload_start_byte != self.payload_start_byte ||
+        eed.handle_stream_start_bit != self.handle_stream_start_bit ||
+        eed.handle_stream_end_bit != self.handle_stream_end_bit ||
+        flags.raw_flags_end_bit <= flags.raw_flags_start_bit ||
+        flags.raw_flags_end_bit >= self.handle_stream_start_bit ||
+        self.payload_start_byte >= object_bytes ||
+        self.handle_stream_end_bit / 8u > object_bytes - self.payload_start_byte)
+        return 0;
+    MusaDwgAc1015Bits bits = {0};
+    uint16_t cmc_index = UINT16_MAX;
+    uint32_t cmc_rgb = 0u, name_flags = 0u;
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + self.payload_start_byte,
+            self.handle_stream_end_bit / 8u,
+            flags.raw_flags_end_bit, self.handle_stream_start_bit) ||
+        !musa_dwg_ac1015_bits_read_bs(&bits, &cmc_index) ||
+        cmc_index != 0u ||
+        !musa_dwg_ac1015_bits_read_bl(&bits, &cmc_rgb) ||
+        !musa_dwg_ac1015_bits_read_u(&bits, 8u, &name_flags) ||
+        (name_flags & ~3u) != 0u ||
+        bits.bit_pos > self.handle_stream_start_bit)
+        return 0;
+    MusaDwgAc1024LayerCmcRawPrefix next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = found.record_offset;
+    next.cmc_start_bit = flags.raw_flags_end_bit;
+    next.cmc_end_bit = bits.bit_pos;
+    next.color_index = cmc_index;
+    next.rgb_raw = cmc_rgb;
+    next.raw_name_flags = (uint8_t)name_flags;
+    next.color_name_present = (uint8_t)(name_flags & 1u);
+    next.book_name_present = (uint8_t)((name_flags >> 1u) & 1u);
+    next.original_record_crc_verified = 1u;
+    *out = next;
+    return 1;
+}

@@ -978,6 +978,41 @@ static int test_layer_nonzero_eed_raw_flags(void) {
         return 0;
     const MusaDwgAc1024LayerRawFlagsEvidence saved = flags;
 
+    /* A CRC-authenticated, zero-valued synthetic R2010 CMC prefix:
+     * BS index=0 (18 bits), BL RGB=0 (34 bits), RC flags=0 (8 bits).
+     * All string/render acceptance remains zero. */
+    MusaDwgAc1024LayerCmcRawPrefix cmc = {0};
+    if (!musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+            source, sizeof(source), index, 1u, 42u, &cmc) ||
+        cmc.layer_handle != 42u || cmc.layer_record_offset != 0u ||
+        cmc.cmc_start_bit != 79u || cmc.cmc_end_bit != 139u ||
+        cmc.color_index != 0u || cmc.rgb_raw != 0u ||
+        cmc.raw_name_flags || !cmc.original_record_crc_verified ||
+        cmc.color_names_decoded || cmc.bylayer_color_parity_verified ||
+        cmc.display_accepted)
+        return 0;
+    const MusaDwgAc1024LayerCmcRawPrefix saved_cmc = cmc;
+    if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+            source, sizeof(source), index, 1u, 43u, &cmc) ||
+        musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+            source, sizeof(source), index, 1u, 42u,
+            (MusaDwgAc1024LayerCmcRawPrefix *)(void *)source) ||
+        musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+            source, sizeof(source), index, 1u, 42u,
+            (MusaDwgAc1024LayerCmcRawPrefix *)(void *)index) ||
+        memcmp(&cmc, &saved_cmc, sizeof(cmc)))
+        return 0;
+    set_bits(p, 79u, 2u, 3u); /* BS=256 violates CMC index=0 */
+    if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))
+        return 0;
+    source[27] = (uint8_t)crc;
+    source[28] = (uint8_t)(crc >> 8u);
+    if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+            source, sizeof(source), index, 1u, 42u, &cmc) ||
+        memcmp(&cmc, &saved_cmc, sizeof(cmc)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
+
     /* Corrupted application H code is still refused with correct CRC. */
     set_bits(p, 36u, 4u, 4u);
     if (!musa_core_crc16_arc(0xc0c1u, source, 27u, &crc))

@@ -383,6 +383,30 @@ int musa_dwg_ac1024_layer_eed_raw_flags_probe(
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t layer_handle, MusaDwgAc1024LayerRawFlagsEvidence *out);
 
+/* CRC-backed original R2010 OT51 CMC field prefix, EED-bearing LAYER.
+ * Published CMC field: BS index (0 in R2004+), BL raw RGB, RC name flags.
+ * Optional TV Unicode names are in a separate stream and NOT decoded.
+ * Fail-atomic; no BYLAYER inheritance, viewport, colors or scene admission. */
+typedef struct MusaDwgAc1024LayerCmcRawPrefix {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    size_t cmc_start_bit;
+    size_t cmc_end_bit;
+    uint32_t rgb_raw;
+    uint16_t color_index;
+    uint8_t raw_name_flags;
+    uint8_t color_name_present;
+    uint8_t book_name_present;
+    uint8_t original_record_crc_verified;
+    uint8_t color_names_decoded; /* ALWAYS zero */
+    uint8_t bylayer_color_parity_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LayerCmcRawPrefix;
+int musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle, MusaDwgAc1024LayerCmcRawPrefix *out);
+
 /* Original R2010 LAYER OT51 H stream, EED-bearing and XDictionary
  * present ONLY. A CRC-backed layer and its OT67 APPID targets are
  * mandatory. The first H4 is an OT50 LAYER_CONTROL soft-pointer; the
