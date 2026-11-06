@@ -71,6 +71,13 @@ jobs:
             tests/OriginalSourceV6MergeTest.java
           java -cp /tmp/musacad-original-combined-v6 \
             com.musa.cad.OriginalSourceV6MergeTest
+      - name: Test private CAD-open diagnostic stage and timing summary
+        run: |
+          mkdir -p /tmp/musacad-diagnostic-trace
+          javac -encoding UTF-8 -d /tmp/musacad-diagnostic-trace \
+            app/src/main/java/com/musa/cad/CadOpenTrace.java \
+            tests/CadOpenTraceDiagnosticTest.java
+          java -cp /tmp/musacad-diagnostic-trace com.musa.cad.CadOpenTraceDiagnosticTest
       - name: MC1032 own-engine v1-v2 lossless migration JNI and no-core proof
         run: |
           set -euo pipefail
