@@ -116,13 +116,13 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                             size_t pos=20u;
                             for(uint32_t si=0u;si<shape.sections;si++){
                                 const uint8_t *rec=decoded+pos;
-                                const uint32_t count=read32(rec+8u);
+                                const uint32_t section_page_count=read32(rec+8u);
                                 const uint64_t logical=
                                     (uint64_t)read32(rec)|
                                     ((uint64_t)read32(rec+4u)<<32u);
                                 if(strcmp((const char*)(rec+32u),
                                           "AcDb:Handles")==0){
-                                    e.source_handles_candidate_pages=count;
+                                    e.source_handles_candidate_pages=section_page_count;
                                     e.source_handles_candidate_logical_bytes=
                                         (uint32_t)logical;
                                     e.source_handles_candidate_page_bytes=
@@ -133,7 +133,7 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                         read32(rec+28u);
                                     uint32_t span=read32(rec+12u);
                                     if(!span)span=29696u;
-                                    for(uint32_t pj=0u;pj<count;pj++){
+                                    for(uint32_t pj=0u;pj<section_page_count;pj++){
                                         const uint8_t *link=
                                             decoded+pos+96u+(size_t)pj*16u;
                                         const uint64_t off=
@@ -166,7 +166,7 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                         free(joined);
                                     }
                                 }
-                                pos+=96u+(size_t)count*16u;
+                                pos+=96u+(size_t)section_page_count*16u;
                             }
                         }
                     }
