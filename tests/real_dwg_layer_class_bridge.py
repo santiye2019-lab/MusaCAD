@@ -56,6 +56,10 @@ def summarize(stage: dict) -> dict:
         "terminal_fragment_all_zero_samples": 0,
         "terminal_fragment_nonzero_samples": 0,
         "terminal_fragment_undecoded_samples": 0,
+        "terminal_fragment_2bit_pattern_mask": 0,
+        "terminal_fragment_4bit_pattern_mask": 0,
+        "terminal_fragment_start_alignment_mask": 0,
+        "terminal_fragment_end_alignment_mask": 0,
         "h_tail_fully_decoded": False,
         "verified_raw_target_records": 0,
         "first_party_native_type_triplets_verified": 0,
@@ -129,6 +133,41 @@ def summarize(stage: dict) -> dict:
         aggregate["terminal_fragment_all_zero_samples"] += fragment_zero
         aggregate["terminal_fragment_nonzero_samples"] += fragment_nonzero
         aggregate["terminal_fragment_undecoded_samples"] += n
+        # OR masks of 2-bit/4-bit suffix values. The number of set mask bits
+        # represents DISTINCT patterns, never their frequency or CAD role.
+        pattern2 = _integer(
+            h, "sampled_layer_eed_terminal_fragment_2bit_pattern_mask", 15)
+        pattern4 = _integer(
+            h, "sampled_layer_eed_terminal_fragment_4bit_pattern_mask", 65535)
+        start_align = _integer(
+            h, "sampled_layer_eed_terminal_fragment_start_mod8_mask", 255)
+        end_align = _integer(
+            h, "sampled_layer_eed_terminal_fragment_end_mod8_mask", 255)
+        if (bool(pattern2) != bool(fragment_two) or
+                bool(pattern4) != bool(fragment_four) or
+                not start_align or not end_align or
+                pattern2.bit_count() > fragment_two or
+                pattern4.bit_count() > fragment_four or
+                (fragment_zero == 0 and
+                 ((pattern2 & 1) or (pattern4 & 1))) or
+                (fragment_nonzero and fragment_two + fragment_four == n
+                 and pattern2 <= 1 and pattern4 <= 1)):
+            raise EvidenceError("impossible_terminal_bit_pattern_mask")
+        # Every 2-bit fragment starts 2 bits before its end; every 4-bit
+        # fragment starts 4 bits before its end, including bit-boundary wrap.
+        implied_starts = 0
+        for end_bit in range(8):
+            if end_align & (1 << end_bit):
+                if fragment_two:
+                    implied_starts |= 1 << ((end_bit - 2) & 7)
+                if fragment_four:
+                    implied_starts |= 1 << ((end_bit - 4) & 7)
+        if not start_align & implied_starts:
+            raise EvidenceError("inconsistent_terminal_modulo_alignment")
+        aggregate["terminal_fragment_2bit_pattern_mask"] |= pattern2
+        aggregate["terminal_fragment_4bit_pattern_mask"] |= pattern4
+        aggregate["terminal_fragment_start_alignment_mask"] |= start_align
+        aggregate["terminal_fragment_end_alignment_mask"] |= end_align
         ordinals = [
             _integer(h, "sampled_layer_eed_terminal_candidate_ordinal_%d_matched" % i, 2048)
             for i in (2, 3, 4)
@@ -181,6 +220,14 @@ def summarize(stage: dict) -> dict:
             aggregate["drawings_with_local_material_class_join"] += 1
         else:
             aggregate["layer_samples_with_unresolved_target_class"] += n
+    aggregate["terminal_fragment_2bit_pattern_values_seen"] = [
+        i for i in range(4)
+        if aggregate["terminal_fragment_2bit_pattern_mask"] & (1 << i)
+    ]
+    aggregate["terminal_fragment_4bit_pattern_values_seen"] = [
+        i for i in range(16)
+        if aggregate["terminal_fragment_4bit_pattern_mask"] & (1 << i)
+    ]
     return aggregate
 
 
