@@ -1,0 +1,491 @@
+/* SPDX-License-Identifier: MIT
+ * Original AC1024/R2010 bounded LINE common-data and coordinate adapter.
+ * Reuses existing MusaCAD bit numeric APIs, not another drawing engine.
+ */
+#include "musacad_dwg_ac1024_line.h"
+#include "musacad_dwg_ac1024_self_index.h"
+#include "musacad_dwg_ac1015_values.h"
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
+
+static int overlap(const void *a, size_t an, const void *b, size_t bn) {
+    if (!a || !b || !an || !bn) return 0;
+    const uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+    return x <= y ? y - x < an : x - y < bn;
+}
+
+static int musa_line_common_probe_impl(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineCommon *out, int has_eed, uint8_t *stage,
+    uint8_t *scale_refusal) {
+    if (scale_refusal)
+        *scale_refusal = MUSA_DWG_LINE_LTSCALE_NOT_REJECTED_HERE;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_ARGUMENT;
+    if (!objects || !out || !object_bytes ||
+        overlap(objects, object_bytes, out, sizeof(*out))) return 0;
+
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_META;
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    if (!(has_eed ?
+          musa_dwg_ac1024_record_line_eed_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta) :
+          musa_dwg_ac1024_record_entity_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta)) ||
+        meta.raw_ot != 19u || !meta.embedded_absolute_handle ||
+        !meta.original_crc16_verified ||
+        /* R2010 mode 0 has an explicit owner H; modes 1 and 2 are
+         * implicit paper/model space and DO NOT carry an owner reference.
+         * This is DATA-only geometry evidence: owner/layer resolution
+         * remains a distinct verified graph gate before scene admission. */
+        meta.entity_mode > 2u || meta.reactor_count != 0u ||
+        /* An XDictionary-present flag adds an H-stream reference, not
+         * a DATA-stream offset. A CRC-authenticated LINE may expose
+         * provisional DATA-only geometry here; no owner/layer/scene
+         * graph may use that geometry until the XDictionary H is
+         * separately validated. See ODA R2004+ common entity fields. */
+        meta.payload_start_byte >= object_bytes ||
+        meta.handle_stream_end_bit / 8u >
+            object_bytes - meta.payload_start_byte ||
+        meta.data_after_xdic_bit >= meta.handle_stream_start_bit)
+        return 0;
+
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_STREAM;
+    MusaDwgAc1015Bits b = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &b, objects + meta.payload_start_byte,
+            meta.handle_stream_end_bit / 8u,
+            meta.data_after_xdic_bit, meta.handle_stream_start_bit))
+        return 0;
+    MusaDwgAc1024LineCommon next = {0};
+    next.indexed_handle = meta.embedded_absolute_handle;
+    next.data_end_bit = meta.handle_stream_start_bit;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_COLOR;
+    if (!musa_dwg_ac1015_bits_read_bs(&b, &next.encoded_color))
+        return 0;
+    const uint16_t flags = (uint16_t)(next.encoded_color & 0xe000u);
+    next.color_index = (uint16_t)(next.encoded_color & 0x1fffu);
+    if ((flags & 0x4000u) && !(flags & 0x8000u)) return 0;
+    if (flags & 0x8000u) {
+        if (stage) *stage = MUSA_DWG_LINE_COMMON_RGB;
+        if (!musa_dwg_ac1015_bits_read_bl(&b, &next.rgb_raw))
+            return 0;
+        /* In a R2004+ ENC color, the upper BL byte may carry the
+         * explicit truecolor method 0xC2; it is not a fourth RGB
+         * channel. Preserve raw provenance, expose RRGGBB separately.
+         * No other method is silently promoted to visible RGB. */
+        const uint8_t method = (uint8_t)(next.rgb_raw >> 24u);
+        if (method != 0u && method != 0xc2u) return 0;
+        next.rgb_method = method;
+        next.rgb = next.rgb_raw & 0x00ffffffu;
+        next.has_rgb = 1u;
+        next.has_color_reference = (uint8_t)((flags & 0x4000u) != 0u);
+    } else if (next.color_index > 256u) return 0;
+    if (flags & 0x2000u) {
+        if (stage) *stage = MUSA_DWG_LINE_COMMON_TRANSPARENCY;
+        if (!musa_dwg_ac1015_bits_read_bl(&b, &next.transparency))
+            return 0;
+        const uint32_t mode = (next.transparency >> 24u) & 0xffu;
+        if (mode != 0u && mode != 1u && mode != 3u) return 0;
+        next.has_transparency = 1u;
+    }
+    uint32_t ltype = 0u, plot = 0u, material = 0u;
+    uint32_t shadow = 0u, full = 0u, face = 0u, edge = 0u;
+    uint32_t weight = 0u;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_LTYPE_SCALE;
+    if (!musa_dwg_ac1015_bits_read_bd(&b, &next.linetype_scale)) {
+        if (scale_refusal)
+            *scale_refusal = MUSA_DWG_LINE_LTSCALE_PARSE_REFUSED;
+        return 0;
+    }
+    if (!isfinite(next.linetype_scale)) {
+        if (scale_refusal)
+            *scale_refusal = MUSA_DWG_LINE_LTSCALE_NONFINITE;
+        return 0;
+    }
+    if (next.linetype_scale <= 0.0) {
+        if (scale_refusal)
+            *scale_refusal = next.linetype_scale == 0.0 ?
+                MUSA_DWG_LINE_LTSCALE_ZERO : MUSA_DWG_LINE_LTSCALE_NEGATIVE;
+        return 0;
+    }
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_APPEARANCE;
+    if (!musa_dwg_ac1015_bits_read_u(&b, 2u, &ltype) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 2u, &plot) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 2u, &material) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 8u, &shadow) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 1u, &full) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 1u, &face) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 1u, &edge) ||
+        !musa_dwg_ac1015_bits_read_bs(&b, &next.invisibility) ||
+        !musa_dwg_ac1015_bits_read_u(&b, 8u, &weight)) return 0;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_GEOMETRY_BOUND;
+    if (b.bit_pos >= b.bit_end) return 0;
+    next.linetype_flags = (uint8_t)ltype;
+    next.plotstyle_flags = (uint8_t)plot;
+    next.material_flags = (uint8_t)material;
+    next.shadow_flags = (uint8_t)shadow;
+    next.visualstyle_flags =
+        (uint8_t)(full | (face << 1u) | (edge << 2u));
+    next.lineweight = (uint8_t)weight;
+    next.geometry_start_bit = b.bit_pos;
+    next.record_crc_verified = 1u;
+    *out = next;
+    if (stage) *stage = MUSA_DWG_LINE_COMMON_OK;
+    return 1;
+}
+
+int musa_dwg_ac1024_line_common_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineCommon *out) {
+    return musa_line_common_probe_impl(
+        objects, object_bytes, indexed_offset, out, 0, NULL, NULL);
+}
+
+/* The same strict reader produces a bounded stage code, never scene data. */
+uint8_t musa_dwg_ac1024_line_common_failure_stage(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset) {
+    MusaDwgAc1024LineCommon ignored = {0};
+    uint8_t stage = MUSA_DWG_LINE_COMMON_ARGUMENT;
+    (void)musa_line_common_probe_impl(
+        objects, object_bytes, indexed_offset, &ignored, 0, &stage, NULL);
+    return stage;
+}
+
+uint8_t musa_dwg_ac1024_line_ltscale_refusal_kind(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset) {
+    MusaDwgAc1024LineCommon ignored = {0};
+    uint8_t kind = MUSA_DWG_LINE_LTSCALE_NOT_REJECTED_HERE;
+    (void)musa_line_common_probe_impl(
+        objects, object_bytes, indexed_offset, &ignored, 0, NULL, &kind);
+    return kind;
+}
+
+static int musa_line_fields_probe_impl(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out, int has_eed) {
+    if (!objects || !out || !object_bytes ||
+        overlap(objects, object_bytes, out, sizeof(*out))) return 0;
+
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    if (!(has_eed ?
+          musa_dwg_ac1024_record_line_eed_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta) :
+          musa_dwg_ac1024_record_entity_meta_prefix(
+              objects, object_bytes, indexed_offset, &meta)) ||
+        !musa_line_common_probe_impl(
+            objects, object_bytes, indexed_offset, &common, has_eed, NULL, NULL) ||
+        common.indexed_handle != meta.embedded_absolute_handle ||
+        !common.record_crc_verified ||
+        common.geometry_start_bit >= common.data_end_bit ||
+        meta.handle_stream_end_bit / 8u >
+            object_bytes - meta.payload_start_byte) return 0;
+
+    MusaDwgAc1015Bits b = {0};
+    if (!musa_dwg_ac1015_bits_init(
+            &b, objects + meta.payload_start_byte,
+            meta.handle_stream_end_bit / 8u,
+            common.geometry_start_bit, common.data_end_bit)) return 0;
+    MusaDwgAc1024LineFields next = {0};
+    next.indexed_handle = common.indexed_handle;
+    next.geometry_start_bit = common.geometry_start_bit;
+    uint32_t zero_z = 0u;
+    if (!musa_dwg_ac1015_bits_read_u(&b, 1u, &zero_z) ||
+        !musa_dwg_ac1015_bits_read_rd(&b, &next.start[0]) ||
+        !musa_dwg_ac1015_bits_read_dd(&b, next.start[0], &next.end[0]) ||
+        !musa_dwg_ac1015_bits_read_rd(&b, &next.start[1]) ||
+        !musa_dwg_ac1015_bits_read_dd(&b, next.start[1], &next.end[1]))
+        return 0;
+    if (!zero_z &&
+        (!musa_dwg_ac1015_bits_read_rd(&b, &next.start[2]) ||
+         !musa_dwg_ac1015_bits_read_dd(&b, next.start[2], &next.end[2])))
+        return 0;
+    if (!musa_dwg_ac1015_bits_read_bt(&b, &next.thickness) ||
+        !musa_dwg_ac1015_bits_read_be(&b, next.extrusion))
+        return 0;
+    for (unsigned i = 0u; i < 3u; ++i) {
+        if (!isfinite(next.start[i]) || !isfinite(next.end[i]) ||
+            !isfinite(next.extrusion[i])) return 0;
+    }
+    if (!isfinite(next.thickness) ||
+        (next.extrusion[0] == 0.0 && next.extrusion[1] == 0.0 &&
+         next.extrusion[2] == 0.0)) return 0;
+    next.geometry_end_bit = b.bit_pos;
+    next.coordinates_decoded = 1u;
+    *out = next;
+    return 1;
+}
+
+int musa_dwg_ac1024_line_fields_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out) {
+    return musa_line_fields_probe_impl(
+        objects, object_bytes, indexed_offset, out, 0);
+}
+
+int musa_dwg_ac1024_line_eed_fields_probe(
+    const uint8_t *objects, size_t object_bytes, uint64_t indexed_offset,
+    MusaDwgAc1024LineFields *out) {
+    return musa_line_fields_probe_impl(
+        objects, object_bytes, indexed_offset, out, 1);
+}
+
+/* Never elevate a successfully decoded implicit-space LINE into a scene
+ * through a guessed owner. Explicit-owner graph evidence is separate
+ * from provisional DATA-only geometry and comes from the exact same
+ * authenticated original record. */
+int musa_dwg_ac1024_line_graph_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle, MusaDwgAc1024LineGraphEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_line_handle || !out ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity identity = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle,
+            &identity) ||
+        identity.raw_ot != 19u ||
+        !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified)
+        return 0;
+
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024LineGraphEvidence next = {0};
+    if (!musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, identity.record_offset, &meta) ||
+        meta.raw_ot != 19u || meta.entity_mode != 0u ||
+        meta.embedded_absolute_handle != canonical_line_handle ||
+        !meta.original_crc16_verified ||
+        !musa_dwg_ac1024_line_common_probe(
+            objects, object_bytes, identity.record_offset, &common) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            objects, object_bytes, identity.record_offset, &next.geometry) ||
+        !musa_dwg_ac1024_entity_owner_layer_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &next.owner_layer) ||
+        !common.record_crc_verified ||
+        common.indexed_handle != canonical_line_handle ||
+        next.geometry.indexed_handle != canonical_line_handle ||
+        !next.geometry.coordinates_decoded ||
+        next.geometry.geometry_start_bit != common.geometry_start_bit ||
+        next.geometry.geometry_end_bit <= common.geometry_start_bit ||
+        next.geometry.geometry_end_bit > common.data_end_bit ||
+        next.owner_layer.entity_handle != canonical_line_handle ||
+        next.owner_layer.entity_record_offset != identity.record_offset ||
+        next.owner_layer.entity_raw_ot != 19u ||
+        !next.owner_layer.source_crc_verified ||
+        !next.owner_layer.target_records_verified)
+        return 0;
+    *out = next;
+    return 1;
+}
+
+/* R2010 mode 1/2 lack an explicit owner H. Verify the original
+ * model/paper-space LINE geometry and independently authenticated OT51
+ * layer from the exact same recovered self-H index. Do NOT accept any
+ * implied owner/layout and never emit scene geometry here. */
+int musa_dwg_ac1024_line_implicit_layer_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024ImplicitLineLayerEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_line_handle || !out ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+
+    MusaDwgAc1024SelfIdentity identity = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle,
+            &identity) ||
+        identity.raw_ot != 19u ||
+        !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified)
+        return 0;
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024ImplicitLineLayerEvidence next = {0};
+    if (!musa_dwg_ac1024_record_entity_meta_prefix(
+            objects, object_bytes, identity.record_offset, &meta) ||
+        meta.raw_ot != 19u ||
+        (meta.entity_mode != 1u && meta.entity_mode != 2u) ||
+        meta.embedded_absolute_handle != canonical_line_handle ||
+        !meta.original_crc16_verified ||
+        !musa_dwg_ac1024_line_common_probe(
+            objects, object_bytes, identity.record_offset, &common) ||
+        !musa_dwg_ac1024_line_fields_probe(
+            objects, object_bytes, identity.record_offset, &next.geometry) ||
+        !musa_dwg_ac1024_implicit_layer_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &next.implicit_layer) ||
+        !common.record_crc_verified ||
+        common.indexed_handle != canonical_line_handle ||
+        !next.geometry.coordinates_decoded ||
+        next.geometry.indexed_handle != canonical_line_handle ||
+        next.geometry.geometry_start_bit != common.geometry_start_bit ||
+        next.geometry.geometry_end_bit <= common.geometry_start_bit ||
+        next.geometry.geometry_end_bit > common.data_end_bit ||
+        next.implicit_layer.entity_handle != canonical_line_handle ||
+        next.implicit_layer.entity_record_offset != identity.record_offset ||
+        next.implicit_layer.entity_raw_ot != 19u ||
+        next.implicit_layer.entity_mode != meta.entity_mode ||
+        !next.implicit_layer.source_crc_verified ||
+        !next.implicit_layer.layer_crc_verified)
+        return 0;
+    *out = next;
+    return 1;
+}
+
+/* EED-bearing LINE coordinates and original H graph are separately
+ * authenticated, then joined by exact recovered entity identity. This
+ * must never be used as proof of layer visibility or drawable placement.
+ * The existing zero-EED renderer/graph gates remain unchanged. */
+int musa_dwg_ac1024_line_eed_verified_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024LineEedJoinedEvidence *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_line_handle || !out ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity identity = {0};
+    MusaDwgAc1024EntityMetaPrefix meta = {0};
+    MusaDwgAc1024LineCommon common = {0};
+    MusaDwgAc1024LineEedJoinedEvidence next = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle,
+            &identity) ||
+        identity.raw_ot != 19u ||
+        !identity.frame_crc16_verified ||
+        !identity.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_record_line_eed_meta_prefix(
+            objects, object_bytes, identity.record_offset, &meta) ||
+        meta.raw_ot != 19u ||
+        meta.embedded_absolute_handle != canonical_line_handle ||
+        !meta.original_crc16_verified ||
+        !musa_line_common_probe_impl(
+            objects, object_bytes, identity.record_offset, &common, 1, NULL, NULL) ||
+        !musa_dwg_ac1024_line_eed_fields_probe(
+            objects, object_bytes, identity.record_offset, &next.geometry) ||
+        !musa_dwg_ac1024_line_eed_handle_graph_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &next.graph) ||
+        !common.record_crc_verified ||
+        common.indexed_handle != canonical_line_handle ||
+        !next.geometry.coordinates_decoded ||
+        next.geometry.indexed_handle != canonical_line_handle ||
+        next.geometry.geometry_start_bit != common.geometry_start_bit ||
+        next.geometry.geometry_end_bit <= common.geometry_start_bit ||
+        next.geometry.geometry_end_bit > common.data_end_bit ||
+        next.graph.handles.entity_handle != canonical_line_handle ||
+        next.graph.handles.entity_raw_ot != 19u ||
+        next.graph.handles.entity_mode != meta.entity_mode ||
+        next.graph.handles.entity_record_offset != identity.record_offset ||
+        next.graph.eed.indexed_object_offset != identity.record_offset ||
+        next.graph.eed.embedded_absolute_handle != canonical_line_handle ||
+        !next.graph.eed.application_count ||
+        !next.graph.handles.layer_handle ||
+        !next.graph.handles.original_records_crc_verified ||
+        ((meta.entity_mode == 0u) !=
+             (next.graph.handles.owner_handle != 0u)) ||
+        ((meta.xdictionary_missing == 0u) !=
+             (next.graph.handles.xdictionary_handle != 0u)))
+        return 0;
+    *out = next;
+    return 1;
+}
+
+/* The common-data raw CMC index and LAYER state are authenticated
+ * separately and joined to the exact OT19->OT51 H target in one original
+ * caller-supplied AcDbObjects section. No scene or BYLAYER admission. */
+int musa_dwg_ac1024_line_eed_raw_layer_color_join(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_line_handle,
+    MusaDwgAc1024LineEedRawLayerColorJoin *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !canonical_line_handle || !record_count ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlap(objects, object_bytes, recovered_index,
+                record_count * sizeof(*recovered_index)) ||
+        overlap(objects, object_bytes, out, sizeof(*out)) ||
+        overlap(recovered_index, record_count * sizeof(*recovered_index),
+                out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024SelfIdentity line = {0};
+    MusaDwgAc1024LineEedJoinedEvidence graph = {0};
+    MusaDwgAc1024LineCommon color = {0};
+    MusaDwgAc1024LayerRawStateJoin layer = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_line_handle, &line) ||
+        line.raw_ot != 19u || !line.frame_crc16_verified ||
+        !line.embedded_handle_code0_verified ||
+        !musa_dwg_ac1024_line_eed_verified_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_line_handle, &graph) ||
+        !musa_line_common_probe_impl(
+            objects, object_bytes, line.record_offset, &color,
+            1, NULL, NULL) ||
+        !graph.graph.handles.layer_handle ||
+        !musa_dwg_ac1024_layer_eed_raw_state_join(
+            objects, object_bytes, recovered_index, record_count,
+            graph.graph.handles.layer_handle, &layer) ||
+        !graph.geometry.coordinates_decoded ||
+        graph.geometry.indexed_handle != canonical_line_handle ||
+        graph.graph.handles.entity_handle != canonical_line_handle ||
+        graph.graph.handles.entity_record_offset != line.record_offset ||
+        !graph.graph.handles.original_records_crc_verified ||
+        graph.graph.handles.entity_raw_ot != 19u ||
+        graph.graph.handles.entity_mode > 2u ||
+        graph.graph.handles.layer_handle != layer.layer_handle ||
+        graph.graph.handles.layer_record_offset != layer.layer_record_offset ||
+        graph.graph.eed.indexed_object_offset != line.record_offset ||
+        !graph.graph.eed.original_crc16_verified ||
+        color.indexed_handle != canonical_line_handle ||
+        !color.record_crc_verified ||
+        color.geometry_start_bit != graph.geometry.geometry_start_bit ||
+        graph.geometry.geometry_end_bit <= color.geometry_start_bit ||
+        graph.geometry.geometry_end_bit > color.data_end_bit ||
+        layer.layer_handle == canonical_line_handle ||
+        !layer.eed_flags_crc_verified ||
+        !layer.h_target_triplet_verified ||
+        !layer.byte_alignment_witness_verified ||
+        layer.full_h_tail_decoded ||
+        layer.layer_visibility_parity_verified ||
+        layer.bylayer_color_verified || layer.display_accepted)
+        return 0;
+    MusaDwgAc1024LineEedRawLayerColorJoin next = {0};
+    next.line_handle = canonical_line_handle;
+    next.line_record_offset = line.record_offset;
+    next.layer_handle = layer.layer_handle;
+    next.layer_record_offset = layer.layer_record_offset;
+    next.layer_raw_70_290_370 = layer.raw_70_290_370;
+    next.line_raw_color_index = color.color_index;
+    next.entity_mode = graph.graph.handles.entity_mode;
+    next.frozen_raw_bit = layer.frozen_bit;
+    next.on_raw_bit = layer.on_bit;
+    next.locked_raw_bit = layer.locked_bit;
+    next.line_has_explicit_rgb = color.has_rgb;
+    next.line_rgb_method = color.rgb_method;
+    next.line_has_color_reference = color.has_color_reference;
+    next.line_geometry_crc_verified = 1u;
+    next.layer_raw_state_crc_verified = 1u;
+    next.layer_h_targets_crc_verified = 1u;
+    *out = next;
+    return 1;
+}
