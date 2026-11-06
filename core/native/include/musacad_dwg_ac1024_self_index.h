@@ -559,6 +559,33 @@ int musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerTailTypeTriplet *out);
 
+/* CRC-authenticated original LAYER tail: narrow BYTE-ALIGNMENT witness.
+ * The last 2 or 4 bits after the OT80/505/57 target triple do not
+ * constitute a complete H token (which needs at least 8 header bits).
+ * A byte-aligned end is compatible with R2010 record padding, but is
+ * NEVER proof that those bits are padding. In particular 2-bit 11 is
+ * permitted. No style, material, linetype, visibility or scene admission.
+ * Source and output must not alias; fail atomically.
+ */
+typedef struct MusaDwgAc1024LayerTailAlignmentWitness {
+    uint8_t terminal_bit_count;
+    uint8_t terminal_raw_value;
+    uint8_t terminal_start_mod8;
+    uint8_t terminal_end_mod8;
+    uint8_t terminal_nonzero;
+    uint8_t byte_alignment_compatible;
+    uint8_t complete_additional_h_header_available; /* ALWAYS zero */
+    uint8_t source_crc_verified;
+    uint8_t padding_proven; /* ALWAYS zero */
+    uint8_t target_roles_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LayerTailAlignmentWitness;
+int musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerTailAlignmentWitness *out);
+
 /* First refusal from exactly the same strict tail-shape parser.
  * Diagnosis records only a stage, never source bytes or H values. */
 enum {

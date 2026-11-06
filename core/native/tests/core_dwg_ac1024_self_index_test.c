@@ -1587,6 +1587,21 @@ static int test_layer_eed_xdictionary_original_graph(void) {
     MusaDwgAc1024LayerTailTypeTriplet triplet = {0};
     triplet.layer_handle = UINT64_C(999);
     const MusaDwgAc1024LayerTailTypeTriplet saved_triplet = triplet;
+    MusaDwgAc1024LayerTailAlignmentWitness alignment = {0};
+    alignment.terminal_raw_value = 127u;
+    const MusaDwgAc1024LayerTailAlignmentWitness saved_alignment = alignment;
+    if (musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u, &alignment) ||
+        musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 45u,
+            (MusaDwgAc1024LayerTailAlignmentWitness *)(void *)with_fragment) ||
+        musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+            with_fragment, sizeof(with_fragment), fragment_index,
+            4u, 0u, &alignment) ||
+        memcmp(&alignment, &saved_alignment, sizeof(alignment)))
+        return 0;
     if (musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
             with_fragment, sizeof(with_fragment), fragment_index,
             4u, 45u, &triplet) ||

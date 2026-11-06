@@ -631,6 +631,9 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_triplet_attempts;
     size_t sampled_layer_eed_terminal_triplet_verified;
     size_t sampled_layer_eed_terminal_triplet_nonzero_fragment;
+    size_t sampled_layer_eed_terminal_alignment_attempts;
+    size_t sampled_layer_eed_terminal_alignment_verified;
+    size_t sampled_layer_eed_terminal_alignment_nonzero;
     size_t sampled_layer_eed_terminal_candidate_refused;
     size_t sampled_layer_eed_terminal_candidate_prefix_tokens;
     size_t sampled_layer_eed_terminal_candidate_absolute;
@@ -1661,6 +1664,25 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                     ++hint.sampled_layer_eed_terminal_triplet_verified;
                                                                     if (!triplet.terminal_fragment_all_zero)
                                                                         ++hint.sampled_layer_eed_terminal_triplet_nonzero_fragment;
+                                                                    ++hint.sampled_layer_eed_terminal_alignment_attempts;
+                                                                    MusaDwgAc1024LayerTailAlignmentWitness alignment = {0};
+                                                                    if (musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+                                                                            objects, nb, recovered, legacy_count,
+                                                                            recovered[k].embedded_absolute_handle, &alignment) &&
+                                                                        alignment.source_crc_verified &&
+                                                                        alignment.byte_alignment_compatible &&
+                                                                        !alignment.padding_proven &&
+                                                                        !alignment.target_roles_verified &&
+                                                                        !alignment.display_accepted &&
+                                                                        !alignment.complete_additional_h_header_available &&
+                                                                        alignment.terminal_bit_count ==
+                                                                            triplet.terminal_fragment_bits &&
+                                                                        alignment.terminal_nonzero ==
+                                                                            (uint8_t)!triplet.terminal_fragment_all_zero) {
+                                                                        ++hint.sampled_layer_eed_terminal_alignment_verified;
+                                                                        if (alignment.terminal_nonzero)
+                                                                            ++hint.sampled_layer_eed_terminal_alignment_nonzero;
+                                                                    }
                                                                 }
                                                                 hint.sampled_layer_eed_terminal_candidate_prefix_tokens +=
                                                                     candidates.complete_prefix_h_tokens;
@@ -2807,6 +2829,9 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_triplet_attempts\":%zu,"
                "\"sampled_layer_eed_terminal_triplet_verified\":%zu,"
                "\"sampled_layer_eed_terminal_triplet_nonzero_fragment\":%zu,"
+               "\"sampled_layer_eed_terminal_alignment_attempts\":%zu,"
+               "\"sampled_layer_eed_terminal_alignment_verified\":%zu,"
+               "\"sampled_layer_eed_terminal_alignment_nonzero\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_refused\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_prefix_tokens\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_absolute\":%zu,"
@@ -3231,6 +3256,9 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_triplet_attempts,
                hint->sampled_layer_eed_terminal_triplet_verified,
                hint->sampled_layer_eed_terminal_triplet_nonzero_fragment,
+               hint->sampled_layer_eed_terminal_alignment_attempts,
+               hint->sampled_layer_eed_terminal_alignment_verified,
+               hint->sampled_layer_eed_terminal_alignment_nonzero,
                hint->sampled_layer_eed_terminal_candidate_refused,
                hint->sampled_layer_eed_terminal_candidate_prefix_tokens,
                hint->sampled_layer_eed_terminal_candidate_absolute,

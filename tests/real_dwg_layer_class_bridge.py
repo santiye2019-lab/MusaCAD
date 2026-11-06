@@ -63,6 +63,8 @@ def summarize(stage: dict) -> dict:
         "h_tail_fully_decoded": False,
         "verified_raw_target_records": 0,
         "first_party_native_type_triplets_verified": 0,
+        "first_party_native_byte_alignment_witnesses": 0,
+        "byte_alignment_supports_padding_hypothesis_only": True,
         "material_property_link_semantics_proven": False,
         "ot80_semantics_proven": False,
         "ot57_semantics_proven": False,
@@ -195,6 +197,15 @@ def summarize(stage: dict) -> dict:
             continue
         if native_verified != n or native_nonzero != fragment_nonzero:
             raise EvidenceError("native_type_triplet_not_proven")
+        alignment_attempts = _integer(
+            h, "sampled_layer_eed_terminal_alignment_attempts", 2048)
+        alignment_verified = _integer(
+            h, "sampled_layer_eed_terminal_alignment_verified", 2048)
+        alignment_nonzero = _integer(
+            h, "sampled_layer_eed_terminal_alignment_nonzero", 2048)
+        if (alignment_attempts != n or alignment_verified != n or
+                alignment_nonzero != fragment_nonzero):
+            raise EvidenceError("original_native_byte_alignment_not_proven")
 
 
         aggregate["layer_samples_with_three_crc_backed_targets"] += n
@@ -203,6 +214,7 @@ def summarize(stage: dict) -> dict:
         aggregate["raw_ot57_target_records"] += n
         aggregate["verified_raw_target_records"] += 3*n
         aggregate["first_party_native_type_triplets_verified"] += n
+        aggregate["first_party_native_byte_alignment_witnesses"] += n
         # Fixed OT identities are from the portable first-party DWG type
         # registry: OT80=PLACEHOLDER, OT57=LTYPE. Those NAMES are proven;
         # the meaning of their position within the OT51 H tail is not.

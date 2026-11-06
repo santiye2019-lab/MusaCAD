@@ -841,6 +841,22 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 triplet_nonzero > fragment_nonzero):
             raise ValueError("inconsistent_ac1024_type_triplet_provenance")
 
+        alignment_keys = (
+            "sampled_layer_eed_terminal_alignment_attempts",
+            "sampled_layer_eed_terminal_alignment_verified",
+            "sampled_layer_eed_terminal_alignment_nonzero",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0 for k in alignment_keys):
+            raise ValueError("invalid_ac1024_alignment_witness_counts")
+        alignment_attempts, alignment_verified, alignment_nonzero = (
+            hint[k] for k in alignment_keys
+        )
+        if (alignment_attempts != triplet_verified or
+                alignment_verified > alignment_attempts or
+                alignment_nonzero > alignment_verified or
+                alignment_nonzero > triplet_nonzero):
+            raise ValueError("alignment_witness_without_native_triplet")
+
         # Raw unresolved suffix is diagnostic only. Validate bit-pattern
         # masks against observed short fragments, never against CAD roles.
         mask2 = hint.get("sampled_layer_eed_terminal_fragment_2bit_pattern_mask")

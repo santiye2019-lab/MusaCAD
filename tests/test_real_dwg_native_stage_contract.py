@@ -392,6 +392,9 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_triplet_attempts": 0,
             "sampled_layer_eed_terminal_triplet_verified": 0,
             "sampled_layer_eed_terminal_triplet_nonzero_fragment": 0,
+            "sampled_layer_eed_terminal_alignment_attempts": 0,
+            "sampled_layer_eed_terminal_alignment_verified": 0,
+            "sampled_layer_eed_terminal_alignment_nonzero": 0,
             "sampled_layer_eed_terminal_candidate_refused": 0,
             "sampled_layer_eed_terminal_candidate_prefix_tokens": 0,
             "sampled_layer_eed_terminal_candidate_absolute": 0,
@@ -484,6 +487,9 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             "sampled_layer_eed_terminal_triplet_attempts",
             "sampled_layer_eed_terminal_triplet_verified",
             "sampled_layer_eed_terminal_triplet_nonzero_fragment",
+            "sampled_layer_eed_terminal_alignment_attempts",
+            "sampled_layer_eed_terminal_alignment_verified",
+            "sampled_layer_eed_terminal_alignment_nonzero",
         ):
             fake = deepcopy(baseline)
             fake["ac1024_compatibility_hypothesis"][key] = 1

@@ -1809,3 +1809,62 @@ int musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
     *out = next;
     return 1;
 }
+
+/* Reuses three-target native CRC+numeric proof and then independently
+ * verifies the real truncated suffix. Values 0/3 may both be observed;
+ * byte alignment never grants padding or visibility/appearance admission. */
+int musa_dwg_ac1024_layer_eed_tail_alignment_witness(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerTailAlignmentWitness *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !canonical_layer_handle || !record_count ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024LayerTailTypeTriplet triplet = {0};
+    MusaDwgAc1024LayerEedTerminalFragment suffix = {0};
+    if (!musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &triplet) ||
+        !musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &suffix) ||
+        !triplet.original_records_crc_verified ||
+        !suffix.original_records_crc_verified ||
+        triplet.h_tail_fully_decoded || triplet.target_roles_verified ||
+        triplet.display_accepted || suffix.display_accepted ||
+        triplet.layer_handle != suffix.layer_handle ||
+        triplet.layer_record_offset != suffix.layer_record_offset ||
+        triplet.terminal_fragment_bits != suffix.terminal_fragment_bit_count ||
+        triplet.terminal_fragment_all_zero != suffix.terminal_fragment_all_zero ||
+        (suffix.terminal_fragment_bit_count != 2u &&
+         suffix.terminal_fragment_bit_count != 4u) ||
+        suffix.terminal_fragment_end_mod8 != 0u ||
+        suffix.terminal_fragment_start_mod8 !=
+            (uint8_t)(8u - suffix.terminal_fragment_bit_count) ||
+        suffix.terminal_fragment_raw_pattern >=
+            (1u << suffix.terminal_fragment_bit_count) ||
+        (suffix.terminal_fragment_raw_pattern == 0u) !=
+            (suffix.terminal_fragment_all_zero != 0u))
+        return 0;
+    MusaDwgAc1024LayerTailAlignmentWitness next = {0};
+    next.terminal_bit_count =
+        (uint8_t)suffix.terminal_fragment_bit_count;
+    next.terminal_raw_value = suffix.terminal_fragment_raw_pattern;
+    next.terminal_start_mod8 = suffix.terminal_fragment_start_mod8;
+    next.terminal_end_mod8 = suffix.terminal_fragment_end_mod8;
+    next.terminal_nonzero =
+        (uint8_t)(suffix.terminal_fragment_raw_pattern != 0u);
+    next.byte_alignment_compatible = 1u;
+    next.source_crc_verified = 1u;
+    /* 0 complete additional H headers (2/4 < 8 bits). Still unresolved. */
+    *out = next;
+    return 1;
+}
