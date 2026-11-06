@@ -78,6 +78,10 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
             MusaDwgAc1024DirectoryShape shape={0};
             if(musa_dwg_ac1024_directory_shape(decoded,expanded,&shape)){
                 e.directory_shape_candidate=1u;
+                e.source_handles_name_candidates=
+                    shape.handles_name_candidates;
+                e.source_directory_duplicate_names=
+                    shape.duplicate_section_names;
                 e.directory_sections_candidate=shape.sections;
                 e.directory_referenced_pages_candidate=
                     shape.referenced_pages;
@@ -112,6 +116,18 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                 const uint64_t logical=
                                     (uint64_t)read32(rec)|
                                     ((uint64_t)read32(rec+4u)<<32u);
+                                if(strcmp((const char*)(rec+32u),
+                                          "AcDb:Handles")==0){
+                                    e.source_handles_candidate_pages=count;
+                                    e.source_handles_candidate_logical_bytes=
+                                        (uint32_t)logical;
+                                    e.source_handles_candidate_page_bytes=
+                                        read32(rec+12u);
+                                    e.source_handles_candidate_compression=
+                                        read32(rec+20u);
+                                    e.source_handles_candidate_encryption=
+                                        read32(rec+28u);
+                                }
                                 if(strcmp((const char*)(rec+32u),
                                           "AcDb:Handles")==0&&
                                    logical>0u&&logical<=16u*1024u*1024u){
