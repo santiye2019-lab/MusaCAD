@@ -25,6 +25,9 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint32_t directory_referenced_pages_candidate;
     uint8_t directory_physical_links_candidate;
     uint32_t directory_matched_physical_refs_candidate;
+    uint32_t source_data_masked_headers_verified;
+    uint32_t source_data_payload_adler_verified;
+    uint32_t source_data_header_adler_verified;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately

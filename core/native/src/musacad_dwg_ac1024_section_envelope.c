@@ -87,6 +87,16 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                     e.directory_physical_links_candidate=1u;
                     e.directory_matched_physical_refs_candidate=
                         linked.matched_page_references;
+                    MusaDwgAc1024PageChecksumEvidence crc={0};
+                    if(musa_dwg_ac1024_directory_page_checksums(
+                           file,n,decoded,expanded,pages,count,&crc)){
+                        e.source_data_masked_headers_verified=
+                            crc.masked_headers_verified;
+                        e.source_data_payload_adler_verified=
+                            crc.payload_adler_verified;
+                        e.source_data_header_adler_verified=
+                            crc.header_adler_verified;
+                    }
                 }
             }
         }
