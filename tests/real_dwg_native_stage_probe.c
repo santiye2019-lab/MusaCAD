@@ -622,6 +622,10 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_fragment_ordinal_4_code5;
     size_t sampled_layer_eed_terminal_candidate_attempts;
     size_t sampled_layer_eed_terminal_candidate_verified;
+    /* Complete typed OT80/505/57 source triplet, final bits unresolved. */
+    size_t sampled_layer_eed_terminal_triplet_attempts;
+    size_t sampled_layer_eed_terminal_triplet_verified;
+    size_t sampled_layer_eed_terminal_triplet_nonzero_fragment;
     size_t sampled_layer_eed_terminal_candidate_refused;
     size_t sampled_layer_eed_terminal_candidate_prefix_tokens;
     size_t sampled_layer_eed_terminal_candidate_absolute;
@@ -1618,6 +1622,22 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                     candidates.verified_other_raw_ot ==
                                                                     candidates.verified_index_matches) {
                                                                 ++hint.sampled_layer_eed_terminal_candidate_verified;
+                                                                ++hint.sampled_layer_eed_terminal_triplet_attempts;
+                                                                MusaDwgAc1024LayerTailTypeTriplet triplet = {0};
+                                                                if (musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+                                                                        objects, nb, recovered, legacy_count,
+                                                                        recovered[k].embedded_absolute_handle, &triplet) &&
+                                                                    triplet.original_records_crc_verified &&
+                                                                    !triplet.h_tail_fully_decoded &&
+                                                                    !triplet.target_roles_verified &&
+                                                                    !triplet.display_accepted &&
+                                                                    triplet.target_raw_ot[0] == 80u &&
+                                                                    triplet.target_raw_ot[1] == 505u &&
+                                                                    triplet.target_raw_ot[2] == 57u) {
+                                                                    ++hint.sampled_layer_eed_terminal_triplet_verified;
+                                                                    if (!triplet.terminal_fragment_all_zero)
+                                                                        ++hint.sampled_layer_eed_terminal_triplet_nonzero_fragment;
+                                                                }
                                                                 hint.sampled_layer_eed_terminal_candidate_prefix_tokens +=
                                                                     candidates.complete_prefix_h_tokens;
                                                                 hint.sampled_layer_eed_terminal_candidate_absolute +=
@@ -2756,6 +2776,9 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_fragment_ordinal_4_code5\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_attempts\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_verified\":%zu,"
+               "\"sampled_layer_eed_terminal_triplet_attempts\":%zu,"
+               "\"sampled_layer_eed_terminal_triplet_verified\":%zu,"
+               "\"sampled_layer_eed_terminal_triplet_nonzero_fragment\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_refused\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_prefix_tokens\":%zu,"
                "\"sampled_layer_eed_terminal_candidate_absolute\":%zu,"
@@ -3173,6 +3196,9 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_fragment_ordinal_4_code5,
                hint->sampled_layer_eed_terminal_candidate_attempts,
                hint->sampled_layer_eed_terminal_candidate_verified,
+               hint->sampled_layer_eed_terminal_triplet_attempts,
+               hint->sampled_layer_eed_terminal_triplet_verified,
+               hint->sampled_layer_eed_terminal_triplet_nonzero_fragment,
                hint->sampled_layer_eed_terminal_candidate_refused,
                hint->sampled_layer_eed_terminal_candidate_prefix_tokens,
                hint->sampled_layer_eed_terminal_candidate_absolute,
