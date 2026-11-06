@@ -238,8 +238,23 @@ int main(int argc, char **argv) {
                             envelope.source_handles_candidate_logical_bytes>
                                 16u*1024u*1024u)
                         ac1024_handles_reason=5;
-                    else
-                        ac1024_handles_reason=6;
+                    else if(!envelope.source_handles_candidate_pages)
+                        ac1024_handles_reason=7;
+                    else if(!envelope.source_handles_candidate_page_bytes){
+                        const uint32_t logical=
+                            envelope.source_handles_candidate_logical_bytes;
+                        ac1024_handles_reason=
+                            ((logical-1u)/29696u+1u!=
+                             envelope.source_handles_candidate_pages)?8:10;
+                    }else{
+                        const uint32_t logical=
+                            envelope.source_handles_candidate_logical_bytes;
+                        const uint32_t page=
+                            envelope.source_handles_candidate_page_bytes;
+                        ac1024_handles_reason=
+                            ((logical-1u)/page+1u!=
+                             envelope.source_handles_candidate_pages)?9:10;
+                    }
                 }
             }
         }
