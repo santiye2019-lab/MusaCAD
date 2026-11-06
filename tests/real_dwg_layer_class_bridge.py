@@ -49,6 +49,14 @@ def summarize(stage: dict) -> dict:
         "raw_ot80_target_records": 0,
         "raw_ot505_target_records": 0,
         "raw_ot57_target_records": 0,
+        "fixed_placeholder_ot80_identity_confirmed": False,
+        "fixed_ltype_ot57_identity_confirmed": False,
+        "terminal_fragment_2_bit_samples": 0,
+        "terminal_fragment_4_bit_samples": 0,
+        "terminal_fragment_all_zero_samples": 0,
+        "terminal_fragment_nonzero_samples": 0,
+        "terminal_fragment_undecoded_samples": 0,
+        "h_tail_fully_decoded": False,
         "verified_raw_target_records": 0,
         "material_property_link_semantics_proven": False,
         "ot80_semantics_proven": False,
@@ -85,8 +93,41 @@ def summarize(stage: dict) -> dict:
                 or not _flag(h, "source_classes_r2010_numeric_verified"):
             raise EvidenceError("layer_target_without_authenticated_classes")
 
-        if n > 2048 or targets < 3*n:
-            raise EvidenceError("invalid_layer_target_total")
+        # This narrow pilot requires 3 CRC/self-H-backed absolute targets
+        # for EACH sampled original LAYER. Extra targets/missing ordinals are
+        # not silently promoted into fixed-type role evidence.
+        if (targets != 3*n or raw80 != n or raw505 != n or raw57 != n or
+                _integer(h, "sampled_layer_eed_terminal_candidate_attempts", 2048) != n or
+                _integer(h, "sampled_layer_eed_terminal_candidate_absolute", 8192) != 3*n or
+                _integer(h, "sampled_layer_eed_terminal_candidate_unmatched", 8192) != 0):
+            raise EvidenceError("inconsistent_crc_backed_target_census")
+
+        # The strict H parser currently rejects the final 2 or 4 bits.
+        # Report that refusal even where all the bits are zero: zero is not
+        # proof of padding and cannot authorize appearance/render semantics.
+        fragment_verified = _integer(
+            h, "sampled_layer_eed_terminal_fragment_verified", 2048)
+        fragment_attempts = _integer(
+            h, "sampled_layer_eed_terminal_fragment_attempts", 2048)
+        fragment_two = _integer(
+            h, "sampled_layer_eed_terminal_fragment_bits_2", 2048)
+        fragment_four = _integer(
+            h, "sampled_layer_eed_terminal_fragment_bits_4", 2048)
+        fragment_zero = _integer(
+            h, "sampled_layer_eed_terminal_fragment_zero", 2048)
+        fragment_nonzero = _integer(
+            h, "sampled_layer_eed_terminal_fragment_nonzero", 2048)
+        complete_prefix = _integer(
+            h, "sampled_layer_eed_terminal_fragment_prefix_four_tokens", 2048)
+        if (fragment_verified != n or fragment_attempts != n or
+                complete_prefix != n or fragment_two + fragment_four != n or
+                fragment_zero + fragment_nonzero != n):
+            raise EvidenceError("fragment_witness_not_closed")
+        aggregate["terminal_fragment_2_bit_samples"] += fragment_two
+        aggregate["terminal_fragment_4_bit_samples"] += fragment_four
+        aggregate["terminal_fragment_all_zero_samples"] += fragment_zero
+        aggregate["terminal_fragment_nonzero_samples"] += fragment_nonzero
+        aggregate["terminal_fragment_undecoded_samples"] += n
         ordinals = [
             _integer(h, "sampled_layer_eed_terminal_candidate_ordinal_%d_matched" % i, 2048)
             for i in (2, 3, 4)
@@ -108,6 +149,11 @@ def summarize(stage: dict) -> dict:
         aggregate["raw_ot505_target_records"] += n
         aggregate["raw_ot57_target_records"] += n
         aggregate["verified_raw_target_records"] += 3*n
+        # Fixed OT identities are from the portable first-party DWG type
+        # registry: OT80=PLACEHOLDER, OT57=LTYPE. Those NAMES are proven;
+        # the meaning of their position within the OT51 H tail is not.
+        aggregate["fixed_placeholder_ot80_identity_confirmed"] = True
+        aggregate["fixed_ltype_ot57_identity_confirmed"] = True
 
         local_name = h.get("source_classes_r2010_505_dxf_identifier")
         local_name_valid = _flag(h, "source_classes_r2010_505_dxf_identifier_verified")
