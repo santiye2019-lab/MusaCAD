@@ -31,13 +31,18 @@ typedef enum MusaDwgAc1018LzFailurePhase {
     MUSA_DWG_AC1018_LZ_PHASE_BACKREFERENCE = 7,
     MUSA_DWG_AC1018_LZ_PHASE_TERMINATOR = 8,
     MUSA_DWG_AC1018_LZ_PHASE_STEP_LIMIT = 9,
-    MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN = 10
+    MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN = 10,
+    MUSA_DWG_AC1018_LZ_PHASE_OPCODE_INPUT_EXHAUSTED = 11,
+    MUSA_DWG_AC1018_LZ_PHASE_OPCODE_RESERVED = 12
 } MusaDwgAc1018LzFailurePhase;
 typedef struct MusaDwgAc1018LzDiagnostic {
     size_t input_consumed;
     size_t output_produced;
     size_t overflow_match_bytes;   /* only when OUTPUT_OVERRUN */
     size_t overflow_available_bytes; /* only when OUTPUT_OVERRUN */
+    size_t literal_requested_bytes; /* only on LITERAL_COPY rejection */
+    size_t literal_output_available_bytes; /* only on LITERAL_COPY reject */
+    size_t literal_input_available_bytes; /* only on LITERAL_COPY reject */
     MusaDwgAc1018LzFailurePhase failure_phase;
     uint8_t completed;
 } MusaDwgAc1018LzDiagnostic;

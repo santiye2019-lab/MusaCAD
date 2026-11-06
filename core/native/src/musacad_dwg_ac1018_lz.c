@@ -60,6 +60,20 @@ static int copy_literals(LZCursor *c,size_t n){
     memcpy(c->dst+c->used,c->src+c->at,n);
     c->at+=n;c->used+=n;return 1;
 }
+/* Record only requested/available lengths, never materialized content.
+ * Production still uses the same fail-closed copy_literals() bounds. */
+static int copy_literals_diagnostic(LZCursor *c,size_t n,
+                                   MusaDwgAc1018LzDiagnostic *d){
+    if(n>c->limit-c->used||n>c->len-c->at){
+        if(d){
+            d->literal_requested_bytes=n;
+            d->literal_output_available_bytes=c->limit-c->used;
+            d->literal_input_available_bytes=c->len-c->at;
+        }
+        return 0;
+    }
+    return copy_literals(c,n);
+}
 /* Decode exactly one bounded stream; shared by production and diagnostics.
  * All decoded bytes remain in scratch until a fully correct 0x11 terminal. */
 static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
@@ -85,11 +99,14 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
     if(!literal_header(&c,&literal,&has_opcode,&opcode))
         goto cleanup;
     phase=MUSA_DWG_AC1018_LZ_PHASE_LITERAL_COPY;
-    if(!copy_literals(&c,literal))goto cleanup;
+    if(!copy_literals_diagnostic(&c,literal,diagnostic))goto cleanup;
     const size_t max_steps=decompressed_bytes*2u+64u;
     for(size_t step=0u;step<max_steps;step++){
         phase=MUSA_DWG_AC1018_LZ_PHASE_OPCODE;
-        if(!has_opcode&&!next_byte(&c,&opcode))goto cleanup;
+        if(!has_opcode&&!next_byte(&c,&opcode)){
+            phase=MUSA_DWG_AC1018_LZ_PHASE_OPCODE_INPUT_EXHAUSTED;
+            goto cleanup;
+        }
         has_opcode=0;
         if(opcode==0x11u){
             phase=MUSA_DWG_AC1018_LZ_PHASE_TERMINATOR;
@@ -131,7 +148,7 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
             back=((size_t)b<<2u)|((size_t)(opcode&0x0cu)>>2u);
             post=(size_t)(opcode&3u);
         }else{
-            phase=MUSA_DWG_AC1018_LZ_PHASE_OPCODE;
+            phase=MUSA_DWG_AC1018_LZ_PHASE_OPCODE_RESERVED;
             goto cleanup;
         }
         phase=MUSA_DWG_AC1018_LZ_PHASE_BACKREFERENCE;
@@ -155,7 +172,7 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
                 goto cleanup;
         }else literal=post;
         phase=MUSA_DWG_AC1018_LZ_PHASE_LITERAL_COPY;
-        if(!copy_literals(&c,literal))goto cleanup;
+        if(!copy_literals_diagnostic(&c,literal,diagnostic))goto cleanup;
     }
     phase=MUSA_DWG_AC1018_LZ_PHASE_STEP_LIMIT;
 cleanup:
