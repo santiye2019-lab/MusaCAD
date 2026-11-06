@@ -527,6 +527,32 @@ int musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
     uint64_t canonical_layer_handle,
     MusaDwgAc1024LayerTailCandidateCensus *out);
 
+/* Original R2010 LAYER source-only H-tail type triplet. Requires four
+ * complete tail H tokens: first H5/0 has no target, then THREE independent
+ * CRC16/self-H index matches of raw OT80 (fixed PLACEHOLDER), OT505
+ * (drawing-local custom class, NOT named by this API), and OT57
+ * (fixed LTYPE). Requires a remaining 2- or 4-bit fragment and preserves
+ * that refusal: ALL ZERO DOES NOT MEAN PADDING. Strict fail-atomic output.
+ * Roles/material semantics, H-tail completeness and paint are NEVER
+ * admitted, even on a successful source-only type check.
+ * Caller must independently resolve OT505 from the SAME source Classes. */
+typedef struct MusaDwgAc1024LayerTailTypeTriplet {
+    uint64_t layer_handle;
+    uint64_t layer_record_offset;
+    uint16_t target_raw_ot[3];
+    uint8_t terminal_fragment_bits;
+    uint8_t terminal_fragment_all_zero;
+    uint8_t original_records_crc_verified;
+    uint8_t h_tail_fully_decoded; /* ALWAYS zero */
+    uint8_t target_roles_verified; /* ALWAYS zero */
+    uint8_t display_accepted; /* ALWAYS zero */
+} MusaDwgAc1024LayerTailTypeTriplet;
+int musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerTailTypeTriplet *out);
+
 /* First refusal from exactly the same strict tail-shape parser.
  * Diagnosis records only a stage, never source bytes or H values. */
 enum {
