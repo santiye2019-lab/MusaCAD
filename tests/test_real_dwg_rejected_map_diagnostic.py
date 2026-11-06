@@ -32,8 +32,12 @@ class RejectedMapDiagnosticTest(unittest.TestCase):
         self.assertEqual(row["diagnostic"], "authenticated_header_rejected")
 
     def test_uncovered_version_not_accepted(self):
-        row = self.probe(b"AC1024" + bytes(512))
+        row = self.probe(b"AC1027" + bytes(512))
         self.assertEqual(row["diagnostic"], "unsupported_signature")
+
+    def test_fake_r2010_header_rejected_no_bogus_map(self):
+        row = self.probe(b"AC1024" + bytes(512))
+        self.assertEqual(row["diagnostic"], "authenticated_header_rejected")
 
     def test_short_source_rejected(self):
         with tempfile.TemporaryDirectory() as folder:

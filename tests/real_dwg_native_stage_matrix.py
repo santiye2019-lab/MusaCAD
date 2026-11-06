@@ -28,6 +28,8 @@ KNOWN_STAGES = {
     "ac1018_objects_section_pages",
     "ac1018_handles_section_pages",
     "ac1018_crc_backed_handle_index",
+    "ac1024_page_map_header",
+    "ac1024_physical_page_locations",
     "ac1032_page_map_header",
     "ac1032_physical_page_locations",
     "ac1032_crc_backed_handle_index",
@@ -101,7 +103,7 @@ def main() -> int:
             stage = observed["native_stage"]
             if stage.startswith("ac") and not stage.startswith(version.lower()):
                 raise ValueError("mismatched_native_format_stage")
-            if version in ("AC1015", "AC1018", "AC1032"):
+            if version in ("AC1015", "AC1018", "AC1024", "AC1032"):
                 if observed["result"] == "not_covered_by_this_native_probe":
                     raise ValueError("expected_native_probe_not_invoked")
             elif observed["result"] == "accepted":

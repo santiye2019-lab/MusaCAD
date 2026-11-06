@@ -11,6 +11,7 @@
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1024_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -122,6 +123,20 @@ int main(int argc, char **argv) {
         } else {
             result = "accepted";
             stage = "ac1018_crc_backed_handle_index";
+        }
+    } else if (format == MUSA_DWG_2010) {
+        MusaDwgAc1024FileMapHeader header = {0};
+        size_t locations = 0u;
+        result = "rejected";
+        if (!musa_dwg_ac1024_page_map_header(file, bytes, &header)) {
+            stage = "ac1024_page_map_header";
+        } else if (!musa_dwg_ac1024_page_locations(
+                       file, bytes, NULL, 0u, &locations) || !locations) {
+            stage = "ac1024_physical_page_locations";
+        } else {
+            result = "accepted";
+            stage = "ac1024_physical_page_locations";
+            count = locations;
         }
     } else if (format == MUSA_DWG_2018_2026) {
         MusaDwgAc1032FileMapHeader header = {0};

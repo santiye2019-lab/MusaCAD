@@ -5,6 +5,7 @@
  */
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1032_page_map.h"
+#include "musacad_dwg_ac1024_page_map.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1032_sections.h"
 #include "musacad_dwg_ac1018_lz.h"
@@ -57,7 +58,8 @@ int main(int argc, char **argv) {
     if (!load_readonly(argv[1], &file, &n)) return 2;
     const int modern = memcmp(file, "AC1032", 6u) == 0;
     const int legacy = memcmp(file, "AC1018", 6u) == 0;
-    if (!modern && !legacy) {
+    const int r2010 = memcmp(file, "AC1024", 6u) == 0;
+    if (!modern && !legacy && !r2010) {
         free(file);
         puts("{\"diagnostic\":\"unsupported_signature\"}");
         return 0;
@@ -66,6 +68,7 @@ int main(int argc, char **argv) {
     MusaDwgAc1018FileMapHeader header = {0};
     const int header_ok = modern ?
         musa_dwg_ac1032_page_map_header(file, n, &header) :
+        r2010 ? musa_dwg_ac1024_page_map_header(file, n, &header) :
         musa_dwg_ac1018_page_map_header(file, n, &header);
     if (!header_ok) {
         free(file);
@@ -76,10 +79,12 @@ int main(int argc, char **argv) {
     size_t native_pages = 0u;
     const int locations_ok = modern ?
         musa_dwg_ac1032_page_locations(file, n, NULL, 0u, &native_pages) :
+        r2010 ? musa_dwg_ac1024_page_locations(file, n, NULL, 0u, &native_pages) :
         musa_dwg_ac1018_page_locations(file, n, NULL, 0u, &native_pages);
 
     int objects_ok = 0, handles_ok = 0;
-    if (locations_ok) {
+    /* R2010 object/section schemas differ: stop at authenticated page map. */
+    if (locations_ok && !r2010) {
         MusaDwgAc1018SectionDescriptor desc = {0};
         size_t pages = 0u;
         objects_ok = modern ?
@@ -177,6 +182,8 @@ int main(int argc, char **argv) {
             const int ok=modern?
                 musa_dwg_ac1032_page_locations(
                     file,n,pages,native_pages,&actual_pages):
+                r2010?musa_dwg_ac1024_page_locations(
+                    file,n,pages,native_pages,&actual_pages):
                 musa_dwg_ac1018_page_locations(
                     file,n,pages,native_pages,&actual_pages);
             if(ok && actual_pages==native_pages) {
@@ -254,7 +261,7 @@ int main(int argc, char **argv) {
            "\"system_uncompressed_bytes\":%u,"
            "\"geometry_verified\":false,"
            "\"mutates_source\":false}\n",
-           modern ? "AC1032" : "AC1018", header.page_count,
+           modern ? "AC1032" : r2010 ? "AC1024" : "AC1018", header.page_count,
            locations_ok ? "true" : "false",
            objects_ok ? "true" : "false",
            handles_ok ? "true" : "false",
