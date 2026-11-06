@@ -1738,3 +1738,69 @@ int musa_dwg_ac1024_self_index_find(
     return 1;
 }
 
+
+
+/* Strong first-party original OT51 numeric H-target triplet witness.
+ * Requires independent record CRC/self-H, never accepts semantic H roles.
+ * In particular, the trailing 2/4 bits are always unresolved even when zero. */
+int musa_dwg_ac1024_layer_eed_tail_type_triplet_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerTailTypeTriplet *out) {
+    if (!objects || !object_bytes || !recovered_index || !out ||
+        !canonical_layer_handle || !record_count ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return 0;
+    MusaDwgAc1024LayerEedTerminalFragment fragment = {0};
+    MusaDwgAc1024LayerTailCandidateCensus census = {0};
+    if (!musa_dwg_ac1024_layer_eed_terminal_fragment_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &fragment) ||
+        !musa_dwg_ac1024_layer_eed_tail_candidate_census_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &census) ||
+        !fragment.original_records_crc_verified ||
+        !census.original_records_crc_verified ||
+        fragment.display_accepted || census.display_accepted ||
+        fragment.layer_handle != canonical_layer_handle ||
+        fragment.complete_h_token_count != 4u ||
+        fragment.prefix_h_token_count != 4u ||
+        fragment.prefix_h_code[0] != 5u ||
+        fragment.prefix_h_size[0] != 0u ||
+        (fragment.terminal_fragment_bit_count != 2u &&
+         fragment.terminal_fragment_bit_count != 4u) ||
+        census.complete_prefix_h_tokens != 4u ||
+        census.absolute_candidates != 3u ||
+        census.verified_index_matches != 3u ||
+        census.unmatched_or_unverified != 0u ||
+        census.nonabsolute_or_empty_tokens != 1u ||
+        census.verified_placeholder_ot80 != 1u ||
+        census.unresolved_dynamic_class_ot_ge500 != 1u ||
+        census.verified_ltype_ot57 != 1u ||
+        census.verified_other_raw_ot != 0u ||
+        census.matched_ordinal_mask != 0x0eu ||
+        census.verified_raw_ot_by_ordinal[0] != 0u ||
+        census.verified_raw_ot_by_ordinal[1] != 80u ||
+        census.verified_raw_ot_by_ordinal[2] != 505u ||
+        census.verified_raw_ot_by_ordinal[3] != 57u)
+        return 0;
+
+    MusaDwgAc1024LayerTailTypeTriplet next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = fragment.layer_record_offset;
+    next.target_raw_ot[0] = 80u;
+    next.target_raw_ot[1] = 505u;
+    next.target_raw_ot[2] = 57u;
+    next.terminal_fragment_bits =
+        (uint8_t)fragment.terminal_fragment_bit_count;
+    next.terminal_fragment_all_zero = fragment.terminal_fragment_all_zero;
+    next.original_records_crc_verified = 1u;
+    /* h_tail_fully_decoded, target_roles_verified and display_accepted
+     * MUST stay zero until independent complete parsing/render tests. */
+    *out = next;
+    return 1;
+}
