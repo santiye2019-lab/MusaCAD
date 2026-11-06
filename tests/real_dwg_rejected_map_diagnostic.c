@@ -167,6 +167,8 @@ int main(int argc, char **argv) {
 
     int system_found=0, system_envelope_ok=0;
     int system_adler_ok=0, system_lz_ok=0;
+    int system_lz_trace_attempted=0;
+    MusaDwgAc1018LzDiagnostic system_lz_trace={0};
     uint32_t system_kind=0u,system_codec=0u,system_expanded=0u;
     uint32_t system_section_count=0u;
     if(locations_ok && native_pages && native_pages <= 131072u) {
@@ -209,8 +211,12 @@ int main(int argc, char **argv) {
                     uint8_t *buf=malloc(system_expanded);
                     if(!buf)break;
                     size_t used=0u;
-                    system_lz_ok=musa_dwg_ac1018_lz_decode(
-                        sys+20u,packed,buf,system_expanded,&used);
+                    system_lz_trace_attempted=1;
+                    system_lz_ok=musa_dwg_ac1018_lz_diagnose(
+                        sys+20u,packed,system_expanded,&system_lz_trace);
+                    if(system_lz_ok)
+                        system_lz_ok=musa_dwg_ac1018_lz_decode(
+                            sys+20u,packed,buf,system_expanded,&used);
                     if(system_lz_ok && system_expanded>=4u)
                         system_section_count=read32(buf);
                     free(buf);
@@ -248,6 +254,10 @@ int main(int argc, char **argv) {
            "\"system_envelope_ok\":%s,"
            "\"system_adler_ok\":%s,"
            "\"system_lz_ok\":%s,"
+           "\"system_lz_trace_attempted\":%s,"
+           "\"system_lz_failure_phase\":%u,"
+           "\"system_lz_input_consumed\":%zu,"
+           "\"system_lz_output_produced\":%zu,"
            "\"system_descriptor_count\":%u,"
            "\"system_kind_code\":%u,"
            "\"system_codec\":%u,"
@@ -273,6 +283,10 @@ int main(int argc, char **argv) {
            system_envelope_ok ? "true" : "false",
            system_adler_ok ? "true" : "false",
            system_lz_ok ? "true" : "false",
+           system_lz_trace_attempted ? "true" : "false",
+           (unsigned)system_lz_trace.failure_phase,
+           system_lz_trace.input_consumed,
+           system_lz_trace.output_produced,
            system_section_count,system_kind,system_codec,
            system_expanded);
     free(file);
