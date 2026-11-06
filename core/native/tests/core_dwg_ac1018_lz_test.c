@@ -82,6 +82,11 @@ static void trace(void){
         bad_back,sizeof(bad_back),7u,&diag));
     assert(diag.completed==0u&&diag.output_produced==4u&&
            diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_BACKREFERENCE);
+    const uint8_t overrun[]={1,'A','B','C','D',0x40,0x00,0x11};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        overrun,sizeof(overrun),6u,&diag));
+    assert(diag.completed==0u&&diag.output_produced==4u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN);
     /* Never write diagnostic fields into original source bytes. */
     uint8_t alias[32]={1,'A','B','C','D',0x11};
     uint8_t before[32];memcpy(before,alias,sizeof alias);
