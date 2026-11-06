@@ -1001,6 +1001,38 @@ static int test_layer_nonzero_eed_raw_flags(void) {
         !candidate_bs.original_crc_verified ||
         candidate_bs.cmc_identity_verified || candidate_bs.display_accepted)
         return 0;
+    /* Post-flags BL/RC is a bounded hypothesis, not accepted CMC. */
+    MusaDwgAc1024LayerAfterFlagsTailCandidate tail = {0};
+    if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 42u, &tail) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_OK ||
+        tail.layer_handle != 42u || tail.layer_record_offset != 0u ||
+        tail.bs_end_bit != 97u || tail.bl_end_bit != 131u ||
+        tail.rc_end_bit != 139u ||
+        tail.candidate_bs_value != 0u || tail.candidate_bl_value != 0u ||
+        tail.candidate_rc_value != 0u || !tail.original_crc_verified ||
+        tail.cmc_identity_verified || tail.display_accepted)
+        return 0;
+    const MusaDwgAc1024LayerAfterFlagsTailCandidate saved_tail = tail;
+    if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 42u,
+            (MusaDwgAc1024LayerAfterFlagsTailCandidate *)(void *)source) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_ARGUMENT ||
+        musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 43u, &tail) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BS ||
+        musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            NULL, sizeof(source), index, 1u, 42u, &tail) !=
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_ARGUMENT ||
+        memcmp(&tail, &saved_tail, sizeof(tail)))
+        return 0;
+    source[27] ^= 1u; /* record CRC corruption must fail atomically */
+    if (musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+            source, sizeof(source), index, 1u, 42u, &tail) ==
+            MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_OK ||
+        memcmp(&tail, &saved_tail, sizeof(tail)))
+        return 0;
+    memcpy(source, pristine, sizeof(source));
     if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
             source, sizeof(source), index, 1u, 42u) !=
             MUSA_DWG_LAYER_CMC_STAGE_OK ||
