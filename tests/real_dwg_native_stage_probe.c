@@ -658,6 +658,14 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_state_join_verified;
     /* CRC-backed LAYER CMC raw BS/BL/RC prefix only. No parity. */
     size_t sampled_layer_eed_cmc_attempts;
+    size_t sampled_layer_eed_cmc_postflags_bs_attempts;
+    size_t sampled_layer_eed_cmc_postflags_bs_verified;
+    size_t sampled_layer_eed_cmc_postflags_bs_refused;
+    size_t sampled_layer_eed_cmc_postflags_bs_value_0;
+    size_t sampled_layer_eed_cmc_postflags_bs_value_1_255;
+    size_t sampled_layer_eed_cmc_postflags_bs_value_256;
+    size_t sampled_layer_eed_cmc_postflags_bs_value_257_1023;
+    size_t sampled_layer_eed_cmc_postflags_bs_value_1024_plus;
     size_t sampled_layer_eed_cmc_verified;
     size_t sampled_layer_eed_cmc_refused;
     size_t sampled_layer_eed_cmc_refused_preflight;
@@ -1738,6 +1746,32 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                             raw_state.layer_record_offset ==
                                                                                 recovered[k].record_offset) {
                                                                             ++hint.sampled_layer_eed_state_join_verified;
+                                                                            ++hint.sampled_layer_eed_cmc_postflags_bs_attempts;
+                                                                            MusaDwgAc1024LayerAfterFlagsBsCandidate raw_bs_candidate = {0};
+                                                                            if (musa_dwg_ac1024_layer_eed_after_flags_bs_candidate_probe(
+                                                                                    objects, nb, recovered, legacy_count,
+                                                                                    recovered[k].embedded_absolute_handle,
+                                                                                    &raw_bs_candidate) &&
+                                                                                raw_bs_candidate.original_crc_verified &&
+                                                                                !raw_bs_candidate.cmc_identity_verified &&
+                                                                                !raw_bs_candidate.display_accepted &&
+                                                                                raw_bs_candidate.layer_handle == raw_state.layer_handle &&
+                                                                                raw_bs_candidate.layer_record_offset == raw_state.layer_record_offset) {
+                                                                                ++hint.sampled_layer_eed_cmc_postflags_bs_verified;
+                                                                                const uint16_t v = raw_bs_candidate.candidate_bs_value;
+                                                                                if (v == 0u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_bs_value_0;
+                                                                                else if (v <= 255u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_bs_value_1_255;
+                                                                                else if (v == 256u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_bs_value_256;
+                                                                                else if (v <= 1023u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_bs_value_257_1023;
+                                                                                else
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_bs_value_1024_plus;
+                                                                            } else {
+                                                                                ++hint.sampled_layer_eed_cmc_postflags_bs_refused;
+                                                                            }
                                                                             ++hint.sampled_layer_eed_cmc_attempts;
                                                                             MusaDwgAc1024LayerCmcRawPrefix layer_cmc = {0};
                                                                             if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
@@ -3033,6 +3067,14 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_state_join_attempts\":%zu,"
                "\"sampled_layer_eed_state_join_verified\":%zu,"
                "\"sampled_layer_eed_cmc_attempts\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_attempts\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_verified\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_refused\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_value_0\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_value_1_255\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_value_256\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_value_257_1023\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_bs_value_1024_plus\":%zu,"
                "\"sampled_layer_eed_cmc_verified\":%zu,"
                "\"sampled_layer_eed_cmc_refused\":%zu,"
                "\"sampled_layer_eed_cmc_refused_preflight\":%zu,"
@@ -3494,6 +3536,14 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_state_join_attempts,
                hint->sampled_layer_eed_state_join_verified,
                hint->sampled_layer_eed_cmc_attempts,
+               hint->sampled_layer_eed_cmc_postflags_bs_attempts,
+               hint->sampled_layer_eed_cmc_postflags_bs_verified,
+               hint->sampled_layer_eed_cmc_postflags_bs_refused,
+               hint->sampled_layer_eed_cmc_postflags_bs_value_0,
+               hint->sampled_layer_eed_cmc_postflags_bs_value_1_255,
+               hint->sampled_layer_eed_cmc_postflags_bs_value_256,
+               hint->sampled_layer_eed_cmc_postflags_bs_value_257_1023,
+               hint->sampled_layer_eed_cmc_postflags_bs_value_1024_plus,
                hint->sampled_layer_eed_cmc_verified,
                hint->sampled_layer_eed_cmc_refused,
                hint->sampled_layer_eed_cmc_refused_preflight,
