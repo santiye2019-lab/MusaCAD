@@ -992,6 +992,13 @@ static int test_layer_nonzero_eed_raw_flags(void) {
         cmc.display_accepted)
         return 0;
     const MusaDwgAc1024LayerCmcRawPrefix saved_cmc = cmc;
+    if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
+            source, sizeof(source), index, 1u, 42u) !=
+            MUSA_DWG_LAYER_CMC_STAGE_OK ||
+        musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
+            NULL, sizeof(source), index, 1u, 42u) !=
+            MUSA_DWG_LAYER_CMC_STAGE_ARGUMENT)
+        return 0;
     if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
             source, sizeof(source), index, 1u, 43u, &cmc) ||
         musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
@@ -1009,6 +1016,9 @@ static int test_layer_nonzero_eed_raw_flags(void) {
     source[28] = (uint8_t)(crc >> 8u);
     if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
             source, sizeof(source), index, 1u, 42u, &cmc) ||
+        musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
+            source, sizeof(source), index, 1u, 42u) !=
+            MUSA_DWG_LAYER_CMC_STAGE_INDEX_NONZERO ||
         memcmp(&cmc, &saved_cmc, sizeof(cmc)))
         return 0;
     memcpy(source, pristine, sizeof(source));

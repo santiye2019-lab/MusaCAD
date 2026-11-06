@@ -406,6 +406,25 @@ int musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
     const uint8_t *objects, size_t object_bytes,
     const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
     uint64_t canonical_layer_handle, MusaDwgAc1024LayerCmcRawPrefix *out);
+/* Diagnostic of the exact same fail-atomic CMC parser, including first
+ * source-local refusal gate. Never a fallback/relaxed color decoder. */
+enum {
+    MUSA_DWG_LAYER_CMC_STAGE_OK = 0,
+    MUSA_DWG_LAYER_CMC_STAGE_ARGUMENT = 1,
+    MUSA_DWG_LAYER_CMC_STAGE_INDEX = 2,
+    MUSA_DWG_LAYER_CMC_STAGE_FLAGS = 3,
+    MUSA_DWG_LAYER_CMC_STAGE_FRAME = 4,
+    MUSA_DWG_LAYER_CMC_STAGE_BOUNDS = 5,
+    MUSA_DWG_LAYER_CMC_STAGE_BS = 6,
+    MUSA_DWG_LAYER_CMC_STAGE_INDEX_NONZERO = 7,
+    MUSA_DWG_LAYER_CMC_STAGE_BL = 8,
+    MUSA_DWG_LAYER_CMC_STAGE_RC = 9,
+    MUSA_DWG_LAYER_CMC_STAGE_RC_UNSUPPORTED = 10
+};
+uint8_t musa_dwg_ac1024_layer_eed_cmc_raw_prefix_failure_stage(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle);
 
 /* Original R2010 LAYER OT51 H stream, EED-bearing and XDictionary
  * present ONLY. A CRC-backed layer and its OT67 APPID targets are
