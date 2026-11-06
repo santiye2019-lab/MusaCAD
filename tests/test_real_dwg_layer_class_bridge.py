@@ -24,6 +24,11 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_terminal_alignment_nonzero": 0,
             "sampled_layer_eed_state_join_attempts": n,
             "sampled_layer_eed_state_join_verified": n,
+            "sampled_layer_eed_cmc_attempts": n,
+            "sampled_layer_eed_cmc_verified": 0,
+            "sampled_layer_eed_cmc_refused": n,
+            "sampled_layer_eed_cmc_named": 0,
+            "sampled_layer_eed_cmc_book_named": 0,
             "sampled_layer_eed_state_join_frozen": 0,
             "sampled_layer_eed_state_join_on": 0,
             "sampled_layer_eed_state_join_locked": 0,
@@ -36,6 +41,7 @@ def sample(n=2, *, material=True):
             "sampled_line_eed_layer_state_on": 0,
             "sampled_line_eed_layer_state_locked": 0,
             "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_raw_256_cmc_prefix_verified": 0,
             "sampled_line_eed_layer_state_raw_color_0": 0,
             "sampled_line_eed_layer_state_raw_color_1_255": 0,
             "sampled_line_eed_layer_state_raw_color_257": 0,
@@ -227,6 +233,25 @@ class LayerClassBridgeTests(unittest.TestCase):
         h["sampled_line_eed_layer_state_refused"] = 1
         with self.assertRaises(EvidenceError):
             summarize(stage(item))
+
+    def test_cmc_raw_prefix_is_diagnostic_not_bylayer_render(self):
+        good = sample(2)
+        h = good["ac1024_compatibility_hypothesis"]
+        h["sampled_layer_eed_cmc_verified"] = 1
+        h["sampled_layer_eed_cmc_refused"] = 1
+        h["sampled_layer_eed_cmc_named"] = 1
+        summary = summarize(stage(good))
+        self.assertEqual(summary["layer_eed_cmc_raw_prefix_verified"], 1)
+        self.assertEqual(summary["layer_eed_cmc_raw_prefix_refused"], 1)
+        self.assertTrue(summary["layer_cmc_prefix_not_render_color_parity"])
+        self.assertFalse(summary["layer_visibility_parity_proven"])
+        for key in ("sampled_layer_eed_cmc_verified",
+                    "sampled_layer_eed_cmc_attempts",
+                    "sampled_layer_eed_cmc_named"):
+            bad = copy.deepcopy(good)
+            bad["ac1024_compatibility_hypothesis"][key] += 2
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
 
     def test_disjoint_original_line_color_categories(self):
         one = sample(2)

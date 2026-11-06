@@ -66,6 +66,13 @@ def summarize(stage: dict) -> dict:
         "line_eed_to_source_layer_state_verified": 0,
         "line_eed_to_source_layer_state_refused": 0,
         "line_eed_join_raw_color_index_256_candidates": 0,
+        "line_eed_join_raw_256_with_original_cmc_prefix": 0,
+        "layer_eed_cmc_raw_prefix_attempts": 0,
+        "layer_eed_cmc_raw_prefix_verified": 0,
+        "layer_eed_cmc_raw_prefix_refused": 0,
+        "layer_eed_cmc_raw_prefix_name_flags_present": 0,
+        "layer_eed_cmc_raw_prefix_book_flags_present": 0,
+        "layer_cmc_prefix_not_render_color_parity": True,
         "line_eed_join_raw_color_index_0_candidates": 0,
         "line_eed_join_raw_color_index_1_255_candidates": 0,
         "line_eed_join_raw_color_index_257_candidates": 0,
@@ -118,6 +125,8 @@ def summarize(stage: dict) -> dict:
             h, "sampled_line_eed_layer_state_raw_color_256", 64)
         ll_rgb = _integer(
             h, "sampled_line_eed_layer_state_explicit_rgb", 64)
+        ll_256_cmc = _integer(
+            h, "sampled_line_eed_layer_state_raw_256_cmc_prefix_verified", 64)
         ll_bucket_keys = (
             "sampled_line_eed_layer_state_raw_color_0",
             "sampled_line_eed_layer_state_raw_color_1_255",
@@ -140,12 +149,13 @@ def summarize(stage: dict) -> dict:
                 sum(refusal_breakdown) != ll_refused or
                 max([ll_raw_256, ll_rgb] + raw_counts) > ll_verified or
                 sum(ll_buckets) != ll_verified or
-                ll_buckets[2] != ll_raw_256):
+                ll_buckets[2] != ll_raw_256 or ll_256_cmc > ll_raw_256):
             raise EvidenceError("line_to_layer_raw_state_without_source_proof")
         aggregate["line_eed_to_source_layer_state_attempts"] += ll_attempts
         aggregate["line_eed_to_source_layer_state_verified"] += ll_verified
         aggregate["line_eed_to_source_layer_state_refused"] += ll_refused
         aggregate["line_eed_join_raw_color_index_256_candidates"] += ll_raw_256
+        aggregate["line_eed_join_raw_256_with_original_cmc_prefix"] += ll_256_cmc
         for key, value in zip(
             ("line_eed_join_raw_color_index_0_candidates",
              "line_eed_join_raw_color_index_1_255_candidates",
@@ -286,6 +296,19 @@ def summarize(stage: dict) -> dict:
             h, "sampled_layer_eed_state_join_attempts", 2048)
         raw_join_verified = _integer(
             h, "sampled_layer_eed_state_join_verified", 2048)
+        cmc_a = _integer(h, "sampled_layer_eed_cmc_attempts", 2048)
+        cmc_v = _integer(h, "sampled_layer_eed_cmc_verified", 2048)
+        cmc_r = _integer(h, "sampled_layer_eed_cmc_refused", 2048)
+        cmc_n = _integer(h, "sampled_layer_eed_cmc_named", 2048)
+        cmc_b = _integer(h, "sampled_layer_eed_cmc_book_named", 2048)
+        if (cmc_a != raw_join_verified or cmc_v + cmc_r != cmc_a
+                or cmc_n > cmc_v or cmc_b > cmc_v):
+            raise EvidenceError("unproven_original_layer_cmc_raw_prefix")
+        aggregate["layer_eed_cmc_raw_prefix_attempts"] += cmc_a
+        aggregate["layer_eed_cmc_raw_prefix_verified"] += cmc_v
+        aggregate["layer_eed_cmc_raw_prefix_refused"] += cmc_r
+        aggregate["layer_eed_cmc_raw_prefix_name_flags_present"] += cmc_n
+        aggregate["layer_eed_cmc_raw_prefix_book_flags_present"] += cmc_b
         raw_join_frozen = _integer(
             h, "sampled_layer_eed_state_join_frozen", 2048)
         raw_join_on = _integer(
