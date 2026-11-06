@@ -151,3 +151,41 @@ sınır tanısını, mümkünse bağımsız izole host/oracle kanıtıyla
 çapraz kontrol etmek. Tahmine dayalı katman rengi verme.
 LibreDWG yalnızca ayrı host CI oracle; MusaCAD özgün C11
 çalışma zamanına eklenmedi. PR #720 ana dala birleştirilmedi.
+
+
+## 6 Kasım 2026 — BS→BL→RC alan uzunluğu tanısı
+
+**Doğrulanan kaynak commit:** `10ad1c9e6b4158557c259cfa4608a1245126e8ad`  
+**Başarılı gerçek DWG CI:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42228029833  
+**Kaynak CI artifact:** `musacad-real-dwg-native-stage-diagnostic`, dosya `musacad-real-layer-class-bridge.json`  
+**Kapsam:** 23 orijinal DWG; toplam 14 dar kapsamlı, CRC/self-H kanıtlı OT51 LAYER örneği.
+
+| Sıkı olmayan, yalnızca alan uzunluğu için BS→BL→RC varsayım tanısı | Kayıt |
+|---|---:|
+| Denenen | **14** |
+| BS ardından BL ve ham RC bayt sınırı okunabilen | **13** |
+| BL sınırında güvenli ret | **1** |
+| BS aşamasında ret | **0** |
+| Kayıt/çerçeve sınırında ret | **0** |
+| RC sınırında ret | **0** |
+| Diğer ret | **0** |
+
+Bu yordam `musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe`,
+katman ham bayraklarından sonraki BS adayı konumundan BL ve ham RC bayt
+uzunluğunu ölçer. Sonuçlar birbirinden bağımsız sıkı CMC kabulü değildir:
+önceki `musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe` 14/14 kaydı
+reddetmeye devam eder (13 sıfır olmayan BS, 1 BL reddi).
+BS sayımında 1 adet sıfır, 13 adet 1–255 arası ham değer vardır.
+
+**Kritik sınırlama:** 13/14 okuma, alanların gerçekten CMC olduğuna,
+orijinal renk metoduna, ACI/BYLAYER/BYBLOCK kalıtımına, katman görünürlüğüne
+veya çizimin ekranda doğru görüneceğine kanıt DEĞİLDİR. Hiçbir renk,
+malzeme, katman, blok veya viewport bilgisi bu çıktıyla sahneye
+aktarılmamalıdır. `cmc_identity_verified=0`, `display_accepted=0`
+ve görünüm/render eşdeğerliği bayrakları değiştirilmedi. Kod ve testler
+yalnızca özgün MusaCAD C11 çekirdeğindedir; LibreDWG ayrı host
+referansı olarak kalır. Orijinal DWG'ler değiştirilmedi.
+
+**Devam eden negatif regresyon:** `b4a39a04` commitindeki sentetik
+BL ve RC sınır reddi testlerinin kendi CI sonuçları ayrıca kontrol
+edilmeli; eski yeşil test yeni commiti otomatik onaylamaz.
