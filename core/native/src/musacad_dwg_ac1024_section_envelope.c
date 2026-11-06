@@ -104,6 +104,10 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                             crc.strict_lz_eligible_pages;
                         e.source_data_lz_verified=
                             crc.strict_lz_verified;
+                        e.source_handles_lz_eligible_pages=
+                            crc.handles_strict_lz_eligible;
+                        e.source_handles_lz_verified_pages=
+                            crc.handles_strict_lz_verified;
                         /* Only complete, original-source verified pages
                          * may be joined. Diagnostic-only: never emit the
                          * resulting Handles bytes or claim ownership/paint.
