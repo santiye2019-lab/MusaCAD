@@ -236,6 +236,37 @@ static void r2010_directory_shape_candidate_test(void){
         decoded,sizeof decoded-1u,&shape));
     assert(memcmp(&shape,&before,sizeof shape)==0);
 }
+
+static void r2010_directory_original_page_link_test(void){
+    uint8_t decoded[132]={0};
+    le32(decoded,1u);
+    le32(decoded+20u,64u); /* declared logical section bytes */
+    le32(decoded+28u,1u); /* one page reference */
+    memcpy(decoded+52u,"AcDb:AcDbObjects",17u);
+    le32(decoded+116u,7u); /* original physical page ID */
+    le32(decoded+120u,16u); /* compressed source payload bytes */
+    MusaDwgAc1018PageLocation locations[1]={{7u,64u,256u}};
+    MusaDwgAc1024DirectoryPageLinkEvidence evidence={0};
+    assert(musa_dwg_ac1024_directory_physical_links(
+        decoded,sizeof decoded,locations,1u,&evidence));
+    assert(evidence.matched_page_references==1u&&
+           evidence.matched_section_records==1u);
+    const MusaDwgAc1024DirectoryPageLinkEvidence saved=evidence;
+    locations[0].file_span_bytes=47u; /* < header 32 + payload 16 */
+    assert(!musa_dwg_ac1024_directory_physical_links(
+        decoded,sizeof decoded,locations,1u,&evidence));
+    assert(memcmp(&evidence,&saved,sizeof saved)==0);
+    locations[0].file_span_bytes=64u;
+    locations[0].page_id=8u; /* non-existent original ID */
+    assert(!musa_dwg_ac1024_directory_physical_links(
+        decoded,sizeof decoded,locations,1u,&evidence));
+    assert(memcmp(&evidence,&saved,sizeof saved)==0);
+    locations[0].page_id=7u;
+    assert(!musa_dwg_ac1024_directory_physical_links(
+        decoded,sizeof decoded,locations,1u,
+        (MusaDwgAc1024DirectoryPageLinkEvidence*)
+            (void*)(decoded+4u)));
+}
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -273,5 +304,6 @@ int main(void){
     test_footer44();
     r2010_section_envelope_test();
     r2010_directory_shape_candidate_test();
+    r2010_directory_original_page_link_test();
     return 0;
 }

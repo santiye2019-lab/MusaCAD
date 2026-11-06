@@ -67,3 +67,50 @@ int musa_dwg_ac1024_directory_shape(
     *out=evidence;
     return 1;
 }
+
+int musa_dwg_ac1024_directory_physical_links(
+    const uint8_t *decoded,size_t bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    MusaDwgAc1024DirectoryPageLinkEvidence *out){
+    if(!decoded||!locations||!out||!physical_count||
+       physical_count>MAX_REFERENCES||
+       physical_count>SIZE_MAX/sizeof(*locations)||
+       overlap(decoded,bytes,out,sizeof(*out))||
+       overlap(locations,physical_count*sizeof(*locations),
+               out,sizeof(*out)))return 0;
+    MusaDwgAc1024DirectoryShape shape={0};
+    if(!musa_dwg_ac1024_directory_shape(decoded,bytes,&shape))return 0;
+    for(size_t i=0;i<physical_count;i++){
+        if(!locations[i].page_id ||
+           (i&&locations[i-1u].page_id>=locations[i].page_id))
+            return 0;
+    }
+    MusaDwgAc1024DirectoryPageLinkEvidence evidence={0};
+    evidence.matched_section_records=shape.sections;
+    size_t at=20u;
+    for(uint32_t i=0;i<shape.sections;i++){
+        const uint32_t npage=read32(decoded+at+8u);
+        at+=96u;
+        for(uint32_t j=0;j<npage;j++){
+            const uint8_t *entry=decoded+at+(size_t)j*16u;
+            const uint32_t id=read32(entry),packed=read32(entry+4u);
+            size_t lo=0u,hi=physical_count;
+            while(lo<hi){
+                const size_t mid=lo+(hi-lo)/2u;
+                if(locations[mid].page_id<id)lo=mid+1u;
+                else hi=mid;
+            }
+            if(lo==physical_count||locations[lo].page_id!=id||
+               locations[lo].file_span_bytes<32u||
+               packed>locations[lo].file_span_bytes-32u)
+                return 0;
+            ++evidence.matched_page_references;
+        }
+        at+=(size_t)npage*16u;
+    }
+    if(at!=bytes||
+       evidence.matched_page_references!=shape.referenced_pages)
+        return 0;
+    *out=evidence;
+    return 1;
+}

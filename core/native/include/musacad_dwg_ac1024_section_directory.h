@@ -3,6 +3,7 @@
 #define MUSACAD_DWG_AC1024_SECTION_DIRECTORY_H
 #include <stddef.h>
 #include <stdint.h>
+#include "musacad_dwg_ac1018_page_map.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,6 +21,19 @@ typedef struct MusaDwgAc1024DirectoryShape {
  * function. Caller must independently verify the original source map CRC. */
 int musa_dwg_ac1024_directory_shape(
     const uint8_t *decoded,size_t bytes,MusaDwgAc1024DirectoryShape *out);
+/* Cross-check tentative R2010 logical page IDs against independently
+ * authenticated physical page locations. Still NOT DATA-page CRC proof. */
+typedef struct MusaDwgAc1024DirectoryPageLinkEvidence {
+    uint32_t matched_page_references;
+    uint32_t matched_section_records;
+} MusaDwgAc1024DirectoryPageLinkEvidence;
+/* The source page array must be strictly sorted by positive ID. Complete
+ * only when every bounded candidate page ref matches a physical original
+ * page and its packed length fits within the source physical span. */
+int musa_dwg_ac1024_directory_physical_links(
+    const uint8_t *decoded,size_t bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    MusaDwgAc1024DirectoryPageLinkEvidence *out);
 #ifdef __cplusplus
 }
 #endif
