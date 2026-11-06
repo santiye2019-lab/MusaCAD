@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1024_section_envelope.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -143,6 +144,54 @@ static void test_footer44(void){
         file,sizeof file,pages,2u,&n));
     assert(n==saved_n&&memcmp(pages,saved,sizeof saved)==0);
 }
+
+/* A self-contained, synthetic AC1024 SYSTEM page envelope fixture; never
+ * includes any bytes from the original user drawings in Projeler/. */
+static void r2010_section_envelope_test(void){
+    uint8_t file[380];fixture(file);
+    memcpy(file,"AC1024",6u);
+    const size_t pos=256u;
+    le32(file+pos,UINT32_C(0x4163003b));
+    le32(file+pos+4u,4u);
+    le32(file+pos+8u,6u);
+    le32(file+pos+12u,2u);
+    file[pos+20u]=1u; /* literal 4 bytes */
+    le32(file+pos+21u,3u); /* diagnostic-only candidate count */
+    file[pos+25u]=0x11u;
+    uint8_t clean[20];memcpy(clean,file+pos,20u);
+    memset(clean+16u,0,4u);
+    le32(file+pos+16u,checksum(
+         checksum(0u,clean,20u),file+pos+20u,6u));
+    uint8_t original[380];memcpy(original,file,sizeof(file));
+    MusaDwgAc1024SectionEnvelopeEvidence result={0};
+    assert(musa_dwg_ac1024_section_envelope_probe(
+        file,sizeof(file),&result));
+    assert(result.adler_verified&&result.strict_lz_completed);
+    assert(result.section_map_page_id==1u&&
+           result.original_physical_offset==256u&&
+           result.declared_expanded_bytes==4u&&
+           result.declared_section_count_candidate==3u);
+    assert(memcmp(file,original,sizeof(file))==0);
+    MusaDwgAc1024SectionEnvelopeEvidence saved=result;
+    assert(!musa_dwg_ac1024_section_envelope_probe(
+        file,sizeof(file),
+        (MusaDwgAc1024SectionEnvelopeEvidence*)(void*)(file+4u)));
+    assert(memcmp(file,original,sizeof(file))==0);
+    file[pos+24u]^=1u; /* source checksum and caller evidence protected */
+    assert(!musa_dwg_ac1024_section_envelope_probe(
+        file,sizeof(file),&result));
+    assert(memcmp(&result,&saved,sizeof(result))==0);
+    memcpy(file,original,sizeof(file));
+    file[pos+12u]=3u; /* unsupported source compression codec */
+    assert(!musa_dwg_ac1024_section_envelope_probe(
+        file,sizeof(file),&result));
+    assert(memcmp(&result,&saved,sizeof(result))==0);
+    memcpy(file,original,sizeof(file));
+    file[0]='X'; /* wrong DWG signature is not interpreted as R2010 */
+    assert(!musa_dwg_ac1024_section_envelope_probe(
+        file,sizeof(file),&result));
+    assert(memcmp(&result,&saved,sizeof(result))==0);
+}
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -178,5 +227,6 @@ int main(void){
     assert(n==n_before&&memcmp(before,entries,sizeof(before))==0);
     ac1024_page_map_test();
     test_footer44();
+    r2010_section_envelope_test();
     return 0;
 }

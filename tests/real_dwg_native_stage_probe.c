@@ -10,6 +10,7 @@
 #include "musacad_dwg_ac1018_file_index.h"
 #include "musacad_dwg_ac1018_scene.h"
 #include "musacad_dwg_ac1018_page_map.h"
+#include "musacad_dwg_ac1024_section_envelope.h"
 #include "musacad_dwg_ac1018_sections.h"
 #include "musacad_dwg_ac1032_page_map.h"
 #include "musacad_dwg_ac1032_handles.h"
@@ -60,12 +61,17 @@ static const char *signature_name(MusaCoreDwgSignature format) {
 }
 
 static void report(const char *signature, const char *result,
-                   const char *stage, size_t evidence_count) {
+                   const char *stage, size_t evidence_count,
+                   int r2010_envelope_crc, int r2010_strict_lz) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
-           "\"source_modified\":false}\n",
-           signature, result, stage, evidence_count);
+           "\"source_modified\":false,"
+           "\"ac1024_section_map_crc_verified\":%s,"
+           "\"ac1024_section_map_lz_completed\":%s}\n",
+           signature, result, stage, evidence_count,
+           r2010_envelope_crc ? "true" : "false",
+           r2010_strict_lz ? "true" : "false");
 }
 
 int main(int argc, char **argv) {
@@ -86,6 +92,7 @@ int main(int argc, char **argv) {
     const char *result = "not_covered_by_this_native_probe";
     const char *stage = "signature_only";
     size_t count = 0u;
+    int ac1024_section_crc=0,ac1024_section_lz=0;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -157,6 +164,12 @@ int main(int argc, char **argv) {
             result = "accepted";
             stage = "ac1024_physical_page_locations";
             count = locations;
+            MusaDwgAc1024SectionEnvelopeEvidence envelope={0};
+            if(musa_dwg_ac1024_section_envelope_probe(
+                   file,bytes,&envelope)){
+                ac1024_section_crc=envelope.adler_verified!=0u;
+                ac1024_section_lz=envelope.strict_lz_completed!=0u;
+            }
         }
     } else if (format == MUSA_DWG_2018_2026) {
         MusaDwgAc1032FileMapHeader header = {0};
@@ -185,7 +198,8 @@ int main(int argc, char **argv) {
         result = "rejected";
         stage = "invalid_signature";
     }
-    report(name, result, stage, count);
+    report(name, result, stage, count,
+           ac1024_section_crc, ac1024_section_lz);
     free(file);
     return 0;
 }
