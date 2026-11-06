@@ -63,7 +63,8 @@ static const char *signature_name(MusaCoreDwgSignature format) {
 static void report(const char *signature, const char *result,
                    const char *stage, size_t evidence_count,
                    int r2010_envelope_crc, int r2010_strict_lz,
-                   int r2010_dir_candidate, size_t r2010_dir_refs) {
+                   int r2010_dir_candidate, size_t r2010_dir_refs,
+                   int r2010_links_candidate,size_t r2010_link_count) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
@@ -71,11 +72,14 @@ static void report(const char *signature, const char *result,
            "\"ac1024_section_map_crc_verified\":%s,"
            "\"ac1024_section_map_lz_completed\":%s,"
            "\"ac1024_directory_shape_candidate\":%s,"
-           "\"ac1024_directory_page_refs_candidate\":%zu}\n",
+           "\"ac1024_directory_page_refs_candidate\":%zu,"
+           "\"ac1024_directory_physical_links_candidate\":%s,"
+           "\"ac1024_directory_matched_physical_refs_candidate\":%zu}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
            r2010_strict_lz ? "true" : "false",
-           r2010_dir_candidate ? "true" : "false",r2010_dir_refs);
+           r2010_dir_candidate ? "true" : "false",r2010_dir_refs,
+           r2010_links_candidate ? "true" : "false",r2010_link_count);
 }
 
 int main(int argc, char **argv) {
@@ -99,6 +103,8 @@ int main(int argc, char **argv) {
     int ac1024_section_crc=0,ac1024_section_lz=0;
     int ac1024_directory_candidate=0;
     size_t ac1024_directory_refs=0u;
+    int ac1024_links_candidate=0;
+    size_t ac1024_links_matched=0u;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -179,6 +185,10 @@ int main(int argc, char **argv) {
                     envelope.directory_shape_candidate!=0u;
                 ac1024_directory_refs=
                     envelope.directory_referenced_pages_candidate;
+                ac1024_links_candidate=
+                    envelope.directory_physical_links_candidate!=0u;
+                ac1024_links_matched=
+                    envelope.directory_matched_physical_refs_candidate;
             }
         }
     } else if (format == MUSA_DWG_2018_2026) {
@@ -210,7 +220,8 @@ int main(int argc, char **argv) {
     }
     report(name, result, stage, count,
            ac1024_section_crc, ac1024_section_lz,
-           ac1024_directory_candidate,ac1024_directory_refs);
+           ac1024_directory_candidate,ac1024_directory_refs,
+           ac1024_links_candidate,ac1024_links_matched);
     free(file);
     return 0;
 }
