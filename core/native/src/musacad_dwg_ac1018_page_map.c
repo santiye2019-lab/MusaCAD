@@ -164,8 +164,33 @@ static int shared_page_locations(const uint8_t *file,size_t n,
                 }
                 verified_secondary_header=3;
             }
+            /* Genuine original R2010 terminal proof: the exact empty
+             * 20-byte SYSTEM marker is followed by a byte-for-byte copy
+             * of the 108-byte encrypted header at EOF. The last physical
+             * allocation ends 64 bytes into that copy (44 remain).
+             * This is a physical-map-only gate, NOT entity admission. */
+            if(available>size&&available-size==44u&&
+               memcmp(required_signature,"AC1024",6u)==0){
+                static const uint8_t empty[20]={
+                    0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+                    0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+                };
+                const uint64_t body_end=h.page_map_offset+20u+
+                                         (uint64_t)h.map_compressed_bytes;
+                const uint64_t end=pos+(uint64_t)size;
+                if(n<128u||body_end>(uint64_t)n-128u||
+                   body_end+20u!=(uint64_t)n-108u||
+                   end!=(uint64_t)n-44u||
+                   end-((uint64_t)n-108u)!=64u||
+                   memcmp(file+(size_t)body_end,empty,sizeof(empty))!=0||
+                   memcmp(file+n-108u,file+0x80u,0x6cu)!=0){
+                    valid=0;break;
+                }
+                verified_secondary_header=4;
+            }
             if(available>size&&available-size!=106u&&
-               available-size!=107u&&available-size!=108u){
+               available-size!=107u&&available-size!=108u&&
+               verified_secondary_header!=4){
                 /* A genuine R2018 file can store a SECOND copy of the
                  * authenticated 108-byte encrypted file header at EOF,
                  * preceded by exactly two zero alignment bytes.
@@ -237,7 +262,8 @@ static int shared_page_locations(const uint8_t *file,size_t n,
         !((verified_secondary_header==1&&n-(size_t)pos==110u)||
           (verified_secondary_header==2&&
            (n-(size_t)pos==106u||n-(size_t)pos==107u))||
-          (verified_secondary_header==3&&n-(size_t)pos==108u)))){
+          (verified_secondary_header==3&&n-(size_t)pos==108u)||
+           (verified_secondary_header==4&&n-(size_t)pos==44u)))){
         free(plain);return 0;
     }
     /* AC1032 physical page records are ordered by physical FILE location,

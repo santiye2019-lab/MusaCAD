@@ -87,6 +87,62 @@ static void ac1024_page_map_test(void){
         file,sizeof(file),rows,2u,&count));
     assert(count==saved_count&&memcmp(rows,saved,sizeof rows)==0);
 }
+/* Synthetic R2010 exact 44-byte suffix: all values constructed here. */
+static void footer44(uint8_t file[486]){
+    memset(file,0,486u);
+    fixture(file);
+    memcpy(file,"AC1024",6u);
+    le32(file+340u+13u,122u);
+    uint8_t hdr[20];memcpy(hdr,file+320u,sizeof hdr);
+    memset(hdr+16u,0,4u);
+    le32(file+336u,checksum(checksum(0u,hdr,20u),
+                             file+340u,18u));
+    static const uint8_t marker[20]={
+        0x3bu,0x0eu,0x63u,0x41u,0u,0u,0u,0u,
+        0u,0u,0u,0u,2u,0u,0u,0u,0u,0u,0u,0u
+    };
+    memcpy(file+358u,marker,20u);
+    memcpy(file+378u,file+0x80u,108u);
+}
+static void test_footer44(void){
+    uint8_t file[486];footer44(file);
+    uint8_t before[486];memcpy(before,file,sizeof file);
+    size_t n=17u;
+    MusaDwgAc1018PageLocation pages[2]={{0}},saved[2]={{0}};
+    assert(musa_dwg_ac1024_page_locations(
+        file,sizeof file,NULL,0u,&n)&&n==2u);
+    assert(musa_dwg_ac1024_page_locations(
+        file,sizeof file,pages,2u,&n));
+    assert(pages[0].file_offset==256u&&
+           pages[1].file_offset==320u&&
+           pages[1].file_span_bytes==122u);
+    assert(memcmp(file,before,sizeof file)==0);
+    memcpy(saved,pages,sizeof pages);
+    const size_t saved_n=n;
+    assert(!musa_dwg_ac1018_page_locations(
+        file,sizeof file,pages,2u,&n));
+    assert(n==saved_n&&memcmp(pages,saved,sizeof saved)==0);
+    file[359u]^=1u; /* exact SYSTEM marker is mandatory */
+    assert(!musa_dwg_ac1024_page_locations(
+        file,sizeof file,pages,2u,&n));
+    assert(n==saved_n&&memcmp(pages,saved,sizeof saved)==0);
+    memcpy(file,before,sizeof file);
+    file[388u]^=1u; /* copied encrypted header must match */
+    assert(!musa_dwg_ac1024_page_locations(
+        file,sizeof file,pages,2u,&n));
+    assert(n==saved_n&&memcmp(pages,saved,sizeof saved)==0);
+    memcpy(file,before,sizeof file);
+    le32(file+340u+13u,123u); /* even checksum-correct 43-byte tail fails */
+    uint8_t hdr[20];memcpy(hdr,file+320u,20u);
+    memset(hdr+16u,0,4u);
+    le32(file+336u,checksum(checksum(0u,hdr,20u),file+340u,18u));
+    MusaDwgAc1018FileMapHeader verified={0};
+    assert(musa_dwg_ac1024_page_map_header(
+        file,sizeof file,&verified));
+    assert(!musa_dwg_ac1024_page_locations(
+        file,sizeof file,pages,2u,&n));
+    assert(n==saved_n&&memcmp(pages,saved,sizeof saved)==0);
+}
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -121,5 +177,6 @@ int main(void){
     assert(!musa_dwg_ac1018_page_locations(file,337u,entries,2u,&n));
     assert(n==n_before&&memcmp(before,entries,sizeof(before))==0);
     ac1024_page_map_test();
+    test_footer44();
     return 0;
 }
