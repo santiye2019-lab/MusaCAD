@@ -67,3 +67,45 @@ LibreDWG yalnızca CI'daki ayrı host referans aracıdır; uygulamanın
 özgün çekirdeğine eklenmedi. Kaynak DWG'ler değişmedi, PR #720
 main'e birleştirilmedi ve APK üretilmedi.
 
+
+
+## 6 Kasım 2026 — kaynak bit-deseni ve bayt-hizası incelemesi
+
+**Saat dilimi:** Europe/Istanbul (UTC+03:00)  
+**Kaynak kanıtın test edildiği commit:** 473147930e989ff6d0958abe35bae9f43e6aa93f  
+**Başarılı gerçek kaynak Actions çalışması:** https://github.com/santiye2019-lab/MusaCAD/actions/runs/42185003836  
+**Teknik çıktı:** musacad-real-layer-class-bridge.json
+
+Özgün birinci taraf C11 çözümleyicisine kısa OT51 H-terminal parçasının
+1..7 bitlik ham değeri ve bit-başı/bit-sonu mod 8 hizası eklendi.
+Dosya adı, katman adı, koordinatlar, handle'lar veya DWG kaynak baytları
+CI raporuna alınmıyor. Python sözleşmesi bit maskelerini örnek sayılarıyla
+karşılaştırıyor; imkânsız değerleri ve sahte örnek kapsamasını reddediyor.
+
+Kaynak DWG örnekleri üzerinde:
+- **5 kaynak çizim**, **14 doğrulanmış OT51 kaydı** ve **42 CRC/self-H destekli hedef**.
+- **10** parçanın uzunluğu **2 bit**, **4** parçanın uzunluğu **4 bit**.
+- **12** parçada ham değer **0**, **2** parçada **2-bit değer 3 (binary 11)**.
+- 2-bitliklerde görülen benzersiz ham değerler **{0,3}**;
+  4-bitliklerde görülen benzersiz ham değerler **{0}**.
+- Başlangıç hizası maskesi **80 (bit konumu 4 veya 6)**;
+  bitiş hizası maskesi **1 (konum 0)**. Tüm 14 parça bayt sınırında bitiyor.
+- Hiçbir parça henüz güvenilir biçimde padding sayılmadı. Sıfır olmayan
+  2-bit alanlar özellikle kesin dolgu varsayımını engelliyor.
+  h_tail_fully_decoded=false, rendering_verified=false ve
+  layer_visibility_parity_proven=false korunuyor.
+
+**Biçimle uyumlu, henüz işlev kabulü olmayan yorum:** ODA Open Design
+Specification for .dwg files 5.1, madde 18.1.51 LAYER (sayfa 152),
+R2000+ plotstyle/PLACEHOLDER; R2007+ material; common linetype
+H referanslarını bu sırayla tarif ediyor. Bu biçim sırası
+OT80 PLACEHOLDER → yerel OT505 MATERIAL → OT57 LTYPE üçlüsüyle uyumlu.
+Belge: https://kldp.org/files/OpenDesign_Specification_for_.dwg_files.pdf
+Buradaki biçim uyumu, gerçek malzeme/plotstyle/linetype kalıtımı,
+görüntü renkleri veya AutoCAD eşdeğerliğini tek başına kanıtlamaz.
+
+**Yeni regresyon koruması:** CI iş akışında en az **14 özgün C11 üçlü
+kanıtı ve 5 kaynak DWG** aranıyor. Daha az kanıt üretildiğinde, yanlışlıkla
+yeşil rapor verilmesi yerine CI başarısız olacak.
+Bu yeni asgari eşik için son commitin test sonucu, önceki
+4731479 kaynak çalışmasından ayrı izlenmelidir.
