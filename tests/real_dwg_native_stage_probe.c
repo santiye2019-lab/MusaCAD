@@ -240,6 +240,8 @@ int main(int argc, char **argv) {
                         ac1024_handles_reason=5;
                     else if(!envelope.source_handles_candidate_pages)
                         ac1024_handles_reason=7;
+                    else if(envelope.source_handles_logical_offset_mismatch_pages)
+                        ac1024_handles_reason=12;
                     else if(!envelope.source_handles_candidate_page_bytes){
                         const uint32_t logical=
                             envelope.source_handles_candidate_logical_bytes;
