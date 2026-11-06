@@ -267,6 +267,7 @@ def ac1024_probe_record():
             "sampled_line_eed_layer_state_on": 0,
             "sampled_line_eed_layer_state_locked": 0,
             "sampled_line_eed_layer_state_raw_color_256": 0,
+            "sampled_line_eed_layer_state_raw_256_cmc_prefix_verified": 0,
             "sampled_line_eed_layer_state_raw_color_0": 0,
             "sampled_line_eed_layer_state_raw_color_1_255": 0,
             "sampled_line_eed_layer_state_raw_color_257": 0,
@@ -413,6 +414,11 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_alignment_nonzero": 0,
             "sampled_layer_eed_state_join_attempts": 0,
             "sampled_layer_eed_state_join_verified": 0,
+            "sampled_layer_eed_cmc_attempts": 0,
+            "sampled_layer_eed_cmc_verified": 0,
+            "sampled_layer_eed_cmc_refused": 0,
+            "sampled_layer_eed_cmc_named": 0,
+            "sampled_layer_eed_cmc_book_named": 0,
             "sampled_layer_eed_state_join_frozen": 0,
             "sampled_layer_eed_state_join_on": 0,
             "sampled_layer_eed_state_join_locked": 0,
@@ -523,6 +529,22 @@ class Ac1024CompatibilityContractTest(unittest.TestCase):
             fake["ac1024_compatibility_hypothesis"][key] = 1
             with self.subTest(field=key), self.assertRaises(ValueError):
                 validate_fake_result(fake)
+
+    def test_layer_cmc_counts_require_independent_original_prefix(self):
+        original = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(original), original)
+        for key in (
+            "sampled_layer_eed_cmc_attempts",
+            "sampled_layer_eed_cmc_verified",
+            "sampled_layer_eed_cmc_refused",
+            "sampled_layer_eed_cmc_named",
+            "sampled_layer_eed_cmc_book_named",
+            "sampled_line_eed_layer_state_raw_256_cmc_prefix_verified",
+        ):
+            bad = deepcopy(original)
+            bad["ac1024_compatibility_hypothesis"][key] = 1
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_fake_result(bad)
 
     def test_original_color_index_bucket_partition_is_fail_closed(self):
         record = ac1024_probe_record()

@@ -883,6 +883,25 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 join_unmapped > hint.get("sampled_layer_eed_flags_unmapped_bits", -1)):
             raise ValueError("unproven_ac1024_same_record_raw_flags_join")
 
+        # Source-backed OT51 CMC prefix: bounded BS/BL/RC evidence only.
+        # Names live in a detached TU stream and no actual color/paint is
+        # certified. Separate from the fixed-size raw-state tuple below.
+        cmc_keys = (
+            "sampled_layer_eed_cmc_attempts",
+            "sampled_layer_eed_cmc_verified",
+            "sampled_layer_eed_cmc_refused",
+            "sampled_layer_eed_cmc_named",
+            "sampled_layer_eed_cmc_book_named",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0 for k in cmc_keys):
+            raise ValueError("invalid_original_ot51_cmc_raw_prefix")
+        cmc_a, cmc_v, cmc_r, cmc_named, cmc_book = (
+            hint[k] for k in cmc_keys
+        )
+        if (cmc_a != join_verified or cmc_v + cmc_r != cmc_a or
+                cmc_named > cmc_v or cmc_book > cmc_v):
+            raise ValueError("unproven_original_ot51_cmc_raw_census")
+
         # Raw unresolved suffix is diagnostic only. Validate bit-pattern
         # masks against observed short fragments, never against CAD roles.
         mask2 = hint.get("sampled_layer_eed_terminal_fragment_2bit_pattern_mask")
@@ -942,6 +961,13 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 max(ll_frozen, ll_on, ll_locked, ll_256, ll_rgb)
                 > ll_verified):
             raise ValueError("unproven_source_local_line_layer_color_bridge")
+
+        line256_cmc = hint.get(
+            "sampled_line_eed_layer_state_raw_256_cmc_prefix_verified"
+        )
+        if (type(line256_cmc) is not int or line256_cmc < 0 or
+                line256_cmc > ll_256):
+            raise ValueError("line_bylayer_candidate_without_original_layer_cmc")
 
         # Complete and disjoint raw LINE index census, source-local only.
         # Neither indexed 256 nor 0 nor a palette index proves pixels,
