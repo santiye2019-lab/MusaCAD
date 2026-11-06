@@ -127,6 +127,17 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                         read32(rec+20u);
                                     e.source_handles_candidate_encryption=
                                         read32(rec+28u);
+                                    uint32_t span=read32(rec+12u);
+                                    if(!span)span=29696u;
+                                    for(uint32_t pj=0u;pj<count;pj++){
+                                        const uint8_t *link=
+                                            decoded+pos+96u+(size_t)pj*16u;
+                                        const uint64_t off=
+                                            (uint64_t)read32(link+8u)|
+                                            ((uint64_t)read32(link+12u)<<32u);
+                                        if(off!=(uint64_t)pj*span)
+                                            ++e.source_handles_logical_offset_mismatch_pages;
+                                    }
                                 }
                                 if(strcmp((const char*)(rec+32u),
                                           "AcDb:Handles")==0&&
