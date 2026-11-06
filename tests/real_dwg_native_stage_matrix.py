@@ -841,6 +841,31 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 triplet_nonzero > fragment_nonzero):
             raise ValueError("inconsistent_ac1024_type_triplet_provenance")
 
+        # Raw unresolved suffix is diagnostic only. Validate bit-pattern
+        # masks against observed short fragments, never against CAD roles.
+        mask2 = hint.get("sampled_layer_eed_terminal_fragment_2bit_pattern_mask")
+        mask4 = hint.get("sampled_layer_eed_terminal_fragment_4bit_pattern_mask")
+        starts = hint.get("sampled_layer_eed_terminal_fragment_start_mod8_mask")
+        ends = hint.get("sampled_layer_eed_terminal_fragment_end_mod8_mask")
+        f2 = hint.get("sampled_layer_eed_terminal_fragment_bits_2")
+        f4 = hint.get("sampled_layer_eed_terminal_fragment_bits_4")
+        fv = hint.get("sampled_layer_eed_terminal_fragment_verified")
+        fzero = hint.get("sampled_layer_eed_terminal_fragment_zero")
+        fnonzero = hint.get("sampled_layer_eed_terminal_fragment_nonzero")
+        if (any(type(v) is not int for v in
+                (mask2, mask4, starts, ends, f2, f4, fv, fzero, fnonzero))
+                or not 0 <= mask2 <= 15 or not 0 <= mask4 <= 65535
+                or not 0 <= starts <= 255 or not 0 <= ends <= 255
+                or min(f2, f4, fv, fzero, fnonzero) < 0
+                or f2 + f4 > fv or fzero + fnonzero != fv
+                or bool(mask2) != bool(f2) or bool(mask4) != bool(f4)
+                or bool(starts) != bool(fv) or bool(ends) != bool(fv)
+                or mask2.bit_count() > f2 or mask4.bit_count() > f4
+                or (fzero == 0 and ((mask2 & 1) or (mask4 & 1)))
+                or (f2 + f4 == fv and fnonzero > 0
+                    and mask2 <= 1 and mask4 <= 1)):
+            raise ValueError("invalid_original_layer_terminal_raw_pattern")
+
         line_keys = (
             "sampled_line_attempts",
             "sampled_line_common_verified",
@@ -982,6 +1007,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             "sampled_layer_eed_terminal_fragment_bits_5",
             "sampled_layer_eed_terminal_fragment_bits_6",
             "sampled_layer_eed_terminal_fragment_bits_7",
+            "sampled_layer_eed_terminal_fragment_2bit_pattern_mask",
+            "sampled_layer_eed_terminal_fragment_4bit_pattern_mask",
+            "sampled_layer_eed_terminal_fragment_start_mod8_mask",
+            "sampled_layer_eed_terminal_fragment_end_mod8_mask",
             "sampled_layer_eed_terminal_fragment_prefix_count",
             "sampled_layer_eed_terminal_fragment_prefix_code_5",
             "sampled_layer_eed_terminal_fragment_prefix_code_other",
