@@ -132,5 +132,34 @@ class NativeStageContractTest(unittest.TestCase):
                          "ac1032_crc_backed_handle_index")
 
 
+class OriginalAc1024LogicalJoinGateTest(unittest.TestCase):
+    def test_corpus_logical_join_must_be_real_not_header_only(self):
+        from real_dwg_native_stage_matrix import require_original_ac1024_handles_join
+        example = {
+            "result": "accepted",
+            "native_stage": "ac1024_physical_page_locations",
+            "ac1024_handles_join_verified": True,
+            "ac1024_handles_join_logical_bytes": 2048,
+            "ac1024_handles_join_inner_failure_stage": 0,
+            "geometry_verified": False,
+            "rendering_verified": False,
+        }
+        require_original_ac1024_handles_join("AC1024", example)
+        for key, bad in (
+            ("ac1024_handles_join_verified", False),
+            ("ac1024_handles_join_logical_bytes", 0),
+            ("ac1024_handles_join_inner_failure_stage", 4),
+            ("geometry_verified", True),
+        ):
+            bad_record = dict(example)
+            bad_record[key] = bad
+            with self.subTest(key=key), self.assertRaisesRegex(
+                    ValueError, "original_ac1024_handles_logical_join_not_verified"):
+                require_original_ac1024_handles_join("AC1024", bad_record)
+        # AC1018, AC1032 and unsupported signatures are not assigned the
+        # AC1024-specific Handles acceptance by a cross-version fallback.
+        require_original_ac1024_handles_join("AC1032", {})
+
+
 if __name__ == "__main__":
     unittest.main()
