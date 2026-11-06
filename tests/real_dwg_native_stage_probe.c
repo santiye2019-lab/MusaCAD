@@ -675,6 +675,13 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_cmc_postflags_tail_refused_bl;
     size_t sampled_layer_eed_cmc_postflags_tail_refused_rc;
     size_t sampled_layer_eed_cmc_postflags_tail_refused_other;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_bs_zero;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_bl_zero;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_rc_zero;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero;
+    size_t sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits;
     size_t sampled_layer_eed_cmc_verified;
     size_t sampled_layer_eed_cmc_refused;
     size_t sampled_layer_eed_cmc_refused_preflight;
@@ -1771,6 +1778,20 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                                 tail_candidate.bs_end_bit < tail_candidate.bl_end_bit &&
                                                                                 tail_candidate.bl_end_bit < tail_candidate.rc_end_bit) {
                                                                                 ++hint.sampled_layer_eed_cmc_postflags_tail_verified;
+                                                                                if (tail_candidate.candidate_bs_value == 0u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_bs_zero;
+                                                                                else
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero;
+                                                                                if (tail_candidate.candidate_bl_value == 0u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_bl_zero;
+                                                                                else
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero;
+                                                                                if (tail_candidate.candidate_rc_value == 0u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_rc_zero;
+                                                                                else
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero;
+                                                                                if ((tail_candidate.candidate_rc_value & ~3u) != 0u)
+                                                                                    ++hint.sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits;
                                                                             } else {
                                                                                 ++hint.sampled_layer_eed_cmc_postflags_tail_refused;
                                                                                 if (tail_stage == MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BS)
@@ -3121,6 +3142,13 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_cmc_postflags_tail_refused_bl\":%zu,"
                "\"sampled_layer_eed_cmc_postflags_tail_refused_rc\":%zu,"
                "\"sampled_layer_eed_cmc_postflags_tail_refused_other\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_bs_zero\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_bl_zero\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_rc_zero\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero\":%zu,"
+               "\"sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits\":%zu,"
                "\"sampled_layer_eed_cmc_verified\":%zu,"
                "\"sampled_layer_eed_cmc_refused\":%zu,"
                "\"sampled_layer_eed_cmc_refused_preflight\":%zu,"
@@ -3598,6 +3626,13 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_cmc_postflags_tail_refused_bl,
                hint->sampled_layer_eed_cmc_postflags_tail_refused_rc,
                hint->sampled_layer_eed_cmc_postflags_tail_refused_other,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_bs_zero,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_bs_nonzero,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_bl_zero,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_bl_nonzero,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_rc_zero,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_rc_nonzero,
+               hint->sampled_layer_eed_cmc_postflags_tail_verified_rc_reserved_bits,
                hint->sampled_layer_eed_cmc_verified,
                hint->sampled_layer_eed_cmc_refused,
                hint->sampled_layer_eed_cmc_refused_preflight,
