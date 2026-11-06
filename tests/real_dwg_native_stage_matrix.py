@@ -82,11 +82,16 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or any(type(result.get(k)) is not int or result[k] < 0
                for k in ("ac1024_data_masked_headers_verified",
                          "ac1024_data_payload_adler_verified",
-                         "ac1024_data_header_adler_verified"))
+                         "ac1024_data_header_adler_verified",
+                         "ac1024_data_lz_eligible_pages",
+                         "ac1024_data_lz_verified"))
         or not (result.get("ac1024_data_header_adler_verified") <=
                 result.get("ac1024_data_payload_adler_verified") <=
                 result.get("ac1024_data_masked_headers_verified") <=
                 result.get("ac1024_directory_matched_physical_refs_candidate"))
+        or not (result.get("ac1024_data_lz_verified") <=
+                result.get("ac1024_data_lz_eligible_pages") <=
+                result.get("ac1024_data_header_adler_verified"))
     ):
         raise ValueError("invalid_native_probe_contract")
     if result["result"] == "accepted":

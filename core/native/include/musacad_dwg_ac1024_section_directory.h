@@ -43,6 +43,11 @@ typedef struct MusaDwgAc1024PageChecksumEvidence {
     uint32_t masked_headers_verified;
     uint32_t payload_adler_verified;
     uint32_t header_adler_verified;
+    /* Eligible pages: encrypted=0, compression=2, verified checksums,
+     * bounded declared output page bytes, exact logical page order.
+     * This is read-only diagnostic; neither count implies CAD semantics. */
+    uint32_t strict_lz_eligible_pages;
+    uint32_t strict_lz_verified;
 } MusaDwgAc1024PageChecksumEvidence;
 /* The source must have already passed original AC1024 physical map and
  * section-map Adler32/strict LZ; caller supplies original authenticated

@@ -96,6 +96,10 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                             crc.payload_adler_verified;
                         e.source_data_header_adler_verified=
                             crc.header_adler_verified;
+                        e.source_data_lz_eligible_pages=
+                            crc.strict_lz_eligible_pages;
+                        e.source_data_lz_verified=
+                            crc.strict_lz_verified;
                     }
                 }
             }
