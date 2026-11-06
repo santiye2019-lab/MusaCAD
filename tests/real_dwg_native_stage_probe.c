@@ -245,7 +245,7 @@ int main(int argc, char **argv) {
                             envelope.source_handles_candidate_logical_bytes;
                         ac1024_handles_reason=
                             ((logical-1u)/29696u+1u!=
-                             envelope.source_handles_candidate_pages)?8:10;
+                             envelope.source_handles_candidate_pages)?8:11;
                     }else{
                         const uint32_t logical=
                             envelope.source_handles_candidate_logical_bytes;
