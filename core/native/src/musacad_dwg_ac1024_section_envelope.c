@@ -100,6 +100,40 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                             crc.strict_lz_eligible_pages;
                         e.source_data_lz_verified=
                             crc.strict_lz_verified;
+                        /* Only complete, original-source verified pages
+                         * may be joined. Diagnostic-only: never emit the
+                         * resulting Handles bytes or claim ownership/paint.
+                         * Bound additional report-stage memory to 16 MiB. */
+                        if(crc.header_adler_verified==crc.referenced_pages){
+                            size_t pos=20u;
+                            for(uint32_t si=0u;si<shape.sections;si++){
+                                const uint8_t *rec=decoded+pos;
+                                const uint32_t count=read32(rec+8u);
+                                const uint64_t logical=
+                                    (uint64_t)read32(rec)|
+                                    ((uint64_t)read32(rec+4u)<<32u);
+                                if(strcmp((const char*)(rec+32u),
+                                          "AcDb:Handles")==0&&
+                                   logical>0u&&logical<=16u*1024u*1024u){
+                                    uint8_t *joined=(uint8_t*)malloc(
+                                        (size_t)logical);
+                                    if(joined){
+                                        size_t written=0u;
+                                        if(musa_dwg_ac1024_directory_join_section(
+                                               file,n,decoded,expanded,
+                                               pages,count,"AcDb:Handles",
+                                               joined,(size_t)logical,
+                                               &written)&&written==logical){
+                                            e.source_handles_logical_join_verified=1u;
+                                            e.source_handles_logical_bytes=
+                                                (uint32_t)written;
+                                        }
+                                        free(joined);
+                                    }
+                                }
+                                pos+=96u+(size_t)count*16u;
+                            }
+                        }
                     }
                 }
             }
