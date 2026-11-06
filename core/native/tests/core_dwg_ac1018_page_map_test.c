@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1024_section_envelope.h"
+#include "musacad_dwg_ac1024_section_directory.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -192,6 +193,49 @@ static void r2010_section_envelope_test(void){
         file,sizeof(file),&result));
     assert(memcmp(&result,&saved,sizeof(result))==0);
 }
+
+static void r2010_directory_shape_candidate_test(void){
+    uint8_t decoded[132]={0},snapshot[132]={0};
+    le32(decoded,1u); /* one record at 20, one 16-byte page link */
+    uint8_t *record=decoded+20u;
+    le32(record,64u); /* 64 logical bytes */
+    le32(record+8u,1u); /* one source page candidate */
+    memcpy(record+32u,"AcDb:Handles",13u);
+    le32(decoded+116u,7u); /* physical page ID candidate */
+    le32(decoded+120u,16u); /* packed byte count candidate */
+    memcpy(snapshot,decoded,sizeof decoded);
+    MusaDwgAc1024DirectoryShape shape={0};
+    assert(musa_dwg_ac1024_directory_shape(
+        decoded,sizeof decoded,&shape));
+    assert(shape.sections==1u&&shape.referenced_pages==1u&&
+           shape.handles_name_candidates==1u&&
+           shape.objects_name_candidates==0u&&
+           shape.duplicate_section_names==0u);
+    assert(memcmp(decoded,snapshot,sizeof decoded)==0);
+    const MusaDwgAc1024DirectoryShape before=shape;
+    assert(!musa_dwg_ac1024_directory_shape(
+        decoded,sizeof decoded,(MusaDwgAc1024DirectoryShape*)(void*)
+            (decoded+8u)));
+    assert(memcmp(decoded,snapshot,sizeof decoded)==0);
+    decoded[116u]=0u;
+    assert(!musa_dwg_ac1024_directory_shape(
+        decoded,sizeof decoded,&shape));
+    assert(memcmp(&shape,&before,sizeof shape)==0);
+    memcpy(decoded,snapshot,sizeof decoded);
+    le32(decoded+28u,2u); /* declared page refs exceed record boundary */
+    assert(!musa_dwg_ac1024_directory_shape(
+        decoded,sizeof decoded,&shape));
+    assert(memcmp(&shape,&before,sizeof shape)==0);
+    memcpy(decoded,snapshot,sizeof decoded);
+    memset(decoded+52u,'X',64u); /* un-terminated class name */
+    assert(!musa_dwg_ac1024_directory_shape(
+        decoded,sizeof decoded,&shape));
+    assert(memcmp(&shape,&before,sizeof shape)==0);
+    memcpy(decoded,snapshot,sizeof decoded);
+    assert(!musa_dwg_ac1024_directory_shape(
+        decoded,sizeof decoded-1u,&shape));
+    assert(memcmp(&shape,&before,sizeof shape)==0);
+}
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -228,5 +272,6 @@ int main(void){
     ac1024_page_map_test();
     test_footer44();
     r2010_section_envelope_test();
+    r2010_directory_shape_candidate_test();
     return 0;
 }
