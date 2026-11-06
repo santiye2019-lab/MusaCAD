@@ -59,6 +59,13 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or type(result.get("ac1024_section_map_lz_completed")) is not bool
         or (result.get("ac1024_section_map_lz_completed")
             and not result.get("ac1024_section_map_crc_verified"))
+        or type(result.get("ac1024_directory_shape_candidate")) is not bool
+        or type(result.get("ac1024_directory_page_refs_candidate")) is not int
+        or result.get("ac1024_directory_page_refs_candidate") < 0
+        or (result.get("ac1024_directory_shape_candidate")
+            and not result.get("ac1024_section_map_lz_completed"))
+        or (not result.get("ac1024_directory_shape_candidate")
+            and result.get("ac1024_directory_page_refs_candidate") != 0)
     ):
         raise ValueError("invalid_native_probe_contract")
     if result["result"] == "accepted":

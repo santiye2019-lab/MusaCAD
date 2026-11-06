@@ -62,16 +62,20 @@ static const char *signature_name(MusaCoreDwgSignature format) {
 
 static void report(const char *signature, const char *result,
                    const char *stage, size_t evidence_count,
-                   int r2010_envelope_crc, int r2010_strict_lz) {
+                   int r2010_envelope_crc, int r2010_strict_lz,
+                   int r2010_dir_candidate, size_t r2010_dir_refs) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
            "\"source_modified\":false,"
            "\"ac1024_section_map_crc_verified\":%s,"
-           "\"ac1024_section_map_lz_completed\":%s}\n",
+           "\"ac1024_section_map_lz_completed\":%s,"
+           "\"ac1024_directory_shape_candidate\":%s,"
+           "\"ac1024_directory_page_refs_candidate\":%zu}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
-           r2010_strict_lz ? "true" : "false");
+           r2010_strict_lz ? "true" : "false",
+           r2010_dir_candidate ? "true" : "false",r2010_dir_refs);
 }
 
 int main(int argc, char **argv) {
@@ -93,6 +97,8 @@ int main(int argc, char **argv) {
     const char *stage = "signature_only";
     size_t count = 0u;
     int ac1024_section_crc=0,ac1024_section_lz=0;
+    int ac1024_directory_candidate=0;
+    size_t ac1024_directory_refs=0u;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -169,6 +175,10 @@ int main(int argc, char **argv) {
                    file,bytes,&envelope)){
                 ac1024_section_crc=envelope.adler_verified!=0u;
                 ac1024_section_lz=envelope.strict_lz_completed!=0u;
+                ac1024_directory_candidate=
+                    envelope.directory_shape_candidate!=0u;
+                ac1024_directory_refs=
+                    envelope.directory_referenced_pages_candidate;
             }
         }
     } else if (format == MUSA_DWG_2018_2026) {
@@ -199,7 +209,8 @@ int main(int argc, char **argv) {
         stage = "invalid_signature";
     }
     report(name, result, stage, count,
-           ac1024_section_crc, ac1024_section_lz);
+           ac1024_section_crc, ac1024_section_lz,
+           ac1024_directory_candidate,ac1024_directory_refs);
     free(file);
     return 0;
 }

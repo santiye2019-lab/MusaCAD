@@ -18,6 +18,11 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint64_t original_physical_offset;
     uint8_t adler_verified;
     uint8_t strict_lz_completed;
+    /* Source-authenticated LZ output may match the bounded R2004-family
+     * directory shape; this remains provisional, NOT full CAD admission. */
+    uint8_t directory_shape_candidate;
+    uint32_t directory_sections_candidate;
+    uint32_t directory_referenced_pages_candidate;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately
