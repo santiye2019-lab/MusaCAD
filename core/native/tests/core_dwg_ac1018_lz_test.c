@@ -51,4 +51,49 @@ static void corrupt(void){
                                        (uint8_t*)out,1024u*1024u+1u,&consumed));
     assert(memcmp(out,original,7u)==0 && consumed==777u);
 }
-int main(void){valid();corrupt();return 0;}
+
+/* Diagnostic phases never invent output, and must agree with the strict
+ * production decoder on successful streams. All bytes are synthetic. */
+static void trace(void){
+    const uint8_t good[]={1,'A','B','C','D',0x11,0,0};
+    MusaDwgAc1018LzDiagnostic diag={0};
+    assert(musa_dwg_ac1018_lz_diagnose(
+        good,sizeof(good),4u,&diag));
+    assert(diag.completed==1u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_NONE&&
+           diag.input_consumed==6u&&diag.output_produced==4u);
+    const uint8_t bad_header[]={0u};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        bad_header,sizeof(bad_header),4u,&diag));
+    assert(diag.completed==0u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_LITERAL_HEADER);
+    const uint8_t missing_opcode[]={1,'A','B','C','D'};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        missing_opcode,sizeof(missing_opcode),4u,&diag));
+    assert(diag.completed==0u&&diag.output_produced==4u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_OPCODE);
+    const uint8_t wrong_length[]={1,'A','B','C','D',0x11};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        wrong_length,sizeof(wrong_length),5u,&diag));
+    assert(diag.completed==0u&&diag.output_produced==4u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_TERMINATOR);
+    const uint8_t bad_back[]={1,'A','B','C','D',0x40,0x7f,0x11};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        bad_back,sizeof(bad_back),7u,&diag));
+    assert(diag.completed==0u&&diag.output_produced==4u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_BACKREFERENCE);
+    const uint8_t overrun[]={1,'A','B','C','D',0x40,0x00,0x11};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        overrun,sizeof(overrun),6u,&diag));
+    assert(diag.completed==0u&&diag.output_produced==4u&&
+           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN&&
+           diag.overflow_match_bytes==3u&&
+           diag.overflow_available_bytes==2u);
+    /* Never write diagnostic fields into original source bytes. */
+    uint8_t alias[32]={1,'A','B','C','D',0x11};
+    uint8_t before[32];memcpy(before,alias,sizeof alias);
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        alias,16u,4u,(MusaDwgAc1018LzDiagnostic*)alias));
+    assert(memcmp(before,alias,sizeof alias)==0);
+}
+int main(void){valid();corrupt();trace();return 0;}
