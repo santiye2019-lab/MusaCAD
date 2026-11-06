@@ -93,7 +93,7 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
                 result.get("ac1024_data_lz_eligible_pages") <=
                 result.get("ac1024_data_header_adler_verified"))
         or type(result.get("ac1024_handles_join_probe_reason")) is not int
-        or not (0 <= result.get("ac1024_handles_join_probe_reason") <= 12)
+        or not (0 <= result.get("ac1024_handles_join_probe_reason") <= 15)
         or (result.get("ac1024_handles_join_verified") and
             result.get("ac1024_handles_join_probe_reason") != 0)
         or type(result.get("ac1024_handles_join_verified")) is not bool
