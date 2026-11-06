@@ -33,6 +33,14 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_cmc_postflags_bs_value_256": 0,
             "sampled_layer_eed_cmc_postflags_bs_value_257_1023": 0,
             "sampled_layer_eed_cmc_postflags_bs_value_1024_plus": 0,
+            "sampled_layer_eed_cmc_postflags_tail_attempts": n,
+            "sampled_layer_eed_cmc_postflags_tail_verified": n,
+            "sampled_layer_eed_cmc_postflags_tail_refused": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_bs": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_frame": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_bl": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_rc": 0,
+            "sampled_layer_eed_cmc_postflags_tail_refused_other": 0,
             "sampled_layer_eed_cmc_verified": 0,
             "sampled_layer_eed_cmc_refused": n,
             "sampled_layer_eed_cmc_refused_preflight": n,
@@ -304,6 +312,33 @@ class LayerClassBridgeTests(unittest.TestCase):
             wrong["ac1024_compatibility_hypothesis"][key] += 1
             with self.subTest(key=key), self.assertRaises(EvidenceError):
                 summarize(stage(wrong))
+
+    def test_source_tail_hypothesis_atomic_counts(self):
+        good = sample(2)
+        out = summarize(stage(good))
+        self.assertEqual(out["layer_after_flags_tail_candidate_attempts"], 2)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified"], 2)
+        self.assertTrue(out["layer_after_flags_tail_is_not_verified_cmc"])
+        self.assertFalse(out["line_layer_bylayer_rendering_parity"])
+        base = good["ac1024_compatibility_hypothesis"]
+        for key in (
+            "sampled_layer_eed_cmc_postflags_tail_attempts",
+            "sampled_layer_eed_cmc_postflags_tail_verified",
+            "sampled_layer_eed_cmc_postflags_tail_refused_bs",
+            "sampled_layer_eed_cmc_postflags_tail_refused_bl",
+            "sampled_layer_eed_cmc_postflags_tail_refused_rc",
+        ):
+            bad = copy.deepcopy(good)
+            bad["ac1024_compatibility_hypothesis"][key] += 1
+            with self.subTest(key=key), self.assertRaises(EvidenceError):
+                summarize(stage(bad))
+        base["sampled_layer_eed_cmc_postflags_tail_verified"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_refused"] = 1
+        base["sampled_layer_eed_cmc_postflags_tail_refused_bl"] = 1
+        out = summarize(stage(good))
+        self.assertEqual(out["layer_after_flags_tail_candidate_refused_bl"], 1)
+        self.assertEqual(out["layer_after_flags_tail_candidate_verified"], 1)
+        self.assertFalse(out["layer_after_flags_tail_is_not_verified_cmc"] is False)
 
     def test_real_corpus_minimum_coverage_gate(self):
         out = summarize(stage(sample(2), sample(4), sample(4), sample(2), sample(2)))
