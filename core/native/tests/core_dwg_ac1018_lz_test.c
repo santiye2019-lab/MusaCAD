@@ -71,7 +71,37 @@ static void trace(void){
     assert(!musa_dwg_ac1018_lz_diagnose(
         missing_opcode,sizeof(missing_opcode),4u,&diag));
     assert(diag.completed==0u&&diag.output_produced==4u&&
-           diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_OPCODE);
+           diag.failure_phase==
+               MUSA_DWG_AC1018_LZ_PHASE_OPCODE_INPUT_EXHAUSTED);
+    const uint8_t reserved_opcode[]={1,'A','B','C','D',0x00};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        reserved_opcode,sizeof(reserved_opcode),4u,&diag));
+    assert(diag.completed==0u&&diag.output_produced==4u&&
+           diag.failure_phase==
+               MUSA_DWG_AC1018_LZ_PHASE_OPCODE_RESERVED);
+    /* Neither reserved nor truncated input becomes valid through a larger
+     * output bound; the production result and caller bytes stay atomic. */
+    uint8_t sentinel[4]={'N','O','P','E'};
+    size_t sentinel_consumed=333u;
+    assert(!musa_dwg_ac1018_lz_decode(
+        reserved_opcode,sizeof(reserved_opcode),sentinel,4u,
+        &sentinel_consumed));
+    assert(memcmp(sentinel,"NOPE",4u)==0 && sentinel_consumed==333u);
+    /* Each rejected literal records input/output bounds, without bytes. */
+    const uint8_t truncated_literal[]={4,'A','B'};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        truncated_literal,sizeof(truncated_literal),7u,&diag));
+    assert(diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_LITERAL_COPY &&
+           diag.literal_requested_bytes==7u &&
+           diag.literal_input_available_bytes==2u &&
+           diag.literal_output_available_bytes==7u);
+    const uint8_t too_small_out[]={1,'A','B','C','D',0x11};
+    assert(!musa_dwg_ac1018_lz_diagnose(
+        too_small_out,sizeof(too_small_out),3u,&diag));
+    assert(diag.failure_phase==MUSA_DWG_AC1018_LZ_PHASE_LITERAL_COPY &&
+           diag.literal_requested_bytes==4u &&
+           diag.literal_input_available_bytes==5u &&
+           diag.literal_output_available_bytes==3u);
     const uint8_t wrong_length[]={1,'A','B','C','D',0x11};
     assert(!musa_dwg_ac1018_lz_diagnose(
         wrong_length,sizeof(wrong_length),5u,&diag));

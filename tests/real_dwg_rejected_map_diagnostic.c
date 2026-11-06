@@ -173,6 +173,7 @@ int main(int argc, char **argv) {
      * to accepted DWG content; the authenticated advertised size remains
      * the sole admission limit for all production decoders. */
     int system_lz_alt_attempted=0, system_lz_alt_completed=0;
+    size_t system_lz_compressed_budget=0u;
     size_t system_lz_alt_extra=0u;
     MusaDwgAc1018LzDiagnostic system_lz_alt_trace={0};
     uint32_t system_kind=0u,system_codec=0u,system_expanded=0u;
@@ -218,6 +219,7 @@ int main(int argc, char **argv) {
                     if(!buf)break;
                     size_t used=0u;
                     system_lz_trace_attempted=1;
+                    system_lz_compressed_budget=packed;
                     system_lz_ok=musa_dwg_ac1018_lz_diagnose(
                         sys+20u,packed,system_expanded,&system_lz_trace);
                     if(system_lz_ok)
@@ -296,6 +298,13 @@ int main(int argc, char **argv) {
            "\"system_lz_alt_failure_phase\":%u,"
            "\"system_lz_alt_input_consumed\":%zu,"
            "\"system_lz_alt_output_produced\":%zu,"
+           "\"system_lz_compressed_budget\":%zu,"
+           "\"system_lz_literal_requested\":%zu,"
+           "\"system_lz_literal_output_available\":%zu,"
+           "\"system_lz_literal_input_available\":%zu,"
+           "\"system_lz_alt_literal_requested\":%zu,"
+           "\"system_lz_alt_literal_output_available\":%zu,"
+           "\"system_lz_alt_literal_input_available\":%zu,"
            "\"system_descriptor_count\":%u,"
            "\"system_kind_code\":%u,"
            "\"system_codec\":%u,"
@@ -333,6 +342,13 @@ int main(int argc, char **argv) {
            (unsigned)system_lz_alt_trace.failure_phase,
            system_lz_alt_trace.input_consumed,
            system_lz_alt_trace.output_produced,
+           system_lz_compressed_budget,
+           system_lz_trace.literal_requested_bytes,
+           system_lz_trace.literal_output_available_bytes,
+           system_lz_trace.literal_input_available_bytes,
+           system_lz_alt_trace.literal_requested_bytes,
+           system_lz_alt_trace.literal_output_available_bytes,
+           system_lz_alt_trace.literal_input_available_bytes,
            system_section_count,system_kind,system_codec,
            system_expanded);
     free(file);
