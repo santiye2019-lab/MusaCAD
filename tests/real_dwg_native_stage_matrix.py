@@ -898,8 +898,20 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         cmc_a, cmc_v, cmc_r, cmc_named, cmc_book = (
             hint[k] for k in cmc_keys
         )
+        cmc_refusal_keys = (
+            "sampled_layer_eed_cmc_refused_preflight",
+            "sampled_layer_eed_cmc_refused_index_nonzero",
+            "sampled_layer_eed_cmc_refused_bl",
+            "sampled_layer_eed_cmc_refused_rc",
+            "sampled_layer_eed_cmc_refused_rc_flags",
+            "sampled_layer_eed_cmc_refused_other",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0
+               for k in cmc_refusal_keys):
+            raise ValueError("invalid_source_cmc_refusal_histogram")
         if (cmc_a != join_verified or cmc_v + cmc_r != cmc_a or
-                cmc_named > cmc_v or cmc_book > cmc_v):
+                cmc_named > cmc_v or cmc_book > cmc_v or
+                sum(hint[k] for k in cmc_refusal_keys) != cmc_r):
             raise ValueError("unproven_original_ot51_cmc_raw_census")
 
         # Raw unresolved suffix is diagnostic only. Validate bit-pattern

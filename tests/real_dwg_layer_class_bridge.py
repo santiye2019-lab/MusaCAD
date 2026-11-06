@@ -70,6 +70,12 @@ def summarize(stage: dict) -> dict:
         "layer_eed_cmc_raw_prefix_attempts": 0,
         "layer_eed_cmc_raw_prefix_verified": 0,
         "layer_eed_cmc_raw_prefix_refused": 0,
+        "layer_eed_cmc_refused_preflight": 0,
+        "layer_eed_cmc_refused_index_nonzero": 0,
+        "layer_eed_cmc_refused_bl": 0,
+        "layer_eed_cmc_refused_rc": 0,
+        "layer_eed_cmc_refused_rc_flags": 0,
+        "layer_eed_cmc_refused_other": 0,
         "layer_eed_cmc_raw_prefix_name_flags_present": 0,
         "layer_eed_cmc_raw_prefix_book_flags_present": 0,
         "layer_cmc_prefix_not_render_color_parity": True,
@@ -301,9 +307,19 @@ def summarize(stage: dict) -> dict:
         cmc_r = _integer(h, "sampled_layer_eed_cmc_refused", 2048)
         cmc_n = _integer(h, "sampled_layer_eed_cmc_named", 2048)
         cmc_b = _integer(h, "sampled_layer_eed_cmc_book_named", 2048)
+        cmc_refusal_suffixes = (
+            "preflight", "index_nonzero", "bl", "rc", "rc_flags", "other"
+        )
+        cmc_refusal_values = [
+            _integer(h, "sampled_layer_eed_cmc_refused_" + k, 2048)
+            for k in cmc_refusal_suffixes
+        ]
         if (cmc_a != raw_join_verified or cmc_v + cmc_r != cmc_a
-                or cmc_n > cmc_v or cmc_b > cmc_v):
+                or cmc_n > cmc_v or cmc_b > cmc_v or
+                sum(cmc_refusal_values) != cmc_r):
             raise EvidenceError("unproven_original_layer_cmc_raw_prefix")
+        for suffix, value in zip(cmc_refusal_suffixes, cmc_refusal_values):
+            aggregate["layer_eed_cmc_refused_" + suffix] += value
         aggregate["layer_eed_cmc_raw_prefix_attempts"] += cmc_a
         aggregate["layer_eed_cmc_raw_prefix_verified"] += cmc_v
         aggregate["layer_eed_cmc_raw_prefix_refused"] += cmc_r

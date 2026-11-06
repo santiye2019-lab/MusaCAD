@@ -27,6 +27,12 @@ def sample(n=2, *, material=True):
             "sampled_layer_eed_cmc_attempts": n,
             "sampled_layer_eed_cmc_verified": 0,
             "sampled_layer_eed_cmc_refused": n,
+            "sampled_layer_eed_cmc_refused_preflight": n,
+            "sampled_layer_eed_cmc_refused_index_nonzero": 0,
+            "sampled_layer_eed_cmc_refused_bl": 0,
+            "sampled_layer_eed_cmc_refused_rc": 0,
+            "sampled_layer_eed_cmc_refused_rc_flags": 0,
+            "sampled_layer_eed_cmc_refused_other": 0,
             "sampled_layer_eed_cmc_named": 0,
             "sampled_layer_eed_cmc_book_named": 0,
             "sampled_layer_eed_state_join_frozen": 0,
@@ -239,6 +245,7 @@ class LayerClassBridgeTests(unittest.TestCase):
         h = good["ac1024_compatibility_hypothesis"]
         h["sampled_layer_eed_cmc_verified"] = 1
         h["sampled_layer_eed_cmc_refused"] = 1
+        h["sampled_layer_eed_cmc_refused_preflight"] = 1
         h["sampled_layer_eed_cmc_named"] = 1
         summary = summarize(stage(good))
         self.assertEqual(summary["layer_eed_cmc_raw_prefix_verified"], 1)
