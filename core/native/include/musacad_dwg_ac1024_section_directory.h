@@ -34,6 +34,24 @@ int musa_dwg_ac1024_directory_physical_links(
     const uint8_t *decoded,size_t bytes,
     const MusaDwgAc1018PageLocation *locations,size_t physical_count,
     MusaDwgAc1024DirectoryPageLinkEvidence *out);
+/* Three independent R2004-family R2010 DATA page proof stages:
+ * (1) masked 32-byte envelope, (2) payload Adler32, (3) header Adler32.
+ * Even complete checksum proof does NOT decode entity geometry or admit
+ * rendering; do not infer completeness from any of these counters. */
+typedef struct MusaDwgAc1024PageChecksumEvidence {
+    uint32_t referenced_pages;
+    uint32_t masked_headers_verified;
+    uint32_t payload_adler_verified;
+    uint32_t header_adler_verified;
+} MusaDwgAc1024PageChecksumEvidence;
+/* The source must have already passed original AC1024 physical map and
+ * section-map Adler32/strict LZ; caller supplies original authenticated
+ * physical locations. On invalid argument or map, output is untouched. */
+int musa_dwg_ac1024_directory_page_checksums(
+    const uint8_t *file,size_t file_bytes,
+    const uint8_t *decoded,size_t decoded_bytes,
+    const MusaDwgAc1018PageLocation *locations,size_t physical_count,
+    MusaDwgAc1024PageChecksumEvidence *out);
 #ifdef __cplusplus
 }
 #endif

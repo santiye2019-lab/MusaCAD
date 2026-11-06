@@ -83,6 +83,9 @@ class NativeStageContractTest(unittest.TestCase):
             "ac1024_directory_page_refs_candidate": 0,
             "ac1024_directory_physical_links_candidate": False,
             "ac1024_directory_matched_physical_refs_candidate": 0,
+            "ac1024_data_masked_headers_verified": 0,
+            "ac1024_data_payload_adler_verified": 0,
+            "ac1024_data_header_adler_verified": 0,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
