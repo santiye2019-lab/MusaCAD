@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 #define MAX_SECTION_BYTES 1048576u
 #define MAX_SECTIONS 256u
 #define MAX_REFERENCES 65536u
