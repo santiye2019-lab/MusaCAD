@@ -90,6 +90,38 @@ int musa_dwg1032_layer_color_select_scratch(
     const MusaDwg1032LayerColor *layers, size_t layer_count,
     MusaDwg1032ResolvedColor *resolved,
     MusaDwg1032ResolvedColor *scratch, size_t scratch_capacity);
+/* Resolve only a bounded viewport page of an already authenticated, immutable
+ * object index. A page uses caller-owned scratch instead of a full-drawing
+ * color array; each page is published atomically after validation.
+ * Full source arrays (including future pages), index metadata and layer
+ * table must be disjoint from BOTH page output and the entire scratch
+ * capacity. Source index ordering and spans are verified for the selected
+ * page and its boundary neighbors; the caller must have validated and kept
+ * the full index immutable before paging. No entity/DWG parsing or JNI.
+ * O(page_count log layer_count + layer_count), O(page_count) scratch. */
+int musa_dwg1032_layer_color_select_page(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *entity_layer_handles,
+    const MusaDwg1032CadColor *entity_colors,
+    const MusaDwg1032LayerColor *layers, size_t layer_count,
+    size_t first, size_t page_count,
+    MusaDwg1032ResolvedColor *page_resolved,
+    MusaDwg1032ResolvedColor *page_scratch, size_t scratch_capacity);
+/* Apply one bounded page of a caller-authenticated block definition under
+ * a specific INSERT instance. All source arrays are full-drawing arrays:
+ * the page output is forbidden to alias even future source pages.
+ * Source and INSERT provenance is validated for the selected page only;
+ * callers must authenticate and hold the complete source immutable first.
+ * The selected page publishes atomically; no allocation or DWG decoding.
+ * A different INSERT instance requires a separate call and output. */
+int musa_dwg1032_layer_color_apply_insert_context_page(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles, size_t total_count,
+    size_t first, size_t page_count, uint64_t layer_zero_handle,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    MusaDwg1032ResolvedColor *page_resolved);
 #ifdef __cplusplus
 }
 #endif

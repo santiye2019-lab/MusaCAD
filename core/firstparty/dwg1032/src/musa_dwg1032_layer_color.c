@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <string.h>
 
+/* A C object span must fit PTRDIFF_MAX before indexing; SIZE_MAX alone
+ * permits non-representable pointer offsets on supported platforms. */
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
@@ -38,11 +40,11 @@ int musa_dwg1032_layer_color_select(
     if (!index || !index->entries || !index->count ||
         !entity_layer_handles || !entity_colors || !layers ||
         !layer_count || !resolved ||
-        index->count>SIZE_MAX/sizeof(*index->entries) ||
-        index->count>SIZE_MAX/sizeof(*entity_layer_handles) ||
-        index->count>SIZE_MAX/sizeof(*entity_colors) ||
-        layer_count>SIZE_MAX/sizeof(*layers) ||
-        index->count>SIZE_MAX/sizeof(*resolved)) return 0;
+        index->count>PTRDIFF_MAX/sizeof(*index->entries) ||
+        index->count>PTRDIFF_MAX/sizeof(*entity_layer_handles) ||
+        index->count>PTRDIFF_MAX/sizeof(*entity_colors) ||
+        layer_count>PTRDIFF_MAX/sizeof(*layers) ||
+        index->count>PTRDIFF_MAX/sizeof(*resolved)) return 0;
     const size_t n=index->count;
     const size_t out_bytes=n*sizeof(*resolved);
     if (overlaps(resolved,out_bytes,index,sizeof(*index)) ||
@@ -110,7 +112,7 @@ int musa_dwg1032_layer_color_apply_insert(
     const MusaDwg1032ResolvedColor *insert_color,
     MusaDwg1032ResolvedColor *resolved) {
     if (!definition_colors || !insert_color || !resolved || !count ||
-        count>SIZE_MAX/sizeof(*definition_colors)) return 0;
+        count>PTRDIFF_MAX/sizeof(*definition_colors)) return 0;
     const size_t bytes=count*sizeof(*definition_colors);
     if (overlaps(resolved,bytes,definition_colors,bytes) ||
         overlaps(resolved,bytes,insert_color,sizeof(*insert_color)) ||
@@ -137,10 +139,10 @@ int musa_dwg1032_layer_color_apply_insert_context(
     if (!definition_colors || !source_colors || !source_layer_handles ||
         !insert_color || !insert_layer_color || !resolved || !count ||
         !layer_zero_handle ||
-        count>SIZE_MAX/sizeof(*definition_colors) ||
-        count>SIZE_MAX/sizeof(*source_colors) ||
-        count>SIZE_MAX/sizeof(*source_layer_handles) ||
-        count>SIZE_MAX/sizeof(*resolved)) return 0;
+        count>PTRDIFF_MAX/sizeof(*definition_colors) ||
+        count>PTRDIFF_MAX/sizeof(*source_colors) ||
+        count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        count>PTRDIFF_MAX/sizeof(*resolved)) return 0;
     const size_t bytes=count*sizeof(*definition_colors);
     const size_t color_bytes=count*sizeof(*source_colors);
     const size_t layer_bytes=count*sizeof(*source_layer_handles);
@@ -197,12 +199,12 @@ int musa_dwg1032_layer_color_select_scratch(
         !entity_layer_handles || !entity_colors || !layers ||
         !layer_count || !resolved || !scratch ||
         scratch_capacity<index->count ||
-        index->count>SIZE_MAX/sizeof(*index->entries) ||
-        index->count>SIZE_MAX/sizeof(*entity_layer_handles) ||
-        index->count>SIZE_MAX/sizeof(*entity_colors) ||
-        index->count>SIZE_MAX/sizeof(*resolved) ||
-        scratch_capacity>SIZE_MAX/sizeof(*scratch) ||
-        layer_count>SIZE_MAX/sizeof(*layers)) return 0;
+        index->count>PTRDIFF_MAX/sizeof(*index->entries) ||
+        index->count>PTRDIFF_MAX/sizeof(*entity_layer_handles) ||
+        index->count>PTRDIFF_MAX/sizeof(*entity_colors) ||
+        index->count>PTRDIFF_MAX/sizeof(*resolved) ||
+        scratch_capacity>PTRDIFF_MAX/sizeof(*scratch) ||
+        layer_count>PTRDIFF_MAX/sizeof(*layers)) return 0;
     const size_t n=index->count;
     const size_t output_bytes=n*sizeof(*resolved);
     const size_t scratch_bytes=scratch_capacity*sizeof(*scratch);
@@ -251,4 +253,91 @@ int musa_dwg1032_layer_color_select_scratch(
     }
     memcpy(resolved,scratch,output_bytes);
     return 1;
+}
+
+/* A viewport needs only the current page's resolved colors. Borrow a
+ * bounded sub-index after protecting ALL future source pages from writes.
+ * The full index was authenticated before paging and remains immutable. */
+int musa_dwg1032_layer_color_select_page(
+    const MusaDwg1032ObjectIndex *index,
+    const uint64_t *entity_layer_handles,
+    const MusaDwg1032CadColor *entity_colors,
+    const MusaDwg1032LayerColor *layers, size_t layer_count,
+    size_t first, size_t page_count,
+    MusaDwg1032ResolvedColor *page_resolved,
+    MusaDwg1032ResolvedColor *page_scratch, size_t scratch_capacity) {
+    if (!index || !index->entries || !entity_layer_handles ||
+        !entity_colors || !layers || !layer_count || !page_resolved ||
+        !page_scratch || !page_count || first>index->count ||
+        page_count>index->count-first || scratch_capacity<page_count ||
+        index->count>PTRDIFF_MAX/sizeof(*index->entries) ||
+        index->count>PTRDIFF_MAX/sizeof(*entity_layer_handles) ||
+        index->count>PTRDIFF_MAX/sizeof(*entity_colors) ||
+        layer_count>PTRDIFF_MAX/sizeof(*layers) ||
+        page_count>PTRDIFF_MAX/sizeof(*page_resolved) ||
+        scratch_capacity>PTRDIFF_MAX/sizeof(*page_scratch))
+        return 0;
+
+    const size_t n=index->count;
+    const size_t out_bytes=page_count*sizeof(*page_resolved);
+    const size_t scratch_bytes=scratch_capacity*sizeof(*page_scratch);
+    const void *sources[]={index,index->entries,entity_layer_handles,
+                           entity_colors,layers};
+    const size_t source_bytes[]={sizeof(*index),
+        n*sizeof(*index->entries),n*sizeof(*entity_layer_handles),
+        n*sizeof(*entity_colors),layer_count*sizeof(*layers)};
+    if (overlaps(page_resolved,out_bytes,page_scratch,scratch_bytes))
+        return 0;
+    for (size_t i=0u;i<5u;++i)
+        if (overlaps(page_resolved,out_bytes,sources[i],source_bytes[i]) ||
+            overlaps(page_scratch,scratch_bytes,sources[i],source_bytes[i]))
+            return 0;
+
+    /* Check both page boundaries against adjacent entries, not merely
+     * the sliced array's internal ordering. */
+    if (!musa_dwg1032_object_index_neighborhood_valid(index,first) ||
+        !musa_dwg1032_object_index_neighborhood_valid(
+            index,first+page_count-1u))
+        return 0;
+    const MusaDwg1032ObjectIndex page_index={
+        index->entries+first,page_count,index->section_bytes
+    };
+    return musa_dwg1032_layer_color_select_scratch(
+        &page_index,entity_layer_handles+first,entity_colors+first,
+        layers,layer_count,page_resolved,page_scratch,scratch_capacity);
+}
+
+/* A large definition may be shared by thousands of INSERTs. Resolve only
+ * the requested page in the current instance's layer/color context while
+ * protecting every original source page, including pages not yet visited.
+ * The underlying context resolver validates before publishing this page. */
+int musa_dwg1032_layer_color_apply_insert_context_page(
+    const MusaDwg1032ResolvedColor *definition_colors,
+    const MusaDwg1032CadColor *source_colors,
+    const uint64_t *source_layer_handles, size_t total_count,
+    size_t first, size_t page_count, uint64_t layer_zero_handle,
+    const MusaDwg1032ResolvedColor *insert_color,
+    const MusaDwg1032ResolvedColor *insert_layer_color,
+    MusaDwg1032ResolvedColor *page_resolved) {
+    if (!definition_colors || !source_colors || !source_layer_handles ||
+        !insert_color || !insert_layer_color || !page_resolved ||
+        !page_count || first>total_count ||
+        page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_colors) ||
+        total_count>PTRDIFF_MAX/sizeof(*source_colors) ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        page_count>PTRDIFF_MAX/sizeof(*page_resolved))
+        return 0;
+    const size_t output_bytes=page_count*sizeof(*page_resolved);
+    if (overlaps(page_resolved,output_bytes,definition_colors,
+                 total_count*sizeof(*definition_colors)) ||
+        overlaps(page_resolved,output_bytes,source_colors,
+                 total_count*sizeof(*source_colors)) ||
+        overlaps(page_resolved,output_bytes,source_layer_handles,
+                 total_count*sizeof(*source_layer_handles)))
+        return 0;
+    return musa_dwg1032_layer_color_apply_insert_context(
+        definition_colors+first,source_colors+first,
+        source_layer_handles+first,page_count,layer_zero_handle,
+        insert_color,insert_layer_color,page_resolved);
 }

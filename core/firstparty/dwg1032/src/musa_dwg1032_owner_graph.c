@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <string.h>
 
+/* Reject nonrepresentable C object spans before pointer indexing, even if
+ * the byte multiplication would fit in size_t. */
 static int overlaps(const void *a, size_t an, const void *b, size_t bn) {
     if (!an || !bn) return 0;
     const uintptr_t x=(uintptr_t)a, y=(uintptr_t)b;
@@ -18,12 +20,12 @@ int musa_dwg1032_owner_graph_resolve(const MusaDwg1032ObjectIndex *index,
                                      size_t *depths) {
     if (!index || !owner_handles || !work || !roots || !depths ||
         !index->entries || !index->count || work_count<index->count ||
-        index->count>SIZE_MAX/sizeof(*index->entries) ||
-        index->count>SIZE_MAX/sizeof(*owner_handles) ||
-        index->count>SIZE_MAX/sizeof(*work) ||
-        work_count>SIZE_MAX/sizeof(*work) ||
-        index->count>SIZE_MAX/sizeof(*roots) ||
-        index->count>SIZE_MAX/sizeof(*depths)) return 0;
+        index->count>PTRDIFF_MAX/sizeof(*index->entries) ||
+        index->count>PTRDIFF_MAX/sizeof(*owner_handles) ||
+        index->count>PTRDIFF_MAX/sizeof(*work) ||
+        work_count>PTRDIFF_MAX/sizeof(*work) ||
+        index->count>PTRDIFF_MAX/sizeof(*roots) ||
+        index->count>PTRDIFF_MAX/sizeof(*depths)) return 0;
     const size_t n=index->count;
     const void *ptrs[]={index,index->entries,owner_handles,work,roots,depths};
     const size_t sizes[]={sizeof(*index),n*sizeof(*index->entries),
@@ -95,10 +97,10 @@ int musa_dwg1032_owner_graph_visibility(
     if (!index || !index->entries || !index->count || !owner_handles ||
         !local_visible || !work || !effective_visible ||
         work_count<index->count ||
-        index->count>SIZE_MAX/sizeof(*index->entries) ||
-        index->count>SIZE_MAX/sizeof(*owner_handles) ||
-        work_count>SIZE_MAX/sizeof(*work) ||
-        index->count>SIZE_MAX/sizeof(*effective_visible)) return 0;
+        index->count>PTRDIFF_MAX/sizeof(*index->entries) ||
+        index->count>PTRDIFF_MAX/sizeof(*owner_handles) ||
+        work_count>PTRDIFF_MAX/sizeof(*work) ||
+        index->count>PTRDIFF_MAX/sizeof(*effective_visible)) return 0;
     const size_t n=index->count;
     const void *ptrs[]={index,index->entries,owner_handles,local_visible,
                         work,effective_visible};
@@ -162,14 +164,14 @@ int musa_dwg1032_owner_graph_layer_visibility(
         !entity_layer_handles || !entity_visible || !layers || !layer_count ||
         !work || !local_work || !effective_visible ||
         work_count < index->count ||
-        index->count > SIZE_MAX / sizeof(*index->entries) ||
-        index->count > SIZE_MAX / sizeof(*owner_handles) ||
-        index->count > SIZE_MAX / sizeof(*entity_layer_handles) ||
-        index->count > SIZE_MAX / sizeof(*entity_visible) ||
-        layer_count > SIZE_MAX / sizeof(*layers) ||
-        work_count > SIZE_MAX / sizeof(*work) ||
-        index->count > SIZE_MAX / sizeof(*local_work) ||
-        index->count > SIZE_MAX / sizeof(*effective_visible)) return 0;
+        index->count > PTRDIFF_MAX / sizeof(*index->entries) ||
+        index->count > PTRDIFF_MAX / sizeof(*owner_handles) ||
+        index->count > PTRDIFF_MAX / sizeof(*entity_layer_handles) ||
+        index->count > PTRDIFF_MAX / sizeof(*entity_visible) ||
+        layer_count > PTRDIFF_MAX / sizeof(*layers) ||
+        work_count > PTRDIFF_MAX / sizeof(*work) ||
+        index->count > PTRDIFF_MAX / sizeof(*local_work) ||
+        index->count > PTRDIFF_MAX / sizeof(*effective_visible)) return 0;
 
     const size_t n=index->count;
     const void *ptrs[]={index,index->entries,owner_handles,
@@ -220,7 +222,7 @@ int musa_dwg1032_owner_graph_apply_insert_context(
     size_t count, uint64_t layer_zero_handle, uint8_t insert_visible,
     uint8_t *effective_visible) {
     if (!layer_zero_handle || insert_visible>1u ||
-        count>SIZE_MAX/sizeof(*source_layer_handles) ||
+        count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
         (count && (!source_layer_handles || !definition_owner_visible ||
                    !definition_layer_visible || !effective_visible)))
         return 0;
@@ -239,4 +241,37 @@ int musa_dwg1032_owner_graph_apply_insert_context(
             (source_layer_handles[i]==layer_zero_handle ||
              definition_layer_visible[i]));
     return 1;
+}
+
+/* Bounded INSERT visibility for large definitions. Protect all original
+ * source pages, including future pages, before borrowing a subarray. The
+ * existing resolver performs strict per-page preflight before publishing. */
+int musa_dwg1032_owner_graph_apply_insert_context_page(
+    const uint64_t *source_layer_handles,
+    const uint8_t *definition_owner_visible,
+    const uint8_t *definition_layer_visible,
+    size_t total_count, size_t first, size_t page_count,
+    uint64_t layer_zero_handle, uint8_t insert_visible,
+    uint8_t *page_effective_visible) {
+    if (!source_layer_handles || !definition_owner_visible ||
+        !definition_layer_visible || !page_effective_visible ||
+        !page_count || first>total_count ||
+        page_count>total_count-first ||
+        total_count>PTRDIFF_MAX/sizeof(*source_layer_handles) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_owner_visible) ||
+        total_count>PTRDIFF_MAX/sizeof(*definition_layer_visible) ||
+        page_count>PTRDIFF_MAX/sizeof(*page_effective_visible))
+        return 0;
+    const size_t bytes=page_count*sizeof(*page_effective_visible);
+    if (overlaps(page_effective_visible,bytes,source_layer_handles,
+                 total_count*sizeof(*source_layer_handles)) ||
+        overlaps(page_effective_visible,bytes,definition_owner_visible,
+                 total_count*sizeof(*definition_owner_visible)) ||
+        overlaps(page_effective_visible,bytes,definition_layer_visible,
+                 total_count*sizeof(*definition_layer_visible)))
+        return 0;
+    return musa_dwg1032_owner_graph_apply_insert_context(
+        source_layer_handles+first,definition_owner_visible+first,
+        definition_layer_visible+first,page_count,layer_zero_handle,
+        insert_visible,page_effective_visible);
 }

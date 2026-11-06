@@ -1,0 +1,8 @@
+# Per-INSERT color paging — independent source provenance
+
+- **Scope:** `musa_dwg1032_layer_color_apply_insert_context_page` in `src/musa_dwg1032_layer_color.c`, its public declaration, and `tests/dwg1032_insert_color_page_test.c`.
+- **Origin:** Newly authored first-party C11 wrapper and synthetic regression fixtures for MusaCAD on 2026-11-03. No external CAD source code, generated bindings, or third-party DWG parser was copied or linked.
+- **Input contract:** The caller has independently authenticated a complete immutable block-definition object/color/layer snapshot. A bounded page is resolved for one specific INSERT instance; its layer-zero ByLayer children inherit the instance layer, ByBlock children inherit the instance entity color, and explicit colors remain unchanged.
+- **Safety:** Output cannot overlap the *full* source arrays, including future pages. The existing context resolver validates every selected-page entry before publishing output. Bad offsets, invalid color provenance, and aliasing reject without modifying public output.
+- **Verification:** CTest target `firstparty_dwg1032_insert_color_page_20k` compares 20,000 synthetic children against the whole-definition reference under two distinct INSERT contexts and checks late corruption, future-page aliasing, and bounds rejection. CI outcome must be inspected independently; this note does not assert that tests have passed.
+- **Limit:** This is post-decode color semantics only. It does not parse an AC1032 DWG layer table, establish real DWG authenticity, resolve dynamic block state, or authorize rendering. No claim of complete AC1032 read/write compatibility follows from this test.
