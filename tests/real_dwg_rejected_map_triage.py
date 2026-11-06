@@ -59,6 +59,19 @@ def run() -> int:
                 "ac1032_physical_page_locations"
             ):
                 raise ValueError("diagnostic_contradicts_native_stage")
+            if (triage.get("version") == "AC1032" and
+                    triage.get("map_lz_ok") is True and
+                    triage.get("page_id_namespace_audit_complete") is True):
+                counts = ("page_id_duplicate_positive",
+                          "page_id_duplicate_gap",
+                          "page_id_cross_role_collisions",
+                          "page_ids_above_admission_cap")
+                if any(type(triage.get(k)) is not int or triage[k] < 0
+                       for k in counts):
+                    raise ValueError("invalid_page_id_namespace_counters")
+                if sum(triage[k] for k in counts) > triage.get(
+                        "map_entry_count", 0):
+                    raise ValueError("impossible_page_id_namespace_counters")
             row.update(triage)
             row["source_unchanged"] = True
         except (OSError, ValueError, subprocess.SubprocessError,
