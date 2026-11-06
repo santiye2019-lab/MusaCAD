@@ -77,7 +77,7 @@ int musa_dwg_ac1024_directory_join_section(
     const char *section_name,
     uint8_t *output,size_t capacity,size_t *out_bytes);
 /* Diagnostic entry point: identical fail-atomic function, but returns a
- * bounded refusal stage in reason (0 on success; 1..12 on refusal).
+ * bounded refusal stage in reason (0 on success; 1..15 on refusal).
  * No handles, raw bytes, coordinates or source names are reported.
  * reason must not alias any source/input/output range. */
 int musa_dwg_ac1024_directory_join_section_diagnose(
