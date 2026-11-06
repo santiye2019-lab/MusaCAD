@@ -814,6 +814,33 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         # Bounded samples of *original* LFS DWG raw OT19 LINE records.
         # A valid common prefix/XYZ field parse is NOT rendering, owner
         # linkage, independent geometric parity, or normal-open acceptance.
+        # Independent first-party C11 per-LAYER source triplet proof.
+        # A verified OT80/505/57 numeric sequence still cannot establish
+        # CAD roles or make a partly consumed H-tail render-ready.
+        triplet_keys = (
+            "sampled_layer_eed_terminal_triplet_attempts",
+            "sampled_layer_eed_terminal_triplet_verified",
+            "sampled_layer_eed_terminal_triplet_nonzero_fragment",
+        )
+        if any(type(hint.get(k)) is not int or hint[k] < 0 for k in triplet_keys):
+            raise ValueError("invalid_ac1024_raw_type_triplet_contract")
+        triplet_attempted, triplet_verified, triplet_nonzero = (
+            hint[k] for k in triplet_keys
+        )
+        candidate_verified = hint.get(
+            "sampled_layer_eed_terminal_candidate_verified"
+        )
+        fragment_nonzero = hint.get(
+            "sampled_layer_eed_terminal_fragment_nonzero"
+        )
+        if (type(candidate_verified) is not int or
+                type(fragment_nonzero) is not int or
+                triplet_attempted != candidate_verified or
+                triplet_verified > triplet_attempted or
+                triplet_nonzero > triplet_verified or
+                triplet_nonzero > fragment_nonzero):
+            raise ValueError("inconsistent_ac1024_type_triplet_provenance")
+
         line_keys = (
             "sampled_line_attempts",
             "sampled_line_common_verified",
