@@ -276,6 +276,12 @@ int musa_dwg_ac1024_directory_join_section(
             logical_bytes=read64(rec);
             npage=count;
             page_bytes=read32(rec+12u);
+            /* The authenticated R2004-family section directory may
+             * declare page size zero for the conventional 0x7400 DATA
+             * logical block. This candidate is only accepted when every
+             * source logical offset, declared section span, checksum and
+             * strict original LZ stream independently agree. */
+            if(!page_bytes)page_bytes=29696u;
             if(read32(rec+20u)!=2u||read32(rec+28u)!=0u||
                !read32(rec+24u))return 0;
         }
