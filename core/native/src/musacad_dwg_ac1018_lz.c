@@ -74,6 +74,15 @@ static int copy_literals_diagnostic(LZCursor *c,size_t n,
     }
     return copy_literals(c,n);
 }
+/* Address-range checks are fail-closed, even when the caller supplies an
+ * input buffer as the output. Neither a successful decode nor the
+ * consumed-byte publication may overwrite the immutable source.
+ * Subtraction, not base+length, avoids integer wrap on uintptr_t. */
+static int ranges_overlap(const void *a,size_t na,const void *b,size_t nb){
+    if(!a||!b||!na||!nb)return 0;
+    const uintptr_t x=(uintptr_t)a,y=(uintptr_t)b;
+    return x<=y?y-x<na:x-y<nb;
+}
 /* Decode exactly one bounded stream; shared by production and diagnostics.
  * All decoded bytes remain in scratch until a fully correct 0x11 terminal. */
 static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
@@ -81,10 +90,18 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
     MusaDwgAc1018LzDiagnostic *diagnostic){
     if(!source||!consumed_bytes||!compressed_bytes||!decompressed_bytes||
        decompressed_bytes>1024u*1024u||(!output&&!diagnostic))return 0;
+    if(ranges_overlap(source,compressed_bytes,consumed_bytes,
+                      sizeof(*consumed_bytes))||
+       (output&&(ranges_overlap(source,compressed_bytes,output,
+                               decompressed_bytes)||
+                 ranges_overlap(output,decompressed_bytes,consumed_bytes,
+                                sizeof(*consumed_bytes))))||
+       (diagnostic&&(ranges_overlap(source,compressed_bytes,diagnostic,
+                                   sizeof(*diagnostic))||
+                     ranges_overlap(diagnostic,sizeof(*diagnostic),
+                                    consumed_bytes,sizeof(*consumed_bytes)))))
+        return 0;
     if(diagnostic){
-        const uintptr_t a=(uintptr_t)source,b=(uintptr_t)diagnostic;
-        if((a<=b&&b-a<compressed_bytes)||
-           (a>b&&a-b<sizeof(*diagnostic)))return 0;
         *diagnostic=(MusaDwgAc1018LzDiagnostic){
             .failure_phase=MUSA_DWG_AC1018_LZ_PHASE_ALLOC};
     }

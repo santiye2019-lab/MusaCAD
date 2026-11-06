@@ -31,6 +31,44 @@ static void valid(void){
                                       (uint8_t*)out,19u,&read));
     for(int i=0;i<19;i++)assert(out[i]=='Q');
 }
+static void source_alias_protection(void){
+    const uint8_t original[]={1,'A','B','C','D',0x11};
+    uint8_t shared[sizeof(original)];
+    memcpy(shared,original,sizeof shared);
+    size_t consumed=111u;
+    /* In-place copy would otherwise corrupt a real source DWG. */
+    assert(!musa_dwg_ac1018_lz_decode(
+        shared,sizeof(shared),shared,4u,&consumed));
+    assert(consumed==111u&&memcmp(shared,original,sizeof shared)==0);
+    /* Partial overlap is equally unsafe, even if the destination starts
+     * inside an input header or compressed payload. */
+    assert(!musa_dwg_ac1018_lz_decode(
+        shared,sizeof(shared),shared+1u,4u,&consumed));
+    assert(consumed==111u&&memcmp(shared,original,sizeof shared)==0);
+    union {
+        size_t aligned_word;
+        uint8_t bytes[sizeof(size_t)+sizeof(original)];
+    } aligned={0};
+    memcpy(aligned.bytes,original,sizeof original);
+    uint8_t separate[4]={'H','O','L','D'};
+    assert(!musa_dwg_ac1018_lz_decode(
+        aligned.bytes,sizeof(original),separate,4u,
+        &aligned.aligned_word));
+    assert(memcmp(aligned.bytes,original,sizeof original)==0);
+    assert(memcmp(separate,"HOLD",4u)==0);
+    /* The consumed pointer must not scribble over correctly decoded output. */
+    union { size_t words[3]; uint8_t bytes[sizeof(size_t)*3u]; } out={0};
+    uint8_t before[sizeof out.bytes];
+    memcpy(before,out.bytes,sizeof before);
+    assert(!musa_dwg_ac1018_lz_decode(
+        original,sizeof(original),out.bytes,4u,&out.words[0]));
+    assert(memcmp(out.bytes,before,sizeof before)==0);
+    /* Non-overlapping pointers continue to decode as before. */
+    size_t valid_count=0u;
+    assert(musa_dwg_ac1018_lz_decode(
+        original,sizeof(original),separate,4u,&valid_count));
+    assert(valid_count==sizeof(original)&&memcmp(separate,"ABCD",4u)==0);
+}
 static void corrupt(void){
     const uint8_t copy[]={1,'A','B','C','D',0x40,0,0x11};
     char out[7]={'U','N','T','O','U','C','H'};
@@ -143,4 +181,4 @@ static void trace(void){
         alias,16u,4u,(MusaDwgAc1018LzDiagnostic*)alias));
     assert(memcmp(before,alias,sizeof alias)==0);
 }
-int main(void){valid();corrupt();trace();return 0;}
+int main(void){valid();corrupt();trace();source_alias_protection();return 0;}
