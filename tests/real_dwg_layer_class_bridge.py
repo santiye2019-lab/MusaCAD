@@ -231,13 +231,34 @@ def summarize(stage: dict) -> dict:
     return aggregate
 
 
+def require_minimum_evidence(report: dict, min_triplets: int, min_drawings: int) -> None:
+    """Fail CI if its known real-source corpus silently loses coverage.
+
+    Explicit CLI thresholds are pinned to an independently checked baseline.
+    Programmatic summaries remain usable on smaller synthetic fixtures.
+    """
+    if type(min_triplets) is not int or type(min_drawings) is not int or (
+        min_triplets < 0 or min_drawings < 0
+    ):
+        raise EvidenceError("bad_coverage_threshold")
+    if (report["first_party_native_type_triplets_verified"] < min_triplets
+            or report["drawings_with_local_material_class_join"] < min_drawings
+            or report["layer_samples_with_three_crc_backed_targets"]
+            < min_triplets):
+        raise EvidenceError("original_real_dwg_corpus_coverage_regressed")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stage-report", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--min-native-triplets", type=int, default=0)
+    parser.add_argument("--min-source-drawings", type=int, default=0)
     args = parser.parse_args()
     source = json.loads(args.stage_report.read_text(encoding="utf-8"))
     result = summarize(source)
+    require_minimum_evidence(result, args.min_native_triplets,
+                             args.min_source_drawings)
     args.report.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n",
                            encoding="utf-8")
     print("AC1024 OT51 CRC target samples=%d, local MATERIAL class-identity joins=%d, "
