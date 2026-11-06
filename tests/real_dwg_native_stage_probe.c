@@ -67,7 +67,8 @@ static void report(const char *signature, const char *result,
                    int r2010_links_candidate,size_t r2010_link_count,
                    size_t r2010_headers,size_t r2010_payloads,
                    size_t r2010_header_crc,
-                   size_t r2010_lz_eligible,size_t r2010_lz_verified) {
+                   size_t r2010_lz_eligible,size_t r2010_lz_verified,
+                   int handles_join,size_t handles_logical_bytes) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
@@ -82,14 +83,17 @@ static void report(const char *signature, const char *result,
            "\"ac1024_data_payload_adler_verified\":%zu,"
            "\"ac1024_data_header_adler_verified\":%zu,"
            "\"ac1024_data_lz_eligible_pages\":%zu,"
-           "\"ac1024_data_lz_verified\":%zu}\n",
+           "\"ac1024_data_lz_verified\":%zu,"
+           "\"ac1024_handles_join_verified\":%s,"
+           "\"ac1024_handles_join_logical_bytes\":%zu}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
            r2010_strict_lz ? "true" : "false",
            r2010_dir_candidate ? "true" : "false",r2010_dir_refs,
            r2010_links_candidate ? "true" : "false",r2010_link_count,
            r2010_headers,r2010_payloads,r2010_header_crc,
-           r2010_lz_eligible,r2010_lz_verified);
+           r2010_lz_eligible,r2010_lz_verified,
+           handles_join?"true":"false",handles_logical_bytes);
 }
 
 int main(int argc, char **argv) {
@@ -117,6 +121,8 @@ int main(int argc, char **argv) {
     size_t ac1024_links_matched=0u;
     size_t ac1024_masked_headers=0u,ac1024_payloads=0u,ac1024_header_crc=0u;
     size_t ac1024_lz_eligible=0u,ac1024_lz_verified=0u;
+    int ac1024_handles_join=0;
+    size_t ac1024_handles_bytes=0u;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -211,6 +217,10 @@ int main(int argc, char **argv) {
                     envelope.source_data_lz_eligible_pages;
                 ac1024_lz_verified=
                     envelope.source_data_lz_verified;
+                ac1024_handles_join=
+                    envelope.source_handles_logical_join_verified!=0u;
+                ac1024_handles_bytes=
+                    envelope.source_handles_logical_bytes;
             }
         }
     } else if (format == MUSA_DWG_2018_2026) {
@@ -245,7 +255,8 @@ int main(int argc, char **argv) {
            ac1024_directory_candidate,ac1024_directory_refs,
            ac1024_links_candidate,ac1024_links_matched,
            ac1024_masked_headers,ac1024_payloads,ac1024_header_crc,
-           ac1024_lz_eligible,ac1024_lz_verified);
+           ac1024_lz_eligible,ac1024_lz_verified,
+           ac1024_handles_join,ac1024_handles_bytes);
     free(file);
     return 0;
 }
