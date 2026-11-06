@@ -2123,3 +2123,78 @@ int musa_dwg_ac1024_layer_eed_after_flags_bs_candidate_probe(
     *out = next;
     return 1;
 }
+
+/* Continue the CRC-authenticated post-flags BS witness with a bounded BL
+ * and raw RC byte. This is intentionally a FIELD-LENGTH HYPOTHESIS:
+ * even if all three reads succeed, no CMC identity or color is admitted. */
+uint8_t musa_dwg_ac1024_layer_eed_after_flags_tail_candidate_probe(
+    const uint8_t *objects, size_t object_bytes,
+    const MusaDwgAc1024SelfIdentity *recovered_index, size_t record_count,
+    uint64_t canonical_layer_handle,
+    MusaDwgAc1024LayerAfterFlagsTailCandidate *out) {
+    if (!objects || !object_bytes || !recovered_index || !record_count ||
+        !canonical_layer_handle || !out ||
+        record_count > MUSA_AC1024_SELF_INDEX_MAX ||
+        record_count > SIZE_MAX / sizeof(*recovered_index) ||
+        overlaps(objects, object_bytes, recovered_index,
+                 record_count * sizeof(*recovered_index)) ||
+        overlaps(objects, object_bytes, out, sizeof(*out)) ||
+        overlaps(recovered_index, record_count * sizeof(*recovered_index),
+                 out, sizeof(*out)))
+        return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_ARGUMENT;
+
+    MusaDwgAc1024LayerAfterFlagsBsCandidate bs = {0};
+    if (!musa_dwg_ac1024_layer_eed_after_flags_bs_candidate_probe(
+            objects, object_bytes, recovered_index, record_count,
+            canonical_layer_handle, &bs) ||
+        !bs.original_crc_verified || bs.cmc_identity_verified ||
+        bs.display_accepted)
+        return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BS;
+
+    MusaDwgAc1024SelfIdentity found = {0};
+    MusaDwgAc1024SelfPrefix self = {0};
+    if (!musa_dwg_ac1024_self_index_find(
+            recovered_index, record_count, canonical_layer_handle, &found) ||
+        !musa_dwg_ac1024_record_self_prefix(
+            objects, object_bytes, found.record_offset, &self) ||
+        found.raw_ot != 51u || !found.frame_crc16_verified ||
+        !found.embedded_handle_code0_verified ||
+        self.raw_ot != 51u || !self.frame_crc16_verified ||
+        self.indexed_object_offset != found.record_offset ||
+        self.embedded_absolute_handle != canonical_layer_handle ||
+        bs.layer_handle != canonical_layer_handle ||
+        bs.layer_record_offset != found.record_offset ||
+        bs.candidate_start_bit >= bs.candidate_end_bit ||
+        bs.candidate_end_bit >= self.handle_stream_start_bit ||
+        self.payload_start_byte >= object_bytes ||
+        self.handle_stream_end_bit / 8u >
+            object_bytes - self.payload_start_byte)
+        return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_FRAME;
+
+    MusaDwgAc1015Bits bits = {0};
+    uint32_t raw_bl = 0u, raw_rc = 0u;
+    if (!musa_dwg_ac1015_bits_init(
+            &bits, objects + self.payload_start_byte,
+            self.handle_stream_end_bit / 8u,
+            bs.candidate_end_bit, self.handle_stream_start_bit))
+        return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_FRAME;
+    if (!musa_dwg_ac1015_bits_read_bl(&bits, &raw_bl))
+        return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_BL;
+    const size_t bl_end = bits.bit_pos;
+    if (!musa_dwg_ac1015_bits_read_u(&bits, 8u, &raw_rc) ||
+        bits.bit_pos > self.handle_stream_start_bit)
+        return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_RC;
+
+    MusaDwgAc1024LayerAfterFlagsTailCandidate next = {0};
+    next.layer_handle = canonical_layer_handle;
+    next.layer_record_offset = found.record_offset;
+    next.bs_end_bit = bs.candidate_end_bit;
+    next.bl_end_bit = bl_end;
+    next.rc_end_bit = bits.bit_pos;
+    next.candidate_bs_value = bs.candidate_bs_value;
+    next.candidate_bl_value = raw_bl;
+    next.candidate_rc_value = (uint8_t)raw_rc;
+    next.original_crc_verified = 1u;
+    *out = next;
+    return MUSA_DWG_LAYER_AFTER_FLAGS_TAIL_OK;
+}
