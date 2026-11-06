@@ -609,6 +609,11 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_layer_eed_terminal_fragment_bits_5;
     size_t sampled_layer_eed_terminal_fragment_bits_6;
     size_t sampled_layer_eed_terminal_fragment_bits_7;
+    /* Observed raw tiny suffix patterns, NOT padding or stream semantics. */
+    size_t sampled_layer_eed_terminal_fragment_2bit_pattern_mask;
+    size_t sampled_layer_eed_terminal_fragment_4bit_pattern_mask;
+    size_t sampled_layer_eed_terminal_fragment_start_mod8_mask;
+    size_t sampled_layer_eed_terminal_fragment_end_mod8_mask;
     /* Complete first-four RAW H header forms; no target interpretation. */
     size_t sampled_layer_eed_terminal_fragment_prefix_count;
     size_t sampled_layer_eed_terminal_fragment_prefix_code_5;
@@ -1559,8 +1564,27 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                             fragment.prefix_h_token_count ==
                                                                 (fragment.complete_h_token_count < 4u ?
                                                                     fragment.complete_h_token_count : 4u) &&
-                                                            fragment.display_accepted == 0u) {
+                                                            fragment.display_accepted == 0u &&
+                                                            fragment.terminal_fragment_start_mod8 <= 7u &&
+                                                            fragment.terminal_fragment_end_mod8 <= 7u &&
+                                                            fragment.terminal_fragment_raw_pattern <
+                                                                (1u << fragment.terminal_fragment_bit_count) &&
+                                                            (fragment.terminal_fragment_raw_pattern == 0u) ==
+                                                                (fragment.terminal_fragment_all_zero != 0u) &&
+                                                            ((fragment.terminal_fragment_start_mod8 +
+                                                              fragment.terminal_fragment_bit_count) & 7u) ==
+                                                                fragment.terminal_fragment_end_mod8) {
                                                             ++hint.sampled_layer_eed_terminal_fragment_verified;
+                                                            if (fragment.terminal_fragment_bit_count == 2u)
+                                                                hint.sampled_layer_eed_terminal_fragment_2bit_pattern_mask |=
+                                                                    (size_t)1u << fragment.terminal_fragment_raw_pattern;
+                                                            if (fragment.terminal_fragment_bit_count == 4u)
+                                                                hint.sampled_layer_eed_terminal_fragment_4bit_pattern_mask |=
+                                                                    (size_t)1u << fragment.terminal_fragment_raw_pattern;
+                                                            hint.sampled_layer_eed_terminal_fragment_start_mod8_mask |=
+                                                                (size_t)1u << fragment.terminal_fragment_start_mod8;
+                                                            hint.sampled_layer_eed_terminal_fragment_end_mod8_mask |=
+                                                                (size_t)1u << fragment.terminal_fragment_end_mod8;
                                                             if (fragment.terminal_fragment_all_zero)
                                                                 ++hint.sampled_layer_eed_terminal_fragment_zero;
                                                             else
@@ -2764,6 +2788,10 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_fragment_bits_5\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_bits_6\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_bits_7\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_2bit_pattern_mask\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_4bit_pattern_mask\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_start_mod8_mask\":%zu,"
+               "\"sampled_layer_eed_terminal_fragment_end_mod8_mask\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_prefix_count\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_prefix_code_5\":%zu,"
                "\"sampled_layer_eed_terminal_fragment_prefix_code_other\":%zu,"
@@ -3184,6 +3212,10 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_fragment_bits_5,
                hint->sampled_layer_eed_terminal_fragment_bits_6,
                hint->sampled_layer_eed_terminal_fragment_bits_7,
+               hint->sampled_layer_eed_terminal_fragment_2bit_pattern_mask,
+               hint->sampled_layer_eed_terminal_fragment_4bit_pattern_mask,
+               hint->sampled_layer_eed_terminal_fragment_start_mod8_mask,
+               hint->sampled_layer_eed_terminal_fragment_end_mod8_mask,
                hint->sampled_layer_eed_terminal_fragment_prefix_count,
                hint->sampled_layer_eed_terminal_fragment_prefix_code_5,
                hint->sampled_layer_eed_terminal_fragment_prefix_code_other,
