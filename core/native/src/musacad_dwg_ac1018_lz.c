@@ -135,7 +135,10 @@ static int decode_lz_internal(const uint8_t *source,size_t compressed_bytes,
             goto cleanup;
         }
         phase=MUSA_DWG_AC1018_LZ_PHASE_BACKREFERENCE;
-        if(back>=SIZE_MAX||back+1u>c.used||count>c.limit-c.used)
+        if(back>=SIZE_MAX||back+1u>c.used)
+            goto cleanup;
+        phase=MUSA_DWG_AC1018_LZ_PHASE_OUTPUT_OVERRUN;
+        if(count>c.limit-c.used)
             goto cleanup;
         ++back;
         for(size_t i=0u;i<count;i++){
