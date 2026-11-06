@@ -45,6 +45,8 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint32_t source_handles_logical_offset_mismatch_pages;
     uint32_t source_handles_lz_eligible_pages;
     uint32_t source_handles_lz_verified_pages;
+    /* Exact bounded reason from the private first-party join helper. */
+    uint32_t source_handles_join_inner_failure_stage;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately
