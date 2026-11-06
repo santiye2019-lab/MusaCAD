@@ -76,6 +76,15 @@ def summarize(stage: dict) -> dict:
         "layer_after_flags_bs_value_256": 0,
         "layer_after_flags_bs_value_257_1023": 0,
         "layer_after_flags_bs_value_1024_plus": 0,
+        "layer_after_flags_tail_candidate_attempts": 0,
+        "layer_after_flags_tail_candidate_verified": 0,
+        "layer_after_flags_tail_candidate_refused": 0,
+        "layer_after_flags_tail_candidate_refused_bs": 0,
+        "layer_after_flags_tail_candidate_refused_frame": 0,
+        "layer_after_flags_tail_candidate_refused_bl": 0,
+        "layer_after_flags_tail_candidate_refused_rc": 0,
+        "layer_after_flags_tail_candidate_refused_other": 0,
+        "layer_after_flags_tail_is_not_verified_cmc": True,
         "layer_after_flags_bs_is_not_verified_cmc": True,
         "layer_eed_cmc_raw_prefix_verified": 0,
         "layer_eed_cmc_raw_prefix_refused": 0,
@@ -343,6 +352,22 @@ def summarize(stage: dict) -> dict:
              "layer_after_flags_bs_value_1024_plus"), bs_values
         ):
             aggregate[label] += value
+        tail_suffixes = (
+            "attempts", "verified", "refused", "refused_bs",
+            "refused_frame", "refused_bl", "refused_rc", "refused_other"
+        )
+        tail_values = [
+            _integer(h, "sampled_layer_eed_cmc_postflags_tail_" + k, 2048)
+            for k in tail_suffixes
+        ]
+        ta, tv, tr, tbs, tf, tbl, trc, to = tail_values
+        if (ta != raw_join_verified or ta != ba or tv + tr != ta or
+                tbs + tf + tbl + trc + to != tr or tv > bv or
+                tbs > br or
+                max(tbs, tf, tbl, trc, to) > ta):
+            raise EvidenceError("unproven_source_local_postflags_tail_hypothesis")
+        for suffix, value in zip(tail_suffixes, tail_values):
+            aggregate["layer_after_flags_tail_candidate_" + suffix] += value
         cmc_refusal_suffixes = (
             "preflight", "index_nonzero", "bl", "rc", "rc_flags", "other"
         )
