@@ -1500,6 +1500,9 @@ static int test_layer_eed_xdictionary_original_graph(void) {
         fragment.complete_h_token_count != 2u ||
         fragment.complete_h5_zero_token_count != 1u ||
         fragment.terminal_fragment_bit_count != 3u ||
+        fragment.terminal_fragment_raw_pattern != 0u ||
+        fragment.terminal_fragment_start_mod8 != 5u ||
+        fragment.terminal_fragment_end_mod8 != 0u ||
         fragment.prefix_h_token_count != 2u ||
         fragment.prefix_h_code[0] != 5u ||
         fragment.prefix_h_code[1] != 5u ||
@@ -1521,6 +1524,9 @@ static int test_layer_eed_xdictionary_original_graph(void) {
             with_fragment, sizeof(with_fragment), fragment_index,
             4u, 45u, &fragment) ||
         fragment.terminal_fragment_all_zero ||
+        fragment.terminal_fragment_raw_pattern != 5u ||
+        fragment.terminal_fragment_start_mod8 != 5u ||
+        fragment.terminal_fragment_end_mod8 != 0u ||
         fragment.terminal_fragment_bit_count != 3u ||
         fragment.complete_h_token_count != 2u ||
         fragment.prefix_h_token_count != 2u ||
