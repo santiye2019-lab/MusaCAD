@@ -2,6 +2,7 @@
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1024_section_envelope.h"
 #include "musacad_dwg_ac1024_section_directory.h"
+#include "musacad_dwg_ac1024_data_page.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -267,6 +268,62 @@ static void r2010_directory_original_page_link_test(void){
         (MusaDwgAc1024DirectoryPageLinkEvidence*)
             (void*)(decoded+4u)));
 }
+
+/* Synthetic R2010 masked data page: both Adler checksums are independent
+ * of the physical-map index checks from the other fixtures. */
+static void r2010_data_page_checksum_test(void){
+    uint8_t directory[132]={0},file[320]={0};
+    le32(directory,1u);
+    le32(directory+20u,64u);
+    le32(directory+28u,1u);
+    le32(directory+44u,9u); /* section ID at record +24 */
+    memcpy(directory+52u,"AcDb:Handles",13u);
+    le32(directory+116u,7u);
+    le32(directory+120u,16u);
+    MusaDwgAc1018PageLocation locations[1]={{7u,64u,256u}};
+    const size_t offset=256u;
+    const uint32_t mask=UINT32_C(0x4164536b)^(uint32_t)offset;
+    for(unsigned i=0u;i<16u;i++)file[offset+32u+i]=(uint8_t)(i+1u);
+    uint32_t words[8]={UINT32_C(0x4163043b),9u,16u,16u,
+                       0u,0u,0u,0u};
+    words[7]=checksum(0u,file+offset+32u,16u);
+    uint8_t clear[32];
+    for(unsigned i=0u;i<8u;i++)le32(clear+4u*i,i==6u?0u:words[i]);
+    words[6]=checksum(words[7],clear,sizeof clear);
+    for(unsigned i=0u;i<8u;i++)le32(file+offset+4u*i,words[i]^mask);
+    uint8_t before[320];memcpy(before,file,sizeof file);
+    MusaDwgAc1024DataPageEvidence evidence={0};
+    assert(musa_dwg_ac1024_data_pages_authenticated(
+        file,sizeof file,directory,sizeof directory,
+        locations,1u,&evidence));
+    assert(evidence.verified_pages==1u&&
+           evidence.verified_packed_bytes==16u);
+    assert(memcmp(file,before,sizeof file)==0);
+    const MusaDwgAc1024DataPageEvidence saved=evidence;
+    file[offset+33u]^=1u; /* original payload CRC invalid */
+    assert(!musa_dwg_ac1024_data_pages_authenticated(
+        file,sizeof file,directory,sizeof directory,
+        locations,1u,&evidence));
+    assert(memcmp(&evidence,&saved,sizeof saved)==0);
+    memcpy(file,before,sizeof file);
+    file[offset+26u]^=1u; /* masked header CRC invalid */
+    assert(!musa_dwg_ac1024_data_pages_authenticated(
+        file,sizeof file,directory,sizeof directory,
+        locations,1u,&evidence));
+    assert(memcmp(&evidence,&saved,sizeof saved)==0);
+    memcpy(file,before,sizeof file);
+    le32(directory+44u,10u); /* wrong original section ID */
+    assert(!musa_dwg_ac1024_data_pages_authenticated(
+        file,sizeof file,directory,sizeof directory,
+        locations,1u,&evidence));
+    assert(memcmp(&evidence,&saved,sizeof saved)==0);
+    le32(directory+44u,9u);
+    assert(!musa_dwg_ac1024_data_pages_authenticated(
+        file,sizeof file,directory,sizeof directory,
+        locations,1u,
+        (MusaDwgAc1024DataPageEvidence*)(void*)(file+16u)));
+    assert(memcmp(file,before,sizeof file)==0);
+}
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -305,5 +362,6 @@ int main(void){
     r2010_section_envelope_test();
     r2010_directory_shape_candidate_test();
     r2010_directory_original_page_link_test();
+    r2010_data_page_checksum_test();
     return 0;
 }

@@ -79,6 +79,17 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or (not result.get("ac1024_directory_physical_links_candidate")
             and result.get("ac1024_directory_matched_physical_refs_candidate")
             != 0)
+        or type(result.get("ac1024_data_page_checksums_candidate")) is not bool
+        or type(result.get("ac1024_data_page_checksums_verified_count"))
+            is not int
+        or result.get("ac1024_data_page_checksums_verified_count") < 0
+        or (result.get("ac1024_data_page_checksums_candidate")
+            and not result.get("ac1024_directory_physical_links_candidate"))
+        or (result.get("ac1024_data_page_checksums_candidate")
+            and result.get("ac1024_data_page_checksums_verified_count")
+            != result.get("ac1024_directory_matched_physical_refs_candidate"))
+        or (not result.get("ac1024_data_page_checksums_candidate")
+            and result.get("ac1024_data_page_checksums_verified_count") != 0)
     ):
         raise ValueError("invalid_native_probe_contract")
     if result["result"] == "accepted":

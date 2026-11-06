@@ -3,6 +3,7 @@
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_dwg_ac1024_section_directory.h"
+#include "musacad_dwg_ac1024_data_page.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -87,6 +88,13 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                     e.directory_physical_links_candidate=1u;
                     e.directory_matched_physical_refs_candidate=
                         linked.matched_page_references;
+                    MusaDwgAc1024DataPageEvidence data_pages={0};
+                    if(musa_dwg_ac1024_data_pages_authenticated(
+                           file,n,decoded,expanded,pages,count,&data_pages)){
+                        e.data_page_checksums_candidate=1u;
+                        e.data_page_checksum_verified_count_candidate=
+                            data_pages.verified_pages;
+                    }
                 }
             }
         }
