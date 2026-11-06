@@ -159,6 +159,10 @@ int musa_dwg_ac1024_directory_page_checksums(
         const uint32_t compression=read32(rec+20u);
         const uint32_t encryption=read32(rec+28u);
         const uint64_t section_logical_bytes=read64(rec);
+        const int handles_section=
+            strcmp((const char*)(rec+32u),"AcDb:Handles")==0;
+        if(handles_section)
+            evidence.handles_page_references=npage;
         at+=96u;
         for(uint32_t j=0;j<npage;j++){
             const uint8_t *entry=decoded+at+(size_t)j*16u;
@@ -211,13 +215,16 @@ int musa_dwg_ac1024_directory_page_checksums(
                logical!=(uint64_t)j*page_output_bytes)
                 continue;
             ++evidence.strict_lz_eligible_pages;
+            if(handles_section)++evidence.handles_strict_lz_eligible;
             MusaDwgAc1018LzDiagnostic diag={0};
             if(musa_dwg_ac1018_lz_diagnose(
                    file+pos+32u,packed,page_output_bytes,&diag)&&
                diag.completed&&diag.input_consumed>0u&&
                diag.input_consumed<=packed&&
-               diag.output_produced==page_output_bytes)
+               diag.output_produced==page_output_bytes){
                 ++evidence.strict_lz_verified;
+                if(handles_section)++evidence.handles_strict_lz_verified;
+            }
         }
         at+=(size_t)npage*16u;
     }
