@@ -491,6 +491,7 @@ typedef struct MusaAc1024CompatibilityHint {
     size_t sampled_line_eed_layer_state_on;
     size_t sampled_line_eed_layer_state_locked;
     size_t sampled_line_eed_layer_state_raw_color_256;
+    size_t sampled_line_eed_layer_state_raw_256_cmc_prefix_verified;
     /* Mutually exclusive original index-only categories. RGB can overlap. */
     size_t sampled_line_eed_layer_state_raw_color_0;
     size_t sampled_line_eed_layer_state_raw_color_1_255;
@@ -655,6 +656,12 @@ typedef struct MusaAc1024CompatibilityHint {
     /* Same-original OT51 numeric frozen/on/locked bits + H target graph. */
     size_t sampled_layer_eed_state_join_attempts;
     size_t sampled_layer_eed_state_join_verified;
+    /* CRC-backed LAYER CMC raw BS/BL/RC prefix only. No parity. */
+    size_t sampled_layer_eed_cmc_attempts;
+    size_t sampled_layer_eed_cmc_verified;
+    size_t sampled_layer_eed_cmc_refused;
+    size_t sampled_layer_eed_cmc_named;
+    size_t sampled_layer_eed_cmc_book_named;
     size_t sampled_layer_eed_state_join_frozen;
     size_t sampled_layer_eed_state_join_on;
     size_t sampled_layer_eed_state_join_locked;
@@ -1725,6 +1732,27 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                             raw_state.layer_record_offset ==
                                                                                 recovered[k].record_offset) {
                                                                             ++hint.sampled_layer_eed_state_join_verified;
+                                                                            ++hint.sampled_layer_eed_cmc_attempts;
+                                                                            MusaDwgAc1024LayerCmcRawPrefix layer_cmc = {0};
+                                                                            if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+                                                                                    objects, nb, recovered, legacy_count,
+                                                                                    recovered[k].embedded_absolute_handle,
+                                                                                    &layer_cmc) &&
+                                                                                layer_cmc.original_record_crc_verified &&
+                                                                                !layer_cmc.color_names_decoded &&
+                                                                                !layer_cmc.bylayer_color_parity_verified &&
+                                                                                !layer_cmc.display_accepted &&
+                                                                                layer_cmc.color_index == 0u &&
+                                                                                layer_cmc.layer_handle == raw_state.layer_handle &&
+                                                                                layer_cmc.layer_record_offset == raw_state.layer_record_offset) {
+                                                                                ++hint.sampled_layer_eed_cmc_verified;
+                                                                                if (layer_cmc.color_name_present)
+                                                                                    ++hint.sampled_layer_eed_cmc_named;
+                                                                                if (layer_cmc.book_name_present)
+                                                                                    ++hint.sampled_layer_eed_cmc_book_named;
+                                                                            } else {
+                                                                                ++hint.sampled_layer_eed_cmc_refused;
+                                                                            }
                                                                             if (raw_state.frozen_bit)
                                                                                 ++hint.sampled_layer_eed_state_join_frozen;
                                                                             if (raw_state.on_bit)
@@ -2147,8 +2175,20 @@ static MusaAc1024CompatibilityHint ac1024_family_hint(
                                                                             ++hint.sampled_line_eed_layer_state_on;
                                                                         if (raw_color.locked_raw_bit)
                                                                             ++hint.sampled_line_eed_layer_state_locked;
-                                                                        if (raw_color.line_raw_color_index == 256u)
+                                                                        if (raw_color.line_raw_color_index == 256u) {
                                                                             ++hint.sampled_line_eed_layer_state_raw_color_256;
+                                                                            MusaDwgAc1024LayerCmcRawPrefix candidate_cmc = {0};
+                                                                            if (musa_dwg_ac1024_layer_eed_cmc_raw_prefix_probe(
+                                                                                    objects, nb, recovered, legacy_count,
+                                                                                    raw_color.layer_handle, &candidate_cmc) &&
+                                                                                candidate_cmc.original_record_crc_verified &&
+                                                                                !candidate_cmc.color_names_decoded &&
+                                                                                !candidate_cmc.bylayer_color_parity_verified &&
+                                                                                !candidate_cmc.display_accepted &&
+                                                                                candidate_cmc.color_index == 0u &&
+                                                                                candidate_cmc.layer_record_offset == raw_color.layer_record_offset)
+                                                                                ++hint.sampled_line_eed_layer_state_raw_256_cmc_prefix_verified;
+                                                                        }
                                                                         else if (raw_color.line_raw_color_index == 0u)
                                                                             ++hint.sampled_line_eed_layer_state_raw_color_0;
                                                                         else if (raw_color.line_raw_color_index <= 255u)
@@ -2822,6 +2862,7 @@ static void report(const char *signature, const char *result,
                "\"sampled_line_eed_layer_state_on\":%zu,"
                "\"sampled_line_eed_layer_state_locked\":%zu,"
                "\"sampled_line_eed_layer_state_raw_color_256\":%zu,"
+               "\"sampled_line_eed_layer_state_raw_256_cmc_prefix_verified\":%zu,"
                "\"sampled_line_eed_layer_state_raw_color_0\":%zu,"
                "\"sampled_line_eed_layer_state_raw_color_1_255\":%zu,"
                "\"sampled_line_eed_layer_state_raw_color_257\":%zu,"
@@ -2968,6 +3009,11 @@ static void report(const char *signature, const char *result,
                "\"sampled_layer_eed_terminal_alignment_nonzero\":%zu,"
                "\"sampled_layer_eed_state_join_attempts\":%zu,"
                "\"sampled_layer_eed_state_join_verified\":%zu,"
+               "\"sampled_layer_eed_cmc_attempts\":%zu,"
+               "\"sampled_layer_eed_cmc_verified\":%zu,"
+               "\"sampled_layer_eed_cmc_refused\":%zu,"
+               "\"sampled_layer_eed_cmc_named\":%zu,"
+               "\"sampled_layer_eed_cmc_book_named\":%zu,"
                "\"sampled_layer_eed_state_join_frozen\":%zu,"
                "\"sampled_layer_eed_state_join_on\":%zu,"
                "\"sampled_layer_eed_state_join_locked\":%zu,"
@@ -3271,6 +3317,7 @@ static void report(const char *signature, const char *result,
                hint->sampled_line_eed_layer_state_on,
                hint->sampled_line_eed_layer_state_locked,
                hint->sampled_line_eed_layer_state_raw_color_256,
+               hint->sampled_line_eed_layer_state_raw_256_cmc_prefix_verified,
                hint->sampled_line_eed_layer_state_raw_color_0,
                hint->sampled_line_eed_layer_state_raw_color_1_255,
                hint->sampled_line_eed_layer_state_raw_color_257,
@@ -3417,6 +3464,11 @@ static void report(const char *signature, const char *result,
                hint->sampled_layer_eed_terminal_alignment_nonzero,
                hint->sampled_layer_eed_state_join_attempts,
                hint->sampled_layer_eed_state_join_verified,
+               hint->sampled_layer_eed_cmc_attempts,
+               hint->sampled_layer_eed_cmc_verified,
+               hint->sampled_layer_eed_cmc_refused,
+               hint->sampled_layer_eed_cmc_named,
+               hint->sampled_layer_eed_cmc_book_named,
                hint->sampled_layer_eed_state_join_frozen,
                hint->sampled_layer_eed_state_join_on,
                hint->sampled_layer_eed_state_join_locked,
