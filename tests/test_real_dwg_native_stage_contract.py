@@ -385,6 +385,9 @@ def ac1024_probe_record():
             "sampled_layer_eed_terminal_fragment_ordinal_4_code5": 0,
             "sampled_layer_eed_terminal_candidate_attempts": 0,
             "sampled_layer_eed_terminal_candidate_verified": 0,
+            "sampled_layer_eed_terminal_triplet_attempts": 0,
+            "sampled_layer_eed_terminal_triplet_verified": 0,
+            "sampled_layer_eed_terminal_triplet_nonzero_fragment": 0,
             "sampled_layer_eed_terminal_candidate_refused": 0,
             "sampled_layer_eed_terminal_candidate_prefix_tokens": 0,
             "sampled_layer_eed_terminal_candidate_absolute": 0,
@@ -456,6 +459,19 @@ def validate_fake_result(record):
 
 
 class Ac1024CompatibilityContractTest(unittest.TestCase):
+    def test_original_layer_type_triplet_cannot_be_fabricated(self):
+        baseline = ac1024_probe_record()
+        self.assertEqual(validate_fake_result(baseline), baseline)
+        for key in (
+            "sampled_layer_eed_terminal_triplet_attempts",
+            "sampled_layer_eed_terminal_triplet_verified",
+            "sampled_layer_eed_terminal_triplet_nonzero_fragment",
+        ):
+            fake = deepcopy(baseline)
+            fake["ac1024_compatibility_hypothesis"][key] = 1
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_fake_result(fake)
+
     def test_r2010_ot505_numeric_source_requirements(self):
         baseline = ac1024_probe_record()
         self.assertEqual(validate_fake_result(baseline), baseline)
