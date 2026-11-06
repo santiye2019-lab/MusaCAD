@@ -36,6 +36,8 @@ typedef enum MusaDwgAc1018LzFailurePhase {
 typedef struct MusaDwgAc1018LzDiagnostic {
     size_t input_consumed;
     size_t output_produced;
+    size_t overflow_match_bytes;   /* only when OUTPUT_OVERRUN */
+    size_t overflow_available_bytes; /* only when OUTPUT_OVERRUN */
     MusaDwgAc1018LzFailurePhase failure_phase;
     uint8_t completed;
 } MusaDwgAc1018LzDiagnostic;
