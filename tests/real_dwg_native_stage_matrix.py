@@ -92,6 +92,41 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or not (result.get("ac1024_data_lz_verified") <=
                 result.get("ac1024_data_lz_eligible_pages") <=
                 result.get("ac1024_data_header_adler_verified"))
+        or any(type(result.get(k)) is not int or result[k] < 0
+               for k in ("ac1024_handle_candidate_profiles",
+                         "ac1024_handle_candidate_pairs",
+                         "ac1024_handle_crc_self_prefix_pairs",
+                         "ac1024_handle_candidate_numeric_matches",
+                         "ac1024_handle_candidate_profile"))
+        or result["ac1024_handle_candidate_profiles"] > 3
+        or result["ac1024_handle_candidate_pairs"] > 400000
+        or result["ac1024_handle_candidate_profile"] > 3
+        or not (result["ac1024_handle_candidate_numeric_matches"]
+                <= result["ac1024_handle_crc_self_prefix_pairs"]
+                <= result["ac1024_handle_candidate_pairs"])
+        or type(result.get("ac1024_handle_complete_self_index_verified"))
+           is not bool
+        or type(result.get("ac1024_handle_complete_numeric_agreement"))
+           is not bool
+        or ((result["ac1024_handle_candidate_profiles"] == 0)
+            != (result["ac1024_handle_candidate_profile"] == 0))
+        or (result["ac1024_handle_candidate_profiles"] == 0 and
+            (result["ac1024_handle_candidate_pairs"] != 0 or
+             result["ac1024_handle_crc_self_prefix_pairs"] != 0 or
+             result["ac1024_handle_candidate_numeric_matches"] != 0))
+        or (result["ac1024_handle_candidate_profiles"] > 0 and
+            result["ac1024_handle_candidate_pairs"] == 0)
+        or (result["ac1024_handle_complete_self_index_verified"] and
+            (result["signature"] != "AC1024" or
+             result["ac1024_handle_candidate_pairs"] == 0 or
+             result["ac1024_handle_crc_self_prefix_pairs"] !=
+             result["ac1024_handle_candidate_pairs"] or
+             result.get("ac1024_handles_crc_frames_verified") is not True or
+             result.get("ac1024_objects_join_verified") is not True))
+        or (result["ac1024_handle_complete_numeric_agreement"] and
+            (result["ac1024_handle_complete_self_index_verified"] is not True or
+             result["ac1024_handle_candidate_numeric_matches"] !=
+             result["ac1024_handle_candidate_pairs"]))
         or type(result.get("ac1024_handles_crc_frames_verified")) is not bool
         or type(result.get("ac1024_handles_crc_data_pages")) is not int
         or type(result.get("ac1024_handles_crc_page_data_bytes")) is not int
