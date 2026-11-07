@@ -123,6 +123,16 @@ typedef struct MusaDwgAc1024HandleObjectCrosscheck {
     uint8_t candidate_profile; /* 0=none,1=page-local,2=continuous,3=absolute */
     uint8_t complete_self_index_verified;
     uint8_t complete_numeric_agreement;
+    /* Deterministic evenly spaced sample (<=512 indexed source records),
+     * counted ONLY when entire source index + numeric identities agree.
+     * FIXED OT7/17/18/19 are candidates, not drawing entities admitted to
+     * rendering. Existing CRC-checked H witnesses validate targets OT49
+     * BLOCK_HEADER and OT51 LAYER; mode1/2 OT19 has NO serialized owner.
+     * Counters DO NOT imply full-corpus graph/geometry coverage. */
+    uint32_t source_sampled_records;
+    uint32_t source_sampled_fixed_entities;
+    uint32_t source_owner_layer_target_witnesses;
+    uint32_t source_implicit_line_layer_witnesses;
 } MusaDwgAc1024HandleObjectCrosscheck;
 int musa_dwg_ac1024_handle_object_crosscheck(
     const uint8_t *handles,size_t handle_bytes,

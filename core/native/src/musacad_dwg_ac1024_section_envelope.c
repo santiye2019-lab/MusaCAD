@@ -251,6 +251,14 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                         check.complete_self_index_verified;
                                     e.source_handle_complete_numeric_agreement=
                                         check.complete_numeric_agreement;
+                                    e.source_relationship_sampled_records=
+                                        check.source_sampled_records;
+                                    e.source_relationship_fixed_entity_candidates=
+                                        check.source_sampled_fixed_entities;
+                                    e.source_relationship_owner_layer_witnesses=
+                                        check.source_owner_layer_target_witnesses;
+                                    e.source_relationship_implicit_line_layer_witnesses=
+                                        check.source_implicit_line_layer_witnesses;
                                 }
                             }
                             free(joined_handles);

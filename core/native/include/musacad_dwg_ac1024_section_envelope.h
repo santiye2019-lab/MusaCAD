@@ -70,6 +70,15 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint8_t source_handle_candidate_profile;
     uint8_t source_handle_complete_self_index_verified;
     uint8_t source_handle_complete_numeric_agreement;
+    /* At most 512 uniformly spaced ORIGINAL source record witnesses,
+     * counted only after full CRC16/self-H/numeric index agreement.
+     * Owner+layer requires CRC-checked OT49+OT51; implicit LINE records
+     * prove only a CRC-backed OT51 layer, NEVER a serialized owner.
+     * Not a full graph census or scene/display admission. */
+    uint32_t source_relationship_sampled_records;
+    uint32_t source_relationship_fixed_entity_candidates;
+    uint32_t source_relationship_owner_layer_witnesses;
+    uint32_t source_relationship_implicit_line_layer_witnesses;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately

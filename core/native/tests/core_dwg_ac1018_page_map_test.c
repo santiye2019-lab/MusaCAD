@@ -582,6 +582,12 @@ static void r2010_handles_objects_crc_self_candidate_test(void){
            e.candidate_profile<=3u&&e.candidate_pairs==2u&&
            e.crc_self_prefix_pairs==2u&&e.candidate_numeric_matches==2u&&
            e.complete_self_index_verified&&e.complete_numeric_agreement);
+    /* This synthetic record has a genuine self-H but NO qualified
+     * OT49 owner / OT51 layer H references. Never invent a graph. */
+    assert(e.source_sampled_records==2u&&
+           e.source_sampled_fixed_entities==2u&&
+           !e.source_owner_layer_target_witnesses&&
+           !e.source_implicit_line_layer_witnesses);
     assert(memcmp(handles,immutable_h,sizeof handles)==0&&
            memcmp(objects,immutable_o,sizeof objects)==0);
     /* Even a source page with valid framing must NEVER bypass an
@@ -592,7 +598,9 @@ static void r2010_handles_objects_crc_self_candidate_test(void){
         handles,12u,objects,sizeof objects,&e));
     assert(!e.complete_self_index_verified&&
            !e.complete_numeric_agreement&&
-           e.crc_self_prefix_pairs<e.candidate_pairs);
+           e.crc_self_prefix_pairs<e.candidate_pairs&&
+           !e.source_sampled_records&&
+           !e.source_owner_layer_target_witnesses);
     memcpy(objects,immutable_o,sizeof objects);
     /* Numeric H candidate must not be promoted merely because record
      * offsets and independent self-H agree. */
@@ -602,7 +610,10 @@ static void r2010_handles_objects_crc_self_candidate_test(void){
         handles,12u,objects,sizeof objects,&e));
     assert(e.complete_self_index_verified&&
            !e.complete_numeric_agreement&&
-           e.candidate_numeric_matches<e.candidate_pairs);
+           e.candidate_numeric_matches<e.candidate_pairs&&
+           !e.source_sampled_records&&
+           !e.source_owner_layer_target_witnesses&&
+           !e.source_implicit_line_layer_witnesses);
     memcpy(handles,immutable_h,sizeof handles);
     /* Corrupted Handles CRC, absent terminal, alias, invalid capacity
      * all refuse without altering caller evidence or the source. */
