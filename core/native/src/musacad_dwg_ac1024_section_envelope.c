@@ -162,6 +162,17 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                             e.source_handles_logical_join_verified=1u;
                                             e.source_handles_logical_bytes=
                                                 (uint32_t)written;
+                                            MusaDwgAc1024HandlesPageFrames frames={0};
+                                            if(musa_dwg_ac1024_handles_page_frames(
+                                                   joined,written,&frames) &&
+                                               frames.terminal_crc_verified &&
+                                               frames.data_pages>0u){
+                                                e.source_handles_crc_frames_verified=1u;
+                                                e.source_handles_crc_data_pages=
+                                                    frames.data_pages;
+                                                e.source_handles_crc_page_data_bytes=
+                                                    frames.data_bytes;
+                                            }
                                         }
                                         free(joined);
                                     }
