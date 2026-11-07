@@ -106,6 +106,10 @@ class NativeStageContractTest(unittest.TestCase):
             "ac1024_handle_candidate_profile": 0,
             "ac1024_handle_complete_self_index_verified": False,
             "ac1024_handle_complete_numeric_agreement": False,
+            "ac1024_relationship_sampled_records": 0,
+            "ac1024_relationship_fixed_entity_candidates": 0,
+            "ac1024_relationship_owner_layer_witnesses": 0,
+            "ac1024_relationship_implicit_line_layer_witnesses": 0,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
