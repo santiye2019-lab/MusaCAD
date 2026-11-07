@@ -238,5 +238,51 @@ class OriginalAc1024HandlesFrameGateTest(unittest.TestCase):
         require_original_ac1024_handles_crc_frames("AC1018", {})
 
 
+class OriginalAc1024HandleObjectSelfIdentityGateTest(unittest.TestCase):
+    def test_original_source_full_crc_self_and_numeric_handle_match(self):
+        from real_dwg_native_stage_matrix import (
+            require_original_ac1024_handle_object_self_identity,
+        )
+        valid = {
+            "result": "accepted",
+            "ac1024_handles_crc_frames_verified": True,
+            "ac1024_handles_join_verified": True,
+            "ac1024_objects_join_verified": True,
+            "ac1024_handle_candidate_profiles": 2,
+            "ac1024_handle_candidate_profile": 3,
+            "ac1024_handle_candidate_pairs": 2,
+            "ac1024_handle_crc_self_prefix_pairs": 2,
+            "ac1024_handle_candidate_numeric_matches": 2,
+            "ac1024_handle_complete_self_index_verified": True,
+            "ac1024_handle_complete_numeric_agreement": True,
+            "geometry_verified": False,
+            "rendering_verified": False,
+        }
+        require_original_ac1024_handle_object_self_identity("AC1024", valid)
+        for name, wrong in (
+            ("ac1024_handles_crc_frames_verified", False),
+            ("ac1024_objects_join_verified", False),
+            ("ac1024_handle_candidate_profiles", 0),
+            ("ac1024_handle_candidate_profile", 0),
+            ("ac1024_handle_candidate_pairs", 0),
+            ("ac1024_handle_crc_self_prefix_pairs", 1),
+            ("ac1024_handle_candidate_numeric_matches", 1),
+            ("ac1024_handle_complete_self_index_verified", False),
+            ("ac1024_handle_complete_numeric_agreement", False),
+            ("geometry_verified", True),
+        ):
+            malformed = dict(valid)
+            malformed[name] = wrong
+            with self.subTest(field=name), self.assertRaisesRegex(
+                ValueError,
+                "original_ac1024_handle_object_crc_self_identity_not_verified",
+            ):
+                require_original_ac1024_handle_object_self_identity(
+                    "AC1024", malformed
+                )
+        # Do not attribute AC1024 record identity evidence to other formats.
+        require_original_ac1024_handle_object_self_identity("AC1018", {})
+
+
 if __name__ == "__main__":
     unittest.main()
