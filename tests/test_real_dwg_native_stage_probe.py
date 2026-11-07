@@ -99,6 +99,13 @@ class NativeStageContractTest(unittest.TestCase):
             "ac1024_handles_crc_frames_verified": False,
             "ac1024_handles_crc_data_pages": 0,
             "ac1024_handles_crc_page_data_bytes": 0,
+            "ac1024_handle_candidate_profiles": 0,
+            "ac1024_handle_candidate_pairs": 0,
+            "ac1024_handle_crc_self_prefix_pairs": 0,
+            "ac1024_handle_candidate_numeric_matches": 0,
+            "ac1024_handle_candidate_profile": 0,
+            "ac1024_handle_complete_self_index_verified": False,
+            "ac1024_handle_complete_numeric_agreement": False,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
