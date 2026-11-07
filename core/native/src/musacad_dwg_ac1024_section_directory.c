@@ -528,6 +528,7 @@ int musa_dwg_ac1024_handle_object_crosscheck(
                 ++matching;
         }
         int entire=0;
+        uint32_t sampled=0u,fixed=0u,owner_layer=0u,implicit_layer=0u;
         if(prefix==count){
             MusaDwgAc1024SelfIdentity *recovered=
                 (MusaDwgAc1024SelfIdentity*)malloc(
@@ -538,6 +539,44 @@ int musa_dwg_ac1024_handle_object_crosscheck(
             }
             entire=musa_dwg_ac1024_recover_self_index(
                 objects,object_bytes,offsets,count,recovered,count);
+            /* A relationship can only be counted after ALL original
+             * handle offsets have passed record-frame CRC16, absolute
+             * self-H and exact source numeric identity agreement. The
+             * sparse sample cannot certify unvisited objects. */
+            if(entire&&matching==(uint32_t)count){
+                const size_t stride=(count+511u)/512u;
+                for(size_t k=0u;k<count;k+=stride){
+                    const MusaDwgAc1024SelfIdentity *rec=&recovered[k];
+                    ++sampled;
+                    if(rec->raw_ot!=7u&&rec->raw_ot!=17u&&
+                       rec->raw_ot!=18u&&rec->raw_ot!=19u)
+                        continue;
+                    ++fixed;
+                    MusaDwgAc1024OwnerLayerEvidence pair={0};
+                    if(musa_dwg_ac1024_entity_owner_layer_probe(
+                            objects,object_bytes,recovered,count,
+                            rec->embedded_absolute_handle,&pair)&&
+                       pair.source_crc_verified&&pair.target_records_verified&&
+                       pair.owner_handle&&pair.layer_handle&&
+                       pair.owner_record_offset<object_bytes&&
+                       pair.layer_record_offset<object_bytes){
+                        ++owner_layer;
+                    }else if(rec->raw_ot==19u){
+                        /* Entity mode 1/2 has NO owner H. Counting only
+                         * the original CRC-backed layer does not fabricate
+                         * layout, block membership or inherited style. */
+                        MusaDwgAc1024ImplicitLayerEvidence layer={0};
+                        if(musa_dwg_ac1024_implicit_layer_probe(
+                                objects,object_bytes,recovered,count,
+                                rec->embedded_absolute_handle,&layer)&&
+                           layer.source_crc_verified&&layer.layer_crc_verified&&
+                           (layer.entity_mode==1u||layer.entity_mode==2u)&&
+                           layer.layer_handle&&
+                           layer.layer_record_offset<object_bytes)
+                            ++implicit_layer;
+                    }
+                }
+            }
             free(recovered);
         }
         const int replace=(!next.candidate_profile ||
@@ -554,6 +593,10 @@ int musa_dwg_ac1024_handle_object_crosscheck(
             next.complete_self_index_verified=(uint8_t)(entire!=0);
             next.complete_numeric_agreement=(uint8_t)(
                 entire&&matching==(uint32_t)count);
+            next.source_sampled_records=sampled;
+            next.source_sampled_fixed_entities=fixed;
+            next.source_owner_layer_target_witnesses=owner_layer;
+            next.source_implicit_line_layer_witnesses=implicit_layer;
         }
         free(entries);free(offsets);
     }
