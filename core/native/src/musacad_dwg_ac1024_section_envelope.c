@@ -113,6 +113,8 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                          * resulting Handles bytes or claim ownership/paint.
                          * Bound additional report-stage memory to 16 MiB. */
                         if(crc.header_adler_verified==crc.referenced_pages){
+                            uint8_t *joined_handles=NULL,*joined_objects=NULL;
+                            size_t joined_handle_bytes=0u,joined_object_bytes=0u;
                             size_t pos=20u;
                             for(uint32_t si=0u;si<shape.sections;si++){
                                 const uint8_t *rec=decoded+pos;
@@ -172,6 +174,12 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                                     frames.data_pages;
                                                 e.source_handles_crc_page_data_bytes=
                                                     frames.data_bytes;
+                                                /* Retain only a fully source-authenticated,
+                                                 * internally CRC-framed stream for the
+                                                 * independent object-record check. */
+                                                joined_handles=joined;
+                                                joined_handle_bytes=written;
+                                                joined=NULL;
                                             }
                                         }
                                         free(joined);
@@ -208,6 +216,9 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                                 e.source_objects_logical_join_verified=1u;
                                                 e.source_objects_logical_bytes=
                                                     (uint32_t)written;
+                                                joined_objects=object_bytes;
+                                                joined_object_bytes=written;
+                                                object_bytes=NULL;
                                             }
                                             free(object_bytes);
                                         }
@@ -215,6 +226,35 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                 }
                                 pos+=96u+(size_t)section_page_count*16u;
                             }
+                            /* Never allow a byte stream by itself to become
+                             * a scene or a trusted handle index. Candidate
+                             * offsets need independent original CRC16/self-H
+                             * and identity checks in the same source. */
+                            if(joined_handles&&joined_objects&&
+                               e.source_handles_crc_frames_verified&&
+                               e.source_objects_logical_join_verified){
+                                MusaDwgAc1024HandleObjectCrosscheck check={0};
+                                if(musa_dwg_ac1024_handle_object_crosscheck(
+                                       joined_handles,joined_handle_bytes,
+                                       joined_objects,joined_object_bytes,&check)){
+                                    e.source_handle_candidate_profiles=
+                                        check.candidate_profiles;
+                                    e.source_handle_candidate_pairs=
+                                        check.candidate_pairs;
+                                    e.source_handle_crc_self_prefix_pairs=
+                                        check.crc_self_prefix_pairs;
+                                    e.source_handle_numeric_matches=
+                                        check.candidate_numeric_matches;
+                                    e.source_handle_candidate_profile=
+                                        check.candidate_profile;
+                                    e.source_handle_complete_self_index_verified=
+                                        check.complete_self_index_verified;
+                                    e.source_handle_complete_numeric_agreement=
+                                        check.complete_numeric_agreement;
+                                }
+                            }
+                            free(joined_handles);
+                            free(joined_objects);
                         }
                     }
                 }
