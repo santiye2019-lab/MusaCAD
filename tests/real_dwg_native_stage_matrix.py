@@ -92,6 +92,22 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
         or not (result.get("ac1024_data_lz_verified") <=
                 result.get("ac1024_data_lz_eligible_pages") <=
                 result.get("ac1024_data_header_adler_verified"))
+        or type(result.get("ac1024_handles_crc_frames_verified")) is not bool
+        or type(result.get("ac1024_handles_crc_data_pages")) is not int
+        or type(result.get("ac1024_handles_crc_page_data_bytes")) is not int
+        or not (0 <= result.get("ac1024_handles_crc_data_pages") <= 65536)
+        or not (0 <= result.get("ac1024_handles_crc_page_data_bytes")
+                <= 16 * 1024 * 1024)
+        or (result.get("ac1024_handles_crc_frames_verified") !=
+            (result.get("ac1024_handles_crc_data_pages") > 0))
+        or (not result.get("ac1024_handles_crc_frames_verified") and
+            result.get("ac1024_handles_crc_page_data_bytes") != 0)
+        or (result.get("ac1024_handles_crc_frames_verified") and (
+            result.get("signature") != "AC1024"
+            or result.get("ac1024_handles_join_verified") is not True
+            or result.get("ac1024_handles_crc_page_data_bytes") == 0
+            or result.get("ac1024_handles_crc_page_data_bytes") >=
+               result.get("ac1024_handles_join_logical_bytes")))
         or type(result.get("ac1024_objects_join_verified")) is not bool
         or type(result.get("ac1024_objects_join_logical_bytes")) is not int
         or type(result.get("ac1024_objects_candidate_logical_bytes")) is not int
