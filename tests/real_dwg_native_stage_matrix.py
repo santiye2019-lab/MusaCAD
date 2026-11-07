@@ -325,6 +325,35 @@ def require_original_ac1024_handle_object_self_identity(
         raise ValueError("original_ac1024_handle_object_crc_self_identity_not_verified")
 
 
+def require_original_ac1024_owner_layer_source_witnesses(
+        version: str, result: dict) -> None:
+    """Real immutable AC1024 LFS regression: bounded positive OT49/OT51 links.
+
+    Only the deterministic <=512 record sample is covered; this proves
+    source-original target CRC/OT/self-H, NOT full ownership, block insertion,
+    layer visibility, geometry or rendered scene.
+    """
+    if version != "AC1024":
+        return
+    sample = result.get("ac1024_relationship_sampled_records")
+    fixed = result.get("ac1024_relationship_fixed_entity_candidates")
+    owner = result.get("ac1024_relationship_owner_layer_witnesses")
+    implicit = result.get("ac1024_relationship_implicit_line_layer_witnesses")
+    if (
+        result.get("result") != "accepted"
+        or result.get("native_stage") != "ac1024_physical_page_locations"
+        or result.get("ac1024_handle_complete_self_index_verified") is not True
+        or result.get("ac1024_handle_complete_numeric_agreement") is not True
+        or result.get("ac1024_handles_crc_frames_verified") is not True
+        or result.get("ac1024_objects_join_verified") is not True
+        or any(type(value) is not int for value in (sample, fixed, owner, implicit))
+        or not (0 < owner + implicit <= fixed <= sample <= 512)
+        or result.get("geometry_verified") is not False
+        or result.get("rendering_verified") is not False
+    ):
+        raise ValueError("original_ac1024_owner_layer_source_witness_absent")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, default=Path("."))
@@ -376,6 +405,7 @@ def main() -> int:
             require_original_ac1024_objects_join(version, observed)
             require_original_ac1024_handles_crc_frames(version, observed)
             require_original_ac1024_handle_object_self_identity(version, observed)
+            require_original_ac1024_owner_layer_source_witnesses(version, observed)
             record.update(observed)
             record["committed_sha256"] = expected_sha
             record["size_bytes"] = actual_size
