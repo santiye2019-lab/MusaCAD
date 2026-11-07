@@ -288,5 +288,55 @@ class OriginalAc1024HandleObjectSelfIdentityGateTest(unittest.TestCase):
         require_original_ac1024_handle_object_self_identity("AC1018", {})
 
 
+class OriginalAc1024OwnerLayerWitnessGateTest(unittest.TestCase):
+    def test_original_crc_backed_layer_witness_required_without_geometry(self):
+        from real_dwg_native_stage_matrix import (
+            require_original_ac1024_owner_layer_source_witnesses,
+        )
+        valid = {
+            "result": "accepted",
+            "native_stage": "ac1024_physical_page_locations",
+            "ac1024_handle_complete_self_index_verified": True,
+            "ac1024_handle_complete_numeric_agreement": True,
+            "ac1024_handles_crc_frames_verified": True,
+            "ac1024_objects_join_verified": True,
+            "ac1024_relationship_sampled_records": 200,
+            "ac1024_relationship_fixed_entity_candidates": 100,
+            "ac1024_relationship_owner_layer_witnesses": 60,
+            "ac1024_relationship_implicit_line_layer_witnesses": 10,
+            "geometry_verified": False,
+            "rendering_verified": False,
+        }
+        require_original_ac1024_owner_layer_source_witnesses("AC1024", valid)
+        for field, replacement in (
+            ("ac1024_handle_complete_numeric_agreement", False),
+            ("ac1024_objects_join_verified", False),
+            ("ac1024_relationship_sampled_records", 513),
+            ("ac1024_relationship_fixed_entity_candidates", 10),
+            ("ac1024_relationship_owner_layer_witnesses", 0),
+            ("ac1024_relationship_implicit_line_layer_witnesses", 0),
+            ("geometry_verified", True),
+        ):
+            bad = dict(valid)
+            bad[field] = replacement
+            # A single zeroed owner count is allowed if implicit layer
+            # evidence is still valid; the guard forbids *both* zero.
+            if field == "ac1024_relationship_owner_layer_witnesses":
+                continue
+            with self.subTest(field=field), self.assertRaisesRegex(
+                ValueError, "original_ac1024_owner_layer_source_witness_absent"
+            ):
+                require_original_ac1024_owner_layer_source_witnesses(
+                    "AC1024", bad)
+        missing = dict(valid)
+        missing["ac1024_relationship_owner_layer_witnesses"] = 0
+        missing["ac1024_relationship_implicit_line_layer_witnesses"] = 0
+        with self.assertRaisesRegex(
+                ValueError, "original_ac1024_owner_layer_source_witness_absent"):
+            require_original_ac1024_owner_layer_source_witnesses(
+                "AC1024", missing)
+        require_original_ac1024_owner_layer_source_witnesses("AC1018", {})
+
+
 if __name__ == "__main__":
     unittest.main()
