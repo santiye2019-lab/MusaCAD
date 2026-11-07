@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "musacad_dwg_ac1024_section_directory.h"
 #include "musacad_dwg_ac1018_lz.h"
+#include "musacad_crc16.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -406,4 +407,46 @@ int musa_dwg_ac1024_directory_join_section_diagnose(
                                     output,capacity,out_bytes,&stage);
     *reason=stage;
     return ok;
+}
+
+
+/* Diagnostic-only AC1024 Handles CRC page-frame structure. These framing
+ * bytes may resemble R2004, but are NOT evidence that R2004 numeric handle
+ * delta or object-offset semantics apply to R2010. */
+int musa_dwg_ac1024_handles_page_frames(
+    const uint8_t *joined_handles,size_t bytes,
+    MusaDwgAc1024HandlesPageFrames *out){
+    if(!joined_handles||!out||bytes<8u||bytes>16u*1024u*1024u||
+       overlap(joined_handles,bytes,out,sizeof(*out)))
+        return 0;
+    MusaDwgAc1024HandlesPageFrames next={0};
+    size_t at=0u;
+    while(at<bytes){
+        if(bytes-at<4u)return 0;
+        const uint8_t *p=joined_handles+at;
+        const uint32_t size=((uint32_t)p[0]<<8u)|(uint32_t)p[1];
+        if(size<2u||size>2040u||size>bytes-at-2u)
+            return 0;
+        const size_t page_end=at+(size_t)size;
+        const uint16_t stored=((uint16_t)joined_handles[page_end]<<8u)|
+                              (uint16_t)joined_handles[page_end+1u];
+        uint16_t verified=0u;
+        if(!musa_core_crc16_arc(0xc0c1u,p,size,&verified)||
+           verified!=stored)return 0;
+        if(next.total_pages==UINT32_MAX)return 0;
+        ++next.total_pages;
+        if(size==2u){
+            if(page_end+2u!=bytes||!next.data_pages)return 0;
+            next.terminal_crc_verified=1u;
+            *out=next;
+            return 1;
+        }
+        if(next.data_pages==UINT32_MAX||
+           size-2u>UINT32_MAX-next.data_bytes)return 0;
+        ++next.data_pages;
+        next.data_bytes+=size-2u;
+        at=page_end+2u;
+    }
+    /* Missing terminal CRC is never accepted, even if all data pages pass. */
+    return 0;
 }

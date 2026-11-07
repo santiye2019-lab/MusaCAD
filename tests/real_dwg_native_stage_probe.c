@@ -71,7 +71,9 @@ static void report(const char *signature, const char *result,
                    int handles_join,size_t handles_logical_bytes,
                    int handles_reason,int handles_inner_reason,
                    int objects_join,size_t objects_bytes,
-                   size_t objects_candidate_bytes,int objects_inner_reason) {
+                   size_t objects_candidate_bytes,int objects_inner_reason,
+                   int handles_crc_pages,size_t handles_crc_data_pages,
+                   size_t handles_crc_payload_bytes) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
@@ -94,7 +96,10 @@ static void report(const char *signature, const char *result,
            "\"ac1024_objects_join_verified\":%s,"
            "\"ac1024_objects_join_logical_bytes\":%zu,"
            "\"ac1024_objects_candidate_logical_bytes\":%zu,"
-           "\"ac1024_objects_join_inner_failure_stage\":%d}\n",
+           "\"ac1024_objects_join_inner_failure_stage\":%d,"
+           "\"ac1024_handles_crc_frames_verified\":%s,"
+           "\"ac1024_handles_crc_data_pages\":%zu,"
+           "\"ac1024_handles_crc_page_data_bytes\":%zu}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
            r2010_strict_lz ? "true" : "false",
@@ -105,7 +110,9 @@ static void report(const char *signature, const char *result,
            handles_join?"true":"false",handles_logical_bytes,
            handles_reason,handles_inner_reason,
            objects_join?"true":"false",objects_bytes,
-           objects_candidate_bytes,objects_inner_reason);
+           objects_candidate_bytes,objects_inner_reason,
+           handles_crc_pages?"true":"false",handles_crc_data_pages,
+           handles_crc_payload_bytes);
 }
 
 int main(int argc, char **argv) {
@@ -140,6 +147,9 @@ int main(int argc, char **argv) {
     int ac1024_objects_join=0;
     size_t ac1024_objects_bytes=0u,ac1024_objects_candidate_bytes=0u;
     int ac1024_objects_inner_reason=0;
+    int ac1024_handles_crc_pages=0;
+    size_t ac1024_handles_crc_data_pages=0u;
+    size_t ac1024_handles_crc_payload_bytes=0u;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -240,6 +250,12 @@ int main(int argc, char **argv) {
                     envelope.source_handles_logical_bytes;
                 ac1024_handles_inner_reason=
                     (int)envelope.source_handles_join_inner_failure_stage;
+                ac1024_handles_crc_pages=
+                    envelope.source_handles_crc_frames_verified!=0u;
+                ac1024_handles_crc_data_pages=
+                    envelope.source_handles_crc_data_pages;
+                ac1024_handles_crc_payload_bytes=
+                    envelope.source_handles_crc_page_data_bytes;
                 ac1024_objects_join=
                     envelope.source_objects_logical_join_verified!=0u;
                 ac1024_objects_bytes=
@@ -327,7 +343,9 @@ int main(int argc, char **argv) {
            ac1024_handles_join,ac1024_handles_bytes,
            ac1024_handles_reason,ac1024_handles_inner_reason,
            ac1024_objects_join,ac1024_objects_bytes,
-           ac1024_objects_candidate_bytes,ac1024_objects_inner_reason);
+           ac1024_objects_candidate_bytes,ac1024_objects_inner_reason,
+           ac1024_handles_crc_pages,ac1024_handles_crc_data_pages,
+           ac1024_handles_crc_payload_bytes);
     free(file);
     return 0;
 }

@@ -96,6 +96,9 @@ class NativeStageContractTest(unittest.TestCase):
             "ac1024_objects_join_logical_bytes": 0,
             "ac1024_objects_candidate_logical_bytes": 0,
             "ac1024_objects_join_inner_failure_stage": 0,
+            "ac1024_handles_crc_frames_verified": False,
+            "ac1024_handles_crc_data_pages": 0,
+            "ac1024_handles_crc_page_data_bytes": 0,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
@@ -194,6 +197,38 @@ class OriginalAc1024ObjectsJoinGateTest(unittest.TestCase):
                     ValueError, "original_ac1024_objects_logical_join_not_verified"):
                 require_original_ac1024_objects_join("AC1024", changed)
         require_original_ac1024_objects_join("AC1018", {})
+
+
+class OriginalAc1024HandlesFrameGateTest(unittest.TestCase):
+    def test_corpus_requires_original_crc_terminal_and_exact_byte_coverage(self):
+        from real_dwg_native_stage_matrix import require_original_ac1024_handles_crc_frames
+        verified = {
+            "result": "accepted",
+            "ac1024_handles_crc_frames_verified": True,
+            "ac1024_handles_crc_data_pages": 2,
+            "ac1024_handles_crc_page_data_bytes": 5,
+            "ac1024_handles_join_logical_bytes": 17,
+            "ac1024_handles_join_verified": True,
+            "ac1024_objects_join_verified": True,
+            "geometry_verified": False,
+            "rendering_verified": False,
+        }
+        require_original_ac1024_handles_crc_frames("AC1024", verified)
+        for key, value in (
+            ("ac1024_handles_crc_frames_verified", False),
+            ("ac1024_handles_crc_data_pages", 0),
+            ("ac1024_handles_crc_data_pages", 3),
+            ("ac1024_handles_crc_page_data_bytes", 6),
+            ("ac1024_handles_join_logical_bytes", 18),
+            ("ac1024_objects_join_verified", False),
+            ("geometry_verified", True),
+        ):
+            malformed = dict(verified)
+            malformed[key] = value
+            with self.subTest(field=key), self.assertRaisesRegex(
+                    ValueError, "original_ac1024_handles_crc_frames_not_verified"):
+                require_original_ac1024_handles_crc_frames("AC1024", malformed)
+        require_original_ac1024_handles_crc_frames("AC1018", {})
 
 
 if __name__ == "__main__":

@@ -87,6 +87,22 @@ int musa_dwg_ac1024_directory_join_section_diagnose(
     const char *section_name,
     uint8_t *output,size_t capacity,size_t *out_bytes,
     uint32_t *reason);
+/* Read-only R2010 Handles page-frame candidate. This verifies only the
+ * original, independently reconstructed Handles byte stream's big-endian
+ * page lengths and CRC16/ARC (seed 0xc0c1), including a mandatory final
+ * empty CRC-backed terminal page. It NEVER parses numeric handles, object
+ * offsets, owners, layers, or geometry. A successful candidate is not an
+ * AC1024 handle index and must not admit a scene.
+ * All-or-nothing; output preserved on failure, no source writes. */
+typedef struct MusaDwgAc1024HandlesPageFrames {
+    uint32_t data_pages;
+    uint32_t total_pages;
+    uint32_t data_bytes;
+    uint8_t terminal_crc_verified;
+} MusaDwgAc1024HandlesPageFrames;
+int musa_dwg_ac1024_handles_page_frames(
+    const uint8_t *joined_handles,size_t bytes,
+    MusaDwgAc1024HandlesPageFrames *out);
 #ifdef __cplusplus
 }
 #endif

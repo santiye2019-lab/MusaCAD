@@ -2,6 +2,7 @@
 #include "musacad_dwg_ac1018_page_map.h"
 #include "musacad_dwg_ac1024_section_envelope.h"
 #include "musacad_dwg_ac1024_section_directory.h"
+#include "musacad_crc16.h"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -486,6 +487,49 @@ static void r2010_zero_page_size_source_lz_join_test(void){
     assert(produced==123u&&joined[0]==0xa5&&joined[sizeof joined-1u]==0xa5);
 }
 
+
+/* Original R2010 Handles pages: validate bytes/CRC only, never decode
+ * a handle ID, object offset, owner, or geometry in this test. */
+static void r2010_handles_crc_page_frame_test(void){
+    uint8_t pages[32]={0};
+    pages[0]=0u;pages[1]=4u;pages[2]='A';pages[3]='B';
+    pages[6]=0u;pages[7]=5u;
+    pages[8]='C';pages[9]='D';pages[10]='E';
+    pages[13]=0u;pages[14]=2u;
+    uint16_t crc=0u;
+    assert(musa_core_crc16_arc(0xc0c1u,pages,4u,&crc));
+    pages[4]=(uint8_t)(crc>>8u);pages[5]=(uint8_t)crc;
+    assert(musa_core_crc16_arc(0xc0c1u,pages+6u,5u,&crc));
+    pages[11]=(uint8_t)(crc>>8u);pages[12]=(uint8_t)crc;
+    assert(musa_core_crc16_arc(0xc0c1u,pages+13u,2u,&crc));
+    pages[15]=(uint8_t)(crc>>8u);pages[16]=(uint8_t)crc;
+    uint8_t original[32];memcpy(original,pages,sizeof pages);
+    MusaDwgAc1024HandlesPageFrames frames={0};
+    assert(musa_dwg_ac1024_handles_page_frames(
+        pages,17u,&frames));
+    assert(frames.data_pages==2u&&frames.total_pages==3u&&
+           frames.data_bytes==5u&&frames.terminal_crc_verified==1u);
+    assert(memcmp(original,pages,sizeof pages)==0);
+    const MusaDwgAc1024HandlesPageFrames before=frames;
+    /* A truncated terminal CRC, CRC-correct data but missing final
+     * terminal, corrupted data CRC, extra tail and an invalid page length
+     * must all refuse atomically. */
+    assert(!musa_dwg_ac1024_handles_page_frames(pages,16u,&frames));
+    assert(!musa_dwg_ac1024_handles_page_frames(pages,13u,&frames));
+    assert(!musa_dwg_ac1024_handles_page_frames(pages,18u,&frames));
+    pages[9u]^=1u;
+    assert(!musa_dwg_ac1024_handles_page_frames(pages,17u,&frames));
+    memcpy(pages,original,sizeof pages);
+    pages[1u]=1u;
+    assert(!musa_dwg_ac1024_handles_page_frames(pages,17u,&frames));
+    memcpy(pages,original,sizeof pages);
+    assert(!musa_dwg_ac1024_handles_page_frames(
+        pages,17u,(MusaDwgAc1024HandlesPageFrames*)(void*)(pages+4u)));
+    assert(!musa_dwg_ac1024_handles_page_frames(pages,0u,&frames));
+    assert(memcmp(original,pages,sizeof pages)==0);
+    assert(memcmp(&frames,&before,sizeof frames)==0);
+}
+
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -527,5 +571,6 @@ int main(void){
     r2010_data_page_crc_candidate_test();
     r2010_original_logical_section_join_test();
     r2010_zero_page_size_source_lz_join_test();
+    r2010_handles_crc_page_frame_test();
     return 0;
 }
