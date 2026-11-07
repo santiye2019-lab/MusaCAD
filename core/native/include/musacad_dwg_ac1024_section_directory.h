@@ -103,6 +103,31 @@ typedef struct MusaDwgAc1024HandlesPageFrames {
 int musa_dwg_ac1024_handles_page_frames(
     const uint8_t *joined_handles,size_t bytes,
     MusaDwgAc1024HandlesPageFrames *out);
+/* Experimental source-ONLY R2010 offset/self-H crosscheck. The input
+ * buffers MUST come from separately source-authenticated AC1024 Handles
+ * and AcDbObjects joins. This API does NOT authenticate their provenance
+ * itself. Evaluate three bounded legacy delta-format HYPOTHESES (R2004
+ * page-local, continuous offsets, and page-absolute handles); never import
+ * the borrowed numeric IDs as canonical until every source record CRC16,
+ * OT, absolute code-0 self-H and the full numeric pairing agree.
+ * A reported profile is diagnostic, NOT a qualified R2010 index, drawing
+ * open or owner/layer/geometry proof. Only counters/profile are returned;
+ * raw source IDs and object offsets are NOT exposed.
+ * Return 0 without modifying out for invalid/corrupt framing or aliasing;
+ * return 1 with zero evidence if no candidate grammar succeeds. */
+typedef struct MusaDwgAc1024HandleObjectCrosscheck {
+    uint32_t candidate_profiles;
+    uint32_t candidate_pairs;
+    uint32_t crc_self_prefix_pairs;
+    uint32_t candidate_numeric_matches;
+    uint8_t candidate_profile; /* 0=none,1=page-local,2=continuous,3=absolute */
+    uint8_t complete_self_index_verified;
+    uint8_t complete_numeric_agreement;
+} MusaDwgAc1024HandleObjectCrosscheck;
+int musa_dwg_ac1024_handle_object_crosscheck(
+    const uint8_t *handles,size_t handle_bytes,
+    const uint8_t *objects,size_t object_bytes,
+    MusaDwgAc1024HandleObjectCrosscheck *out);
 #ifdef __cplusplus
 }
 #endif
