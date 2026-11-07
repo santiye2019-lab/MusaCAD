@@ -2,6 +2,8 @@
 #include "musacad_dwg_ac1024_section_directory.h"
 #include "musacad_dwg_ac1018_lz.h"
 #include "musacad_crc16.h"
+#include "musacad_dwg_ac1018_handles.h"
+#include "musacad_dwg_ac1024_self_index.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -449,4 +451,112 @@ int musa_dwg_ac1024_handles_page_frames(
     }
     /* Missing terminal CRC is never accepted, even if all data pages pass. */
     return 0;
+}
+
+
+/* A borrowed delta profile is a bounded candidate grammar, not a semantic
+ * R2010 handle map. Only source-record CRC/self-H can advance evidence. */
+static int candidate_handle_mode(unsigned mode,
+    const uint8_t *handles,size_t handle_bytes,size_t object_bytes,
+    MusaDwgAc1018HandleEntry *entries,size_t capacity,size_t *count){
+    if(mode==1u)
+        return musa_dwg_ac1018_handles_index(
+            handles,handle_bytes,object_bytes,entries,capacity,count);
+    if(mode==2u)
+        return musa_dwg_ac1018_handles_index_continuous_offsets(
+            handles,handle_bytes,object_bytes,entries,capacity,count);
+    if(mode==3u)
+        return musa_dwg_ac1018_handles_index_page_absolute_handles(
+            handles,handle_bytes,object_bytes,entries,capacity,count);
+    return 0;
+}
+
+int musa_dwg_ac1024_handle_object_crosscheck(
+    const uint8_t *handles,size_t handle_bytes,
+    const uint8_t *objects,size_t object_bytes,
+    MusaDwgAc1024HandleObjectCrosscheck *out){
+    if(!handles||!objects||!out||handle_bytes>16u*1024u*1024u||
+       !object_bytes||object_bytes>64u*1024u*1024u||
+       overlap(handles,handle_bytes,objects,object_bytes)||
+       overlap(handles,handle_bytes,out,sizeof(*out))||
+       overlap(objects,object_bytes,out,sizeof(*out)))
+        return 0;
+    /* Do not parse a single original offset until EVERY Handles page has
+     * passed CRC16/ARC and its exact terminal sentinel was verified. */
+    MusaDwgAc1024HandlesPageFrames frames={0};
+    if(!musa_dwg_ac1024_handles_page_frames(
+           handles,handle_bytes,&frames)||
+       !frames.terminal_crc_verified)
+        return 0;
+    MusaDwgAc1024HandleObjectCrosscheck next={0};
+    for(unsigned mode=1u;mode<=3u;mode++){
+        size_t count=0u;
+        if(!candidate_handle_mode(mode,handles,handle_bytes,object_bytes,
+                                  NULL,0u,&count)||
+           !count||count>400000u||
+           count>SIZE_MAX/sizeof(MusaDwgAc1018HandleEntry)||
+           count>SIZE_MAX/sizeof(uint64_t)||
+           count>SIZE_MAX/sizeof(MusaDwgAc1024SelfIdentity))
+            continue;
+        MusaDwgAc1018HandleEntry *entries=
+            (MusaDwgAc1018HandleEntry*)malloc(count*sizeof(*entries));
+        uint64_t *offsets=(uint64_t*)malloc(count*sizeof(*offsets));
+        if(!entries||!offsets){
+            free(entries);free(offsets);
+            return 0;
+        }
+        size_t reproduced=0u;
+        if(!candidate_handle_mode(mode,handles,handle_bytes,object_bytes,
+                                  entries,count,&reproduced)||
+           reproduced!=count){
+            free(entries);free(offsets);
+            continue;
+        }
+        ++next.candidate_profiles;
+        uint32_t prefix=0u,matching=0u;
+        uint64_t last_handle=0u;
+        for(size_t k=0u;k<count;k++){
+            offsets[k]=entries[k].object_offset;
+            MusaDwgAc1024SelfPrefix self={0};
+            if(!musa_dwg_ac1024_record_self_prefix(
+                   objects,object_bytes,offsets[k],&self)||
+               self.embedded_absolute_handle<=last_handle)
+                break;
+            last_handle=self.embedded_absolute_handle;
+            ++prefix;
+            if(entries[k].handle==self.embedded_absolute_handle)
+                ++matching;
+        }
+        int entire=0;
+        if(prefix==count){
+            MusaDwgAc1024SelfIdentity *recovered=
+                (MusaDwgAc1024SelfIdentity*)malloc(
+                    count*sizeof(*recovered));
+            if(!recovered){
+                free(entries);free(offsets);
+                return 0;
+            }
+            entire=musa_dwg_ac1024_recover_self_index(
+                objects,object_bytes,offsets,count,recovered,count);
+            free(recovered);
+        }
+        const int replace=(!next.candidate_profile ||
+            (entire&&!next.complete_self_index_verified)||
+            (entire==next.complete_self_index_verified&&
+                (prefix>next.crc_self_prefix_pairs||
+                 (prefix==next.crc_self_prefix_pairs&&
+                  matching>next.candidate_numeric_matches))));
+        if(replace){
+            next.candidate_profile=(uint8_t)mode;
+            next.candidate_pairs=(uint32_t)count;
+            next.crc_self_prefix_pairs=prefix;
+            next.candidate_numeric_matches=matching;
+            next.complete_self_index_verified=(uint8_t)(entire!=0);
+            next.complete_numeric_agreement=(uint8_t)(
+                entire&&matching==(uint32_t)count);
+        }
+        free(entries);free(offsets);
+    }
+    *out=next;
+    return 1;
 }

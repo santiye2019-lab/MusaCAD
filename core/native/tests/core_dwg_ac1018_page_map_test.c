@@ -530,6 +530,100 @@ static void r2010_handles_crc_page_frame_test(void){
     assert(memcmp(&frames,&before,sizeof frames)==0);
 }
 
+
+/* R2010 synthetic CRC16/OT/absolute-self-H record, not a geometry fixture. */
+static void set_synthetic_record_bits(uint8_t *body,size_t first,
+                                      unsigned width,uint32_t value){
+    for(unsigned i=0u;i<width;i++){
+        const size_t bit=first+i;
+        const uint8_t mask=(uint8_t)(1u<<(7u-bit%8u));
+        if((value>>(width-1u-i))&1u)body[bit/8u]|=mask;
+        else body[bit/8u]&=(uint8_t)~mask;
+    }
+}
+static void synth_ac1024_record(uint8_t *out,uint8_t handle){
+    uint16_t crc=0u;
+    memset(out,0,13u);
+    out[0]=8u;out[2]=16u;
+    set_synthetic_record_bits(out+3u,0u,2u,0u);
+    set_synthetic_record_bits(out+3u,2u,8u,19u);
+    set_synthetic_record_bits(out+3u,10u,4u,0u);
+    set_synthetic_record_bits(out+3u,14u,4u,1u);
+    set_synthetic_record_bits(out+3u,18u,8u,handle);
+    assert(musa_core_crc16_arc(0xc0c1u,out,11u,&crc));
+    out[11]=(uint8_t)crc;out[12]=(uint8_t)(crc>>8u);
+}
+static void synth_ac1024_handles_crc(uint8_t *h,uint32_t byte_count){
+    uint16_t crc=0u;
+    assert(byte_count==6u);
+    assert(musa_core_crc16_arc(0xc0c1u,h,byte_count,&crc));
+    h[6u]=(uint8_t)(crc>>8u);h[7u]=(uint8_t)crc;
+    assert(musa_core_crc16_arc(0xc0c1u,h+8u,2u,&crc));
+    h[10u]=(uint8_t)(crc>>8u);h[11u]=(uint8_t)crc;
+}
+static void r2010_handles_objects_crc_self_candidate_test(void){
+    uint8_t handles[16]={0},objects[26]={0};
+    /* One CRC-backed Handles data page: H+44/offset0, H+1/offset13,
+     * followed by mandatory empty CRC-backed terminal page. Numeric H
+     * from this borrowed grammar remains an EXPERIMENTAL source profile. */
+    handles[1]=6u;
+    handles[2]=44u;handles[3]=0u;
+    handles[4]=1u;handles[5]=13u;
+    handles[8]=0u;handles[9]=2u;
+    synth_ac1024_handles_crc(handles,6u);
+    synth_ac1024_record(objects,44u);
+    synth_ac1024_record(objects+13u,45u);
+    uint8_t immutable_h[16];memcpy(immutable_h,handles,sizeof handles);
+    uint8_t immutable_o[26];memcpy(immutable_o,objects,sizeof objects);
+    MusaDwgAc1024HandleObjectCrosscheck e={0};
+    assert(musa_dwg_ac1024_handle_object_crosscheck(
+        handles,12u,objects,sizeof objects,&e));
+    assert(e.candidate_profiles>0u&&e.candidate_profile>=1u&&
+           e.candidate_profile<=3u&&e.candidate_pairs==2u&&
+           e.crc_self_prefix_pairs==2u&&e.candidate_numeric_matches==2u&&
+           e.complete_self_index_verified&&e.complete_numeric_agreement);
+    assert(memcmp(handles,immutable_h,sizeof handles)==0&&
+           memcmp(objects,immutable_o,sizeof objects)==0);
+    /* Even a source page with valid framing must NEVER bypass an
+     * original object's CRC or its embedded absolute code-0 H. */
+    const MusaDwgAc1024HandleObjectCrosscheck success=e;
+    objects[25u]^=1u; /* corrupt second object CRC16 */
+    assert(musa_dwg_ac1024_handle_object_crosscheck(
+        handles,12u,objects,sizeof objects,&e));
+    assert(!e.complete_self_index_verified&&
+           !e.complete_numeric_agreement&&
+           e.crc_self_prefix_pairs<e.candidate_pairs);
+    memcpy(objects,immutable_o,sizeof objects);
+    /* Numeric H candidate must not be promoted merely because record
+     * offsets and independent self-H agree. */
+    handles[2u]=43u;
+    synth_ac1024_handles_crc(handles,6u);
+    assert(musa_dwg_ac1024_handle_object_crosscheck(
+        handles,12u,objects,sizeof objects,&e));
+    assert(e.complete_self_index_verified&&
+           !e.complete_numeric_agreement&&
+           e.candidate_numeric_matches<e.candidate_pairs);
+    memcpy(handles,immutable_h,sizeof handles);
+    /* Corrupted Handles CRC, absent terminal, alias, invalid capacity
+     * all refuse without altering caller evidence or the source. */
+    e=success;
+    handles[4u]^=0x40u;
+    assert(!musa_dwg_ac1024_handle_object_crosscheck(
+        handles,12u,objects,sizeof objects,&e));
+    assert(memcmp(&e,&success,sizeof e)==0);
+    memcpy(handles,immutable_h,sizeof handles);
+    assert(!musa_dwg_ac1024_handle_object_crosscheck(
+        handles,8u,objects,sizeof objects,&e));
+    assert(!musa_dwg_ac1024_handle_object_crosscheck(
+        handles,12u,objects,sizeof objects,
+        (MusaDwgAc1024HandleObjectCrosscheck*)(void*)(objects+1u)));
+    assert(!musa_dwg_ac1024_handle_object_crosscheck(
+        handles,12u,objects,0u,&e));
+    assert(memcmp(&e,&success,sizeof e)==0&&
+           memcmp(handles,immutable_h,sizeof handles)==0&&
+           memcmp(objects,immutable_o,sizeof objects)==0);
+}
+
 int main(void){
     uint8_t file[380];fixture(file);
     MusaDwgAc1018FileMapHeader h={0};
@@ -572,5 +666,6 @@ int main(void){
     r2010_original_logical_section_join_test();
     r2010_zero_page_size_source_lz_join_test();
     r2010_handles_crc_page_frame_test();
+    r2010_handles_objects_crc_self_candidate_test();
     return 0;
 }

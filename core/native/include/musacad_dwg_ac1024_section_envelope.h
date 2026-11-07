@@ -60,6 +60,16 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint8_t source_handles_crc_frames_verified;
     uint32_t source_handles_crc_data_pages;
     uint32_t source_handles_crc_page_data_bytes;
+    /* Source-only CRC16/self-H crosscheck of experimental handle-offset
+     * grammar candidates against original AcDbObjects object frames.
+     * No raw object IDs, offsets, owner/layer or geometry exposed. */
+    uint32_t source_handle_candidate_profiles;
+    uint32_t source_handle_candidate_pairs;
+    uint32_t source_handle_crc_self_prefix_pairs;
+    uint32_t source_handle_numeric_matches;
+    uint8_t source_handle_candidate_profile;
+    uint8_t source_handle_complete_self_index_verified;
+    uint8_t source_handle_complete_numeric_agreement;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately
