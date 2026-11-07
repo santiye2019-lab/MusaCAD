@@ -47,6 +47,14 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint32_t source_handles_lz_verified_pages;
     /* Exact bounded reason from the private first-party join helper. */
     uint32_t source_handles_join_inner_failure_stage;
+    /* Original-source verified logical AcDb:AcDbObjects join only.
+     * Does not certify object frame parsing, handles, layers or geometry.
+     * Diagnostic budget 64 MiB, no untrusted source bytes exposed. */
+    uint8_t source_objects_logical_join_verified;
+    uint32_t source_objects_logical_bytes;
+    uint32_t source_objects_candidate_logical_bytes;
+    uint32_t source_objects_candidate_pages;
+    uint32_t source_objects_join_inner_failure_stage;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately

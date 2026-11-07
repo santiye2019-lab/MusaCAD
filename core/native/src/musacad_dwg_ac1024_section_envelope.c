@@ -166,6 +166,42 @@ int musa_dwg_ac1024_section_envelope_probe(const uint8_t *file,size_t n,
                                         free(joined);
                                     }
                                 }
+                                /* A second, independent original R2010
+                                 * logical stream. It must come from the
+                                 * same authenticated physical directory,
+                                 * but no object/geometry semantics are
+                                 * inferred from its reconstructed bytes.
+                                 * Scratch never leaves this read-only probe. */
+                                if(strcmp((const char*)(rec+32u),
+                                          "AcDb:AcDbObjects")==0){
+                                    e.source_objects_candidate_pages=
+                                        section_page_count;
+                                    if(logical<=UINT32_MAX)
+                                        e.source_objects_candidate_logical_bytes=
+                                            (uint32_t)logical;
+                                    if(logical>0u&&logical<=64u*1024u*1024u){
+                                        uint8_t *object_bytes=
+                                            (uint8_t*)malloc((size_t)logical);
+                                        if(object_bytes){
+                                            size_t written=0u;
+                                            uint32_t stage=0u;
+                                            const int joined_ok=
+                                                musa_dwg_ac1024_directory_join_section_diagnose(
+                                                    file,n,decoded,expanded,
+                                                    pages,count,"AcDb:AcDbObjects",
+                                                    object_bytes,(size_t)logical,
+                                                    &written,&stage);
+                                            e.source_objects_join_inner_failure_stage=
+                                                stage;
+                                            if(joined_ok&&written==logical){
+                                                e.source_objects_logical_join_verified=1u;
+                                                e.source_objects_logical_bytes=
+                                                    (uint32_t)written;
+                                            }
+                                            free(object_bytes);
+                                        }
+                                    }
+                                }
                                 pos+=96u+(size_t)section_page_count*16u;
                             }
                         }

@@ -394,6 +394,25 @@ static void r2010_original_logical_section_join_test(void){
         source,sizeof source,directory,sizeof directory,loc,1u,
         "AcDb:AcDbObjects",out,sizeof out,&bytes));
     assert(memcmp(out,"ZZZZ",4u)==0&&bytes==999u);
+    /* The same source-authenticated physical page may be used for a
+     * differently named section only when the exact directory name
+     * matches. No record parsing or geometry is inferred here. */
+    memset(directory+52u,0u,64u);
+    memcpy(directory+52u,"AcDb:AcDbObjects",16u);
+    assert(musa_dwg_ac1024_directory_join_section(
+        source,sizeof source,directory,sizeof directory,loc,1u,
+        "AcDb:AcDbObjects",out,sizeof out,&bytes));
+    assert(bytes==4u&&memcmp(out,"ABCD",4u)==0);
+    assert(memcmp(source,before,sizeof source)==0);
+    memcpy(out,"ZZZZ",4u);bytes=999u;
+    source[97u]^=1u; /* source checksum refusal for Objects */
+    assert(!musa_dwg_ac1024_directory_join_section(
+        source,sizeof source,directory,sizeof directory,loc,1u,
+        "AcDb:AcDbObjects",out,sizeof out,&bytes));
+    assert(bytes==999u&&memcmp(out,"ZZZZ",4u)==0);
+    memcpy(source,before,sizeof source);
+    memset(directory+52u,0u,64u);
+    memcpy(directory+52u,"AcDb:Handles",13u);
     assert(!musa_dwg_ac1024_directory_join_section(
         source,sizeof source,directory,sizeof directory,loc,1u,
         "AcDb:Handles",out,3u,&bytes));

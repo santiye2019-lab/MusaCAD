@@ -92,6 +92,10 @@ class NativeStageContractTest(unittest.TestCase):
             "ac1024_handles_join_logical_bytes": 0,
             "ac1024_handles_join_probe_reason": 0,
             "ac1024_handles_join_inner_failure_stage": 0,
+            "ac1024_objects_join_verified": False,
+            "ac1024_objects_join_logical_bytes": 0,
+            "ac1024_objects_candidate_logical_bytes": 0,
+            "ac1024_objects_join_inner_failure_stage": 0,
         }
         fake = SimpleNamespace(returncode=0, stdout=json.dumps(record))
         with patch("real_dwg_native_stage_matrix.subprocess.run",
@@ -159,6 +163,37 @@ class OriginalAc1024LogicalJoinGateTest(unittest.TestCase):
         # AC1018, AC1032 and unsupported signatures are not assigned the
         # AC1024-specific Handles acceptance by a cross-version fallback.
         require_original_ac1024_handles_join("AC1032", {})
+
+
+class OriginalAc1024ObjectsJoinGateTest(unittest.TestCase):
+    def test_corpus_objects_join_is_not_silent_optional_evidence(self):
+        from real_dwg_native_stage_matrix import require_original_ac1024_objects_join
+        verified = {
+            "result": "accepted",
+            "native_stage": "ac1024_physical_page_locations",
+            "ac1024_handles_join_verified": True,
+            "ac1024_objects_join_verified": True,
+            "ac1024_objects_join_logical_bytes": 12345,
+            "ac1024_objects_candidate_logical_bytes": 12345,
+            "ac1024_objects_join_inner_failure_stage": 0,
+            "geometry_verified": False,
+            "rendering_verified": False,
+        }
+        require_original_ac1024_objects_join("AC1024", verified)
+        for key, value in (
+            ("ac1024_objects_join_verified", False),
+            ("ac1024_objects_join_logical_bytes", 0),
+            ("ac1024_objects_candidate_logical_bytes", 12346),
+            ("ac1024_objects_join_inner_failure_stage", 14),
+            ("ac1024_handles_join_verified", False),
+            ("geometry_verified", True),
+        ):
+            changed = dict(verified)
+            changed[key] = value
+            with self.subTest(field=key), self.assertRaisesRegex(
+                    ValueError, "original_ac1024_objects_logical_join_not_verified"):
+                require_original_ac1024_objects_join("AC1024", changed)
+        require_original_ac1024_objects_join("AC1018", {})
 
 
 if __name__ == "__main__":
