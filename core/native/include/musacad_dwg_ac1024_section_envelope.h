@@ -55,6 +55,11 @@ typedef struct MusaDwgAc1024SectionEnvelopeEvidence {
     uint32_t source_objects_candidate_logical_bytes;
     uint32_t source_objects_candidate_pages;
     uint32_t source_objects_join_inner_failure_stage;
+    /* CRC16/ARC page-frame-only evidence for joined original Handles.
+     * No numeric source handles or record offsets are exported. */
+    uint8_t source_handles_crc_frames_verified;
+    uint32_t source_handles_crc_data_pages;
+    uint32_t source_handles_crc_page_data_bytes;
 } MusaDwgAc1024SectionEnvelopeEvidence;
 /* Source immutable, caller output atomic on all failures. Return 1 only
  * after exact protected header+page CRC proof; LZ failure is separately
