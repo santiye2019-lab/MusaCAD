@@ -127,6 +127,27 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             (result["ac1024_handle_complete_self_index_verified"] is not True or
              result["ac1024_handle_candidate_numeric_matches"] !=
              result["ac1024_handle_candidate_pairs"]))
+        or any(type(result.get(k)) is not int or result[k] < 0
+               for k in ("ac1024_relationship_sampled_records",
+                         "ac1024_relationship_fixed_entity_candidates",
+                         "ac1024_relationship_owner_layer_witnesses",
+                         "ac1024_relationship_implicit_line_layer_witnesses"))
+        or result["ac1024_relationship_sampled_records"] > 512
+        or not (
+            result["ac1024_relationship_owner_layer_witnesses"] +
+            result["ac1024_relationship_implicit_line_layer_witnesses"] <=
+            result["ac1024_relationship_fixed_entity_candidates"] <=
+            result["ac1024_relationship_sampled_records"])
+        or (result["ac1024_relationship_sampled_records"] != 0 and (
+            result["signature"] != "AC1024" or
+            result.get("ac1024_handle_complete_self_index_verified") is not True or
+            result.get("ac1024_handle_complete_numeric_agreement") is not True or
+            result.get("ac1024_relationship_sampled_records") >
+            result.get("ac1024_handle_candidate_pairs")))
+        or (result["ac1024_relationship_sampled_records"] == 0 and (
+            result["ac1024_relationship_fixed_entity_candidates"] != 0 or
+            result["ac1024_relationship_owner_layer_witnesses"] != 0 or
+            result["ac1024_relationship_implicit_line_layer_witnesses"] != 0))
         or type(result.get("ac1024_handles_crc_frames_verified")) is not bool
         or type(result.get("ac1024_handles_crc_data_pages")) is not int
         or type(result.get("ac1024_handles_crc_page_data_bytes")) is not int
