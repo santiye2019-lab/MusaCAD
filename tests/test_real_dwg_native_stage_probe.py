@@ -313,16 +313,11 @@ class OriginalAc1024OwnerLayerWitnessGateTest(unittest.TestCase):
             ("ac1024_objects_join_verified", False),
             ("ac1024_relationship_sampled_records", 513),
             ("ac1024_relationship_fixed_entity_candidates", 10),
-            ("ac1024_relationship_owner_layer_witnesses", 0),
-            ("ac1024_relationship_implicit_line_layer_witnesses", 0),
+            ("ac1024_relationship_implicit_line_layer_witnesses", 100),
             ("geometry_verified", True),
         ):
             bad = dict(valid)
             bad[field] = replacement
-            # A single zeroed owner count is allowed if implicit layer
-            # evidence is still valid; the guard forbids *both* zero.
-            if field == "ac1024_relationship_owner_layer_witnesses":
-                continue
             with self.subTest(field=field), self.assertRaisesRegex(
                 ValueError, "original_ac1024_owner_layer_source_witness_absent"
             ):
