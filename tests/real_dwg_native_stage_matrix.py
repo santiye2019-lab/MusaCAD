@@ -107,7 +107,10 @@ def run_probe(executable: Path, source: Path, timeout: float) -> dict:
             or result.get("ac1024_handles_join_verified") is not True
             or result.get("ac1024_handles_crc_page_data_bytes") == 0
             or result.get("ac1024_handles_crc_page_data_bytes") >=
-               result.get("ac1024_handles_join_logical_bytes")))
+               result.get("ac1024_handles_join_logical_bytes")
+            or result.get("ac1024_handles_crc_page_data_bytes")
+               + 4 * (result.get("ac1024_handles_crc_data_pages") + 1)
+               != result.get("ac1024_handles_join_logical_bytes")))
         or type(result.get("ac1024_objects_join_verified")) is not bool
         or type(result.get("ac1024_objects_join_logical_bytes")) is not int
         or type(result.get("ac1024_objects_candidate_logical_bytes")) is not int
@@ -210,6 +213,32 @@ def require_original_ac1024_objects_join(version: str, result: dict) -> None:
         raise ValueError("original_ac1024_objects_logical_join_not_verified")
 
 
+def require_original_ac1024_handles_crc_frames(version: str, result: dict) -> None:
+    """Immutable R2010 LFS Handles: source CRC-backed framing, no index.
+
+    Ensures original binary files continue passing every CRC-backed page
+    including the mandatory terminal, not merely logical LZ join.
+    """
+    if version != "AC1024":
+        return
+    if (
+        result.get("result") != "accepted"
+        or result.get("ac1024_handles_crc_frames_verified") is not True
+        or type(result.get("ac1024_handles_crc_data_pages")) is not int
+        or type(result.get("ac1024_handles_crc_page_data_bytes")) is not int
+        or result["ac1024_handles_crc_data_pages"] <= 0
+        or result["ac1024_handles_crc_page_data_bytes"] <= 0
+        or result.get("ac1024_handles_crc_page_data_bytes")
+           + 4 * (result.get("ac1024_handles_crc_data_pages") + 1)
+           != result.get("ac1024_handles_join_logical_bytes")
+        or result.get("ac1024_handles_join_verified") is not True
+        or result.get("ac1024_objects_join_verified") is not True
+        or result.get("geometry_verified") is not False
+        or result.get("rendering_verified") is not False
+    ):
+        raise ValueError("original_ac1024_handles_crc_frames_not_verified")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, default=Path("."))
@@ -259,6 +288,7 @@ def main() -> int:
                 raise ValueError("unsupported_version_falsely_accepted")
             require_original_ac1024_handles_join(version, observed)
             require_original_ac1024_objects_join(version, observed)
+            require_original_ac1024_handles_crc_frames(version, observed)
             record.update(observed)
             record["committed_sha256"] = expected_sha
             record["size_bytes"] = actual_size
