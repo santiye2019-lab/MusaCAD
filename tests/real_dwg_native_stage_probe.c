@@ -73,7 +73,10 @@ static void report(const char *signature, const char *result,
                    int objects_join,size_t objects_bytes,
                    size_t objects_candidate_bytes,int objects_inner_reason,
                    int handles_crc_pages,size_t handles_crc_data_pages,
-                   size_t handles_crc_payload_bytes) {
+                   size_t handles_crc_payload_bytes,
+                   size_t candidate_profiles,size_t candidate_pairs,
+                   size_t self_crc_prefix,size_t numeric_matches,
+                   int profile,int full_self,int full_numeric) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
@@ -99,7 +102,14 @@ static void report(const char *signature, const char *result,
            "\"ac1024_objects_join_inner_failure_stage\":%d,"
            "\"ac1024_handles_crc_frames_verified\":%s,"
            "\"ac1024_handles_crc_data_pages\":%zu,"
-           "\"ac1024_handles_crc_page_data_bytes\":%zu}\n",
+           "\"ac1024_handles_crc_page_data_bytes\":%zu,"
+           "\"ac1024_handle_candidate_profiles\":%zu,"
+           "\"ac1024_handle_candidate_pairs\":%zu,"
+           "\"ac1024_handle_crc_self_prefix_pairs\":%zu,"
+           "\"ac1024_handle_candidate_numeric_matches\":%zu,"
+           "\"ac1024_handle_candidate_profile\":%d,"
+           "\"ac1024_handle_complete_self_index_verified\":%s,"
+           "\"ac1024_handle_complete_numeric_agreement\":%s}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
            r2010_strict_lz ? "true" : "false",
@@ -112,7 +122,9 @@ static void report(const char *signature, const char *result,
            objects_join?"true":"false",objects_bytes,
            objects_candidate_bytes,objects_inner_reason,
            handles_crc_pages?"true":"false",handles_crc_data_pages,
-           handles_crc_payload_bytes);
+           handles_crc_payload_bytes,
+           candidate_profiles,candidate_pairs,self_crc_prefix,numeric_matches,
+           profile,full_self?"true":"false",full_numeric?"true":"false");
 }
 
 int main(int argc, char **argv) {
@@ -150,6 +162,13 @@ int main(int argc, char **argv) {
     int ac1024_handles_crc_pages=0;
     size_t ac1024_handles_crc_data_pages=0u;
     size_t ac1024_handles_crc_payload_bytes=0u;
+    size_t ac1024_handle_candidate_profiles=0u;
+    size_t ac1024_handle_candidate_pairs=0u;
+    size_t ac1024_handle_crc_self_prefix_pairs=0u;
+    size_t ac1024_handle_candidate_numeric_matches=0u;
+    int ac1024_handle_candidate_profile=0;
+    int ac1024_handle_complete_self_index_verified=0;
+    int ac1024_handle_complete_numeric_agreement=0;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -256,6 +275,20 @@ int main(int argc, char **argv) {
                     envelope.source_handles_crc_data_pages;
                 ac1024_handles_crc_payload_bytes=
                     envelope.source_handles_crc_page_data_bytes;
+                ac1024_handle_candidate_profiles=
+                    envelope.source_handle_candidate_profiles;
+                ac1024_handle_candidate_pairs=
+                    envelope.source_handle_candidate_pairs;
+                ac1024_handle_crc_self_prefix_pairs=
+                    envelope.source_handle_crc_self_prefix_pairs;
+                ac1024_handle_candidate_numeric_matches=
+                    envelope.source_handle_numeric_matches;
+                ac1024_handle_candidate_profile=
+                    (int)envelope.source_handle_candidate_profile;
+                ac1024_handle_complete_self_index_verified=
+                    envelope.source_handle_complete_self_index_verified!=0u;
+                ac1024_handle_complete_numeric_agreement=
+                    envelope.source_handle_complete_numeric_agreement!=0u;
                 ac1024_objects_join=
                     envelope.source_objects_logical_join_verified!=0u;
                 ac1024_objects_bytes=
@@ -345,7 +378,13 @@ int main(int argc, char **argv) {
            ac1024_objects_join,ac1024_objects_bytes,
            ac1024_objects_candidate_bytes,ac1024_objects_inner_reason,
            ac1024_handles_crc_pages,ac1024_handles_crc_data_pages,
-           ac1024_handles_crc_payload_bytes);
+           ac1024_handles_crc_payload_bytes,
+           ac1024_handle_candidate_profiles,ac1024_handle_candidate_pairs,
+           ac1024_handle_crc_self_prefix_pairs,
+           ac1024_handle_candidate_numeric_matches,
+           ac1024_handle_candidate_profile,
+           ac1024_handle_complete_self_index_verified,
+           ac1024_handle_complete_numeric_agreement);
     free(file);
     return 0;
 }
