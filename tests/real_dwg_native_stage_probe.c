@@ -76,7 +76,9 @@ static void report(const char *signature, const char *result,
                    size_t handles_crc_payload_bytes,
                    size_t candidate_profiles,size_t candidate_pairs,
                    size_t self_crc_prefix,size_t numeric_matches,
-                   int profile,int full_self,int full_numeric) {
+                   int profile,int full_self,int full_numeric,
+                   size_t sampled,size_t sampled_fixed,
+                   size_t owner_layer_verified,size_t implicit_layer_verified) {
     printf("{\"signature\":\"%s\",\"result\":\"%s\","
            "\"native_stage\":\"%s\",\"evidence_count\":%zu,"
            "\"geometry_verified\":false,\"rendering_verified\":false,"
@@ -109,7 +111,11 @@ static void report(const char *signature, const char *result,
            "\"ac1024_handle_candidate_numeric_matches\":%zu,"
            "\"ac1024_handle_candidate_profile\":%d,"
            "\"ac1024_handle_complete_self_index_verified\":%s,"
-           "\"ac1024_handle_complete_numeric_agreement\":%s}\n",
+           "\"ac1024_handle_complete_numeric_agreement\":%s,"
+           "\"ac1024_relationship_sampled_records\":%zu,"
+           "\"ac1024_relationship_fixed_entity_candidates\":%zu,"
+           "\"ac1024_relationship_owner_layer_witnesses\":%zu,"
+           "\"ac1024_relationship_implicit_line_layer_witnesses\":%zu}\n",
            signature, result, stage, evidence_count,
            r2010_envelope_crc ? "true" : "false",
            r2010_strict_lz ? "true" : "false",
@@ -124,7 +130,8 @@ static void report(const char *signature, const char *result,
            handles_crc_pages?"true":"false",handles_crc_data_pages,
            handles_crc_payload_bytes,
            candidate_profiles,candidate_pairs,self_crc_prefix,numeric_matches,
-           profile,full_self?"true":"false",full_numeric?"true":"false");
+           profile,full_self?"true":"false",full_numeric?"true":"false",
+           sampled,sampled_fixed,owner_layer_verified,implicit_layer_verified);
 }
 
 int main(int argc, char **argv) {
@@ -169,6 +176,10 @@ int main(int argc, char **argv) {
     int ac1024_handle_candidate_profile=0;
     int ac1024_handle_complete_self_index_verified=0;
     int ac1024_handle_complete_numeric_agreement=0;
+    size_t ac1024_relationship_sampled_records=0u;
+    size_t ac1024_relationship_fixed_entity_candidates=0u;
+    size_t ac1024_relationship_owner_layer_witnesses=0u;
+    size_t ac1024_relationship_implicit_line_layer_witnesses=0u;
 
     if (format == MUSA_DWG_2000) {
         MusaDwgAc1015Locators loc = {0};
@@ -289,6 +300,14 @@ int main(int argc, char **argv) {
                     envelope.source_handle_complete_self_index_verified!=0u;
                 ac1024_handle_complete_numeric_agreement=
                     envelope.source_handle_complete_numeric_agreement!=0u;
+                ac1024_relationship_sampled_records=
+                    envelope.source_relationship_sampled_records;
+                ac1024_relationship_fixed_entity_candidates=
+                    envelope.source_relationship_fixed_entity_candidates;
+                ac1024_relationship_owner_layer_witnesses=
+                    envelope.source_relationship_owner_layer_witnesses;
+                ac1024_relationship_implicit_line_layer_witnesses=
+                    envelope.source_relationship_implicit_line_layer_witnesses;
                 ac1024_objects_join=
                     envelope.source_objects_logical_join_verified!=0u;
                 ac1024_objects_bytes=
@@ -384,7 +403,11 @@ int main(int argc, char **argv) {
            ac1024_handle_candidate_numeric_matches,
            ac1024_handle_candidate_profile,
            ac1024_handle_complete_self_index_verified,
-           ac1024_handle_complete_numeric_agreement);
+           ac1024_handle_complete_numeric_agreement,
+           ac1024_relationship_sampled_records,
+           ac1024_relationship_fixed_entity_candidates,
+           ac1024_relationship_owner_layer_witnesses,
+           ac1024_relationship_implicit_line_layer_witnesses);
     free(file);
     return 0;
 }
