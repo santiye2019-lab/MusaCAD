@@ -538,16 +538,6 @@ int musa_dwg_ac1024_handle_object_crosscheck(
             }
             entire=musa_dwg_ac1024_recover_self_index(
                 objects,object_bytes,offsets,count,recovered,count);
-            if(entire){
-                for(size_t k=0u;k<count;k++)
-                    if(recovered[k].embedded_absolute_handle!=
-                       entries[k].handle){
-                        /* Independently verified self IDs NEVER acquire
-                         * borrowed R2004 numeric map authority. */
-                        entire=1;
-                        break;
-                    }
-            }
             free(recovered);
         }
         const int replace=(!next.candidate_profile ||
